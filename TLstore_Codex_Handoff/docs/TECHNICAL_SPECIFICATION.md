@@ -3,6 +3,8 @@
 Version: 1.0
 Planning date: 2026-10-29
 Status: Proposed specification; business decisions remain subject to confirmation.
+Flutter/Dart: - android,web and ios
+Application ID: pynith.tlstore.review
 
 ## 1. Goals
 Build an app-trust assessment platform where users perform structured, evidence-based app assessments and eligible advertiser-funded tasks. Administrators manage app listings, questionnaires, campaigns, memberships, task validation, rewards, financial operations, referrals, rankings, regional eligibility, support and reporting.
@@ -149,6 +151,8 @@ Suggested roles: Super Admin, Operations Manager, Finance Officer, Content Manag
 Onboarding, registration, login, verification, dashboard, app catalog, assessment details/instructions/questions/evidence/submission/history, campaign catalog/details/event status, package comparison/checkout/subscription history, wallet/balances/deposit/withdrawal/transactions, referrals, rankings, notifications, profile/security/devices, support tickets.
 
 All async screens need loading, success, empty, error/retry and form-validation states. Cache only appropriate data. Never generate financial outcomes offline.
+
+Application id & package name use 'pynith.tlstore.review' for flutter app;
 
 ## 9. Task workflow
 Eligibility check -> atomic assignment -> assessment -> validated submission -> moderation -> decision -> idempotent ledger posting.
