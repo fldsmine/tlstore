@@ -1,9 +1,4 @@
-## Project Overview
-
-The transcript clarifies that the client intends a combined site with an affiliate/task-earning activity and an app-listing review activity. Working visual identity is TLstore; prototype labels include Appcheck/Fieldtest. Users pay/activate packages, then see jobs; the app-review task presents operator-uploaded app images/listing information and questions inside the platform. A link to the relevant store may be offered, but downloading is optional. Review tasks include a multi-step, reportedly seven-question flow and attention checks. The earning model includes package rewards, referral commissions, ads/engagement jobs, proxy-gated tasks in some cases, balances and scheduled withdrawals. The relationship among subscription purchase, task assignment, returns and task rewards is still too unclear for a reliable estimate.
-
-
-1. App Trust & Review Intelligence Platform: Where registered users examine applications from Google Play Store, Apple App Store and Samsung Galaxy Store, answer structured questions, and help companies identify scams, misleading advertisements, privacy risks and poor user experiences.
+1. Add a Review Intelligence Platform: Where registered users examine applications from Google Play Store, Apple App Store and Samsung Galaxy Store, answer structured questions, and help companies identify scams, misleading advertisements, privacy risks and poor user experiences.
   The system should help companies assess whether apps match developer claims, promotional images are accurate, suspicious behavior/hidden charges/misleading promises exist, personal information is handled responsibly, and real users would trust the app. 
 sample data structure for app-review.
 `app_review`(
@@ -22,9 +17,6 @@ sample data structure for app-review.
   `reviews` COMMENT 'number of reviews app has',
   `task_reward` NOT NULL COMMENT 'amount use earns for completing task',
   `image_cover` NOT NULL COMMENT 'Thumbnail image representing the app view',
-  ...,
-  ...,
-  ...,
   `maximum_review` COMMENT 'limit to the number of review an app will have, admin sets based on the amount company paid for.'
   `publisher` COMMENT 'Company behind the app or sponsor'
 );
@@ -82,13 +74,14 @@ users on subscription shares revenue from the platform from the each task they c
   `mini_withdraw` double NOT NULL DEFAULT '0' COMMENT 'minimum withdrawable amount each time',
   `plan_id` int NOT NULL DEFAULT '0' COMMENT 'If set to recurring payment, if null users manually re-subscribe package when expires',
   `special` int NOT NULL DEFAULT '0' COMMENT 'if package is special or featured [0,1]',
-  `maxi_daily_earnings` double NOT NULL DEFAULT '0' COMMENT 'the maximum amount a user can earn daily on this package'
+  `maxi_daily_earnings` double NOT NULL DEFAULT '0' COMMENT 'the maximum amount a user can earn daily on this package',
+  `task_quota` COMMENT holds the number of ask the user can do in a package
 );
 
-Data (`package_name`, `price`, `description`, `features`, `expiry_date`, `referral_bonus`, `is_percentage`, `priority`, `image`, `is_active`, `duration`, `payment_link`, `discount`, `bonus`, `threshold`, `mini_withdraw`, `plan_id`, `special`, `maxi_daily_earnings`,`currency`) VALUES
-('Lite ',		1500,	'Standard package',	'Able to review apps but limited, Cannot report app',	30,	4,	1,	1, 'standard.png',	'yes',	'One months cycle',	'',	10,	50,	3000,	1200,	0,	0,	100, 'NGN'),
-('Premium',		3000,	'Popular package, with high earnings',	'Able to review apps, Can report app',	30,	10,	1,	2, 'premium.png',	'yes',	'One months cycle',	'',	12,	70,	7500,	2000,	0,	1,	250, 'NGN'),
-('Platinum',	5500,	'Most advance package, Maximum earnings',	'Able to review apps unlimited, Can report apps, Can make suggestions',	30,	15,	1,	3, 'platinum.png',	'yes',	'One months cycle',	'',	0,	100,	19500,	4000,	0,	1,	650, 'NGN');
+Data (`package_name`, `price`, `description`, `features`, `expiry_date`, `referral_bonus`, `is_percentage`, `priority`, `image`, `is_active`, `duration`, `payment_link`, `discount`, `bonus`, `threshold`, `mini_withdraw`, `plan_id`, `special`, `maxi_daily_earnings`,`currency`, `task_quota`) VALUES
+('Lite ',		1500,	'Standard package',	'Able to review apps but limited, Cannot report app',	30,	4,	1,	1, 'standard.png',	'yes',	'One months cycle',	'',	10,	50,	3000,	1200,	0,	0,	100, 'NGN', 25),
+('Premium',		3000,	'Popular package, with high earnings',	'Able to review apps, Can report app',	30,	10,	1,	2, 'premium.png',	'yes',	'One months cycle',	'',	12,	70,	7500,	2000,	0,	1,	250, 'NGN', 40),
+('Platinum',	5500,	'Most advance package, Maximum earnings',	'Able to review apps unlimited, Can report apps, Can make suggestions',	30,	15,	1,	3, 'platinum.png',	'yes',	'One months cycle',	'',	0,	100,	19500,	4000,	0,	1,	650, 'NGN', 60);
 
 
 4. Proxy: This is a section of the platform that allows users perform task from different region else will be limited to his region. Both app review, share ads, task are region base, so for every earnable task listed its within a region which may be restricted to users region.
@@ -135,17 +128,16 @@ A many-to-many relationship to allow many locations and each location offer mult
 ('992e-339cbef03fe1',	'image5.png',	5,	'Platinum',	15000,	400000,	99,	400,	1,	30);
 user get reward days interval set when hits target.
 
-6. Multi level referral system:
-referral reward should be in 3 level. where you earn from from your direct referral and indirect referral to the second generation on users deposit into the system.
+
+6. A 3 level Multi Referral system:
+referral reward should be in 3 level. where you earn from your direct referral and indirect referral to the second generation from users rewards from app review and ads share.
 -5%, 2% and 1%. Sample below
 `referrals` (`commission_type`, `level`, `percent`, `status`) VALUES
 ('deposit',	1,	5.00,	1),
 ('deposit',	2,	2.00,	1),
 ('deposit',	3,	1.00,	1);
 
-
-7. Payment channels: for inflow and outflow of fund. using the following payment provider.
-Integrations: BACHS Pay through https://docs.bachs.io/introduction, Paystack through https://paystack.com/docs/, Korapay through https://developers.korapay.com/docs/getting-started, manual bank; 
+Note: Some of the table and relationship have not been listed, which you have to complete
 
 
 ## Objectives 
@@ -156,19 +148,3 @@ Integrations: BACHS Pay through https://docs.bachs.io/introduction, Paystack thr
 4. Offer earning through advertisers ads
 5. Users get a Subscription package to enable them earn from the app reviews and ads share.
 6. Purchased package his its referral bonuses, earning limit, withdrawals limit. 
-
-
-## Technology choices and trade-offs
-
-| Mobile | Flutter + Dart
-| API | Laravel (current supported PHP release at implementation), REST/JSON, OpenAPI contract 
-| Admin | Laravel+livewire rendered admin panel 
-| Database | MySQL 
-| Cache/queue | Redis-backed queue/cache 
-| Auth | Laravel Sanctum-style first-party token/session model;
-| API contract | OpenAPI specification, generated/validated client models where practical | Hand-maintained client/server DTOs are flexible but drift-prone. Contract-first provides shared agreement and test fixtures. |
-| Testing | Pest/PHPUnit, Laravel feature tests; Flutter unit/widget/integration tests; provider sandbox tests; static analysis/format/lint in CI 
-| Deployment | Containerized Laravel API/worker, managed PostgreSQL, private object store; separate dev/staging/prod, CI/CD and secrets manager 
-
-
-## Application id & package use 'pynith.tlstore.review'
