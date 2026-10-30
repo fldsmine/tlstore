@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrustLens – Review apps. Get paid.</title>
+<style>
+:root{
+  --red:#C8102E; --red-d:#9E0B23; --red-l:#FCE9EC;
+  --green:#157F3D; --green-d:#0E6129; --green-l:#E4F3E9;
+  --grey:#F3F4F5; --grey2:#E2E5E8; --grey3:#C9CED3;
+  --ink:#1B2024; --mut:#5A646C; --white:#fff;
+  --sans: "Segoe UI","Helvetica Neue",Arial,system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --grey:#1d2125; --grey2:#2c3238; --grey3:#444c54; --ink:#eef0f2; --mut:#a3adb5; --white:#14181b; --red-l:#3a1219; --green-l:#102a1a; --green:#2fa75c; --green-d:#38b868; --red:#e0344f; --red-d:#ff5a73;}
+  body{background:#101316 !important}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--ink);background:var(--grey);line-height:1.5;font-size:15px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+.hidden{display:none !important}
+h1,h2,h3{line-height:1.2;letter-spacing:-.01em}
+a{color:var(--green)}
+
+/* header */
+.top{background:var(--white);border-top:4px solid var(--red);border-bottom:1px solid var(--grey2);position:sticky;top:0;z-index:20}
+.top-in{max-width:1120px;margin:auto;padding:10px 20px;display:flex;align-items:center;gap:20px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;cursor:pointer;background:none;border:0}
+.logo i{width:30px;height:30px;border-radius:7px;background:var(--red);display:grid;place-items:center}
+.logo svg{width:18px;height:18px}
+nav{display:flex;gap:4px;margin-left:12px}
+nav button{background:none;border:0;padding:8px 12px;border-radius:6px;font-weight:600;color:var(--mut);cursor:pointer}
+nav button:hover{background:var(--grey)}
+nav button.on{color:var(--ink);box-shadow:inset 0 -3px 0 var(--red);border-radius:0}
+.sp{flex:1}
+.bal{display:flex;align-items:center;gap:8px;background:var(--green-l);border:1px solid var(--green);border-radius:8px;padding:5px 6px 5px 12px}
+.bal b{color:var(--green-d);font-size:15px}
+.bal small{color:var(--mut);display:block;font-size:11px;line-height:1.1}
+.bal select{border:1px solid var(--grey3);background:var(--white);border-radius:5px;padding:4px;font-size:13px}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--ink);color:var(--white);display:grid;place-items:center;font-weight:700;font-size:13px}
+.menu-btn{display:none}
+
+main{max-width:1120px;margin:auto;padding:26px 20px 70px}
+.card{background:var(--white);border:1px solid var(--grey2);border-radius:8px;padding:22px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:6px;padding:11px 20px;font-weight:700;cursor:pointer;background:var(--green);color:#fff;transition:background .15s}
+.btn:hover{background:var(--green-d)}
+.btn.red{background:var(--red)} .btn.red:hover{background:var(--red-d)}
+.btn.ghost{background:var(--white);color:var(--ink);border:1px solid var(--grey3)} .btn.ghost:hover{background:var(--grey)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.block{width:100%}
+.muted{color:var(--mut)}
+.pill{display:inline-block;font-size:12px;font-weight:700;border-radius:20px;padding:2px 10px;background:var(--grey);border:1px solid var(--grey2)}
+.pill.g{background:var(--green-l);color:var(--green-d);border-color:var(--green)}
+.pill.r{background:var(--red-l);color:var(--red);border-color:var(--red)}
+.grid{display:grid;gap:16px}
+.g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:1fr 1fr}
+
+/* landing */
+.land{display:grid;grid-template-columns:1.15fr .85fr;gap:44px;align-items:center;padding:30px 0 20px}
+.land h1{font-size:44px;margin-bottom:16px}
+.land h1 em{font-style:normal;color:var(--red)}
+.land p.lead{font-size:18px;color:var(--mut);max-width:520px;margin-bottom:22px}
+.stores{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:26px}
+.store{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;background:var(--white);border:1px solid var(--grey3);border-radius:6px;padding:5px 10px}
+.store s{width:9px;height:9px;border-radius:50%;display:inline-block;text-decoration:none}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:10px}
+.steps div{border-left:3px solid var(--green);padding-left:12px}
+.steps b{display:block}
+.login h2{font-size:22px;margin-bottom:4px}
+label.f{display:block;font-weight:600;margin:14px 0 5px;font-size:14px}
+input.t,select.t,textarea.t{width:100%;border:1px solid var(--grey3);border-radius:6px;padding:10px 12px;background:var(--white)}
+textarea.t{min-height:96px;resize:vertical}
+.divider{display:flex;align-items:center;gap:10px;color:var(--mut);margin:16px 0;font-size:13px}
+.divider:before,.divider:after{content:"";flex:1;height:1px;background:var(--grey2)}
+.band{background:var(--white);border-top:1px solid var(--grey2);border-bottom:1px solid var(--grey2);margin:34px -20px 0;padding:24px 20px}
+.band-in{max-width:1080px;margin:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;text-align:left}
+.band b{font-size:26px;display:block}
+.fine{font-size:12.5px;color:var(--mut)}
+
+/* dashboard */
+.page-h{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.page-h h2{font-size:28px}
+.stat b{font-size:28px;display:block;margin-top:2px}
+.stat span{font-size:13px;color:var(--mut)}
+.gate{display:flex;gap:16px;align-items:center;border-left:5px solid var(--red);margin:16px 0}
+.gate.ok{border-color:var(--green)}
+.task{display:grid;grid-template-columns:76px 1fr auto;gap:16px;align-items:center;padding:14px 0;border-top:1px solid var(--grey2)}
+.task:first-child{border-top:0}
+.ico{width:76px;height:76px;border-radius:16px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:26px}
+.task h3{font-size:17px}
+.reward{font-weight:800;color:var(--green-d)}
+
+/* proxy */
+.plan{border:2px solid var(--grey2);border-radius:8px;padding:18px;cursor:pointer;background:var(--white);text-align:left;width:100%}
+.plan[aria-pressed=true]{border-color:var(--green);background:var(--green-l)}
+.plan h3{font-size:18px}
+.plan .pr{font-size:28px;font-weight:800;margin:6px 0}
+.plan ul{list-style:none;font-size:14px;color:var(--mut)}
+.plan li:before{content:"✓ ";color:var(--green);font-weight:800}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sess{font-family:ui-monospace,Menlo,monospace;background:var(--grey);border:1px dashed var(--grey3);border-radius:6px;padding:10px 12px;font-size:13px}
+
+/* review */
+.crumb{font-size:14px;margin-bottom:12px}
+.crumb button{background:none;border:0;color:var(--green);font-weight:600;cursor:pointer}
+.app-head{display:flex;gap:16px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.app-head .ico{width:64px;height:64px;font-size:22px}
+.layout{display:grid;grid-template-columns:.9fr 1.1fr;gap:20px;align-items:start}
+.gal{position:sticky;top:90px}
+.shots{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x mandatory}
+.shots button{flex:0 0 150px;border:1px solid var(--grey3);border-radius:18px;overflow:hidden;background:var(--grey);padding:0;cursor:zoom-in;scroll-snap-align:start}
+.shots svg{display:block;width:100%;height:auto}
+.note{background:var(--grey);border-radius:6px;padding:10px 12px;font-size:13px;color:var(--mut)}
+.prog{display:flex;gap:6px;margin-bottom:18px}
+.prog div{flex:1;height:6px;border-radius:3px;background:var(--grey2)}
+.prog div.on{background:var(--green)}
+.prog-l{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:6px}
+.q{padding:16px 0;border-top:1px solid var(--grey2)}
+.q:first-of-type{border-top:0;padding-top:4px}
+.q h4{font-size:15.5px;margin-bottom:3px}
+.q .hint{font-size:13px;color:var(--mut);margin-bottom:9px}
+.opts{display:grid;gap:7px}
+.opt{display:flex;gap:10px;align-items:center;border:1px solid var(--grey3);border-radius:6px;padding:9px 12px;cursor:pointer;background:var(--white)}
+.opt:hover{background:var(--grey)}
+.opt input{accent-color:var(--green);width:17px;height:17px}
+.opt:has(input:checked){border-color:var(--green);background:var(--green-l)}
+.opt.warn:has(input:checked){border-color:var(--red);background:var(--red-l)}
+.rate{display:flex;gap:7px}
+.rate label{flex:1}
+.rate input{position:absolute;opacity:0}
+.rate span{display:block;text-align:center;padding:9px 0;border:1px solid var(--grey3);border-radius:6px;font-weight:700;cursor:pointer;background:var(--white)}
+.rate input:checked+span{background:var(--green);color:#fff;border-color:var(--green)}
+.rate input:focus-visible+span{outline:3px solid var(--green);outline-offset:2px}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:4px}
+.err{color:var(--red);font-weight:600;font-size:14px;margin-top:10px;min-height:20px}
+.wc{font-size:12.5px;color:var(--mut);text-align:right}
+.nav-row{display:flex;justify-content:space-between;gap:10px;margin-top:14px}
+.earn{display:flex;align-items:center;gap:8px;background:var(--green-l);border:1px solid var(--green);color:var(--green-d);font-weight:700;border-radius:6px;padding:8px 12px;margin-bottom:16px;font-size:14px}
+
+/* done */
+.done{max-width:620px;margin:20px auto;text-align:center}
+.tick{width:66px;height:66px;border-radius:50%;background:var(--green);display:grid;place-items:center;margin:0 auto 14px}
+.timeline{text-align:left;margin:20px 0;border-left:3px solid var(--grey2);padding-left:18px}
+.timeline div{position:relative;margin-bottom:14px}
+.timeline div:before{content:"";position:absolute;left:-26px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--grey3);border:2px solid var(--white)}
+.timeline div.d:before{background:var(--green)}
+.timeline div.p:before{background:#E8A200}
+
+/* wallet */
+.fx-big{font-size:34px;font-weight:800;color:var(--green-d)}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700}
+.live i{width:9px;height:9px;border-radius:50%;background:var(--grey3)}
+.live.on i{background:var(--green);box-shadow:0 0 0 0 rgba(21,127,61,.6);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(21,127,61,0)}100%{box-shadow:0 0 0 0 rgba(21,127,61,0)}}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{text-align:left;font-size:13px;color:var(--mut);font-weight:600;padding:8px 6px;border-bottom:1px solid var(--grey2)}
+td{padding:9px 6px;border-bottom:1px solid var(--grey2)}
+td.n,th.n{text-align:right}
+
+/* modal / toast */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:50;display:grid;place-items:center;padding:20px}
+.modal .box{max-width:340px;width:100%;position:relative}
+.modal .x{position:absolute;right:-8px;top:-44px;background:#fff;color:#000;border:0;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--white);padding:11px 18px;border-radius:8px;font-weight:600;z-index:60}
+footer{border-top:1px solid var(--grey2);background:var(--white);padding:22px 20px;font-size:13px;color:var(--mut);text-align:center}
+
+@media (max-width:860px){
+  .land,.layout,.g2,.g3,.row2{grid-template-columns:1fr}
+  .land h1{font-size:33px}
+  .band-in{grid-template-columns:1fr 1fr}
+  .gal{position:static}
+  .steps{grid-template-columns:1fr}
+  nav{position:absolute;top:100%;left:0;right:0;background:var(--white);border-bottom:1px solid var(--grey2);flex-direction:column;margin:0;padding:6px 14px;display:none}
+  nav.open{display:flex}
+  nav button.on{box-shadow:inset 3px 0 0 var(--red)}
+  .menu-btn{display:block;background:none;border:1px solid var(--grey3);border-radius:6px;padding:6px 10px;cursor:pointer}
+  .bal small{display:none}
+  .task{grid-template-columns:60px 1fr}
+  .task .ico{width:60px;height:60px}
+  .task .go{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<!-- HEADER (shown after login) -->
+<header class="top hidden" id="hdr">
+  <div class="top-in">
+    <button class="logo" onclick="go('dash')" aria-label="TrustLens home"><i><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></i>TrustLens</button>
+    <button class="menu-btn" onclick="document.getElementById('nav').classList.toggle('open')" aria-label="Menu">☰</button>
+    <nav id="nav">
+      <button data-p="dash" onclick="go('dash')">Dashboard</button>
+      <button data-p="proxy" onclick="go('proxy')">Buy proxy</button>
+      <button data-p="wallet" onclick="go('wallet')">Wallet</button>
+    </nav>
+    <div class="sp"></div>
+    <div class="bal" title="Your earnings in your chosen currency">
+      <div><small>Earnings</small><b id="hBal">₦0</b></div>
+      <select id="hCur" aria-label="Display currency" onchange="setCur(this.value)"></select>
+    </div>
+    <div class="avatar" id="av">AO</div>
+  </div>
+</header>
+
+<main id="app">
+
+<!-- LANDING / LOGIN -->
+<section id="p-login">
+  <div class="land">
+    <div>
+      <h1>Review real apps. <em>Keep the stores honest.</em></h1>
+      <p class="lead">Test apps from Google Play, the Apple App Store and Samsung Galaxy Store, answer a short set of questions, and earn ₦600 for every review we approve.</p>
+      <div class="stores">
+        <span class="store"><s style="background:#157F3D"></s>Google Play</span>
+        <span class="store"><s style="background:#1B2024"></s>Apple App Store</span>
+        <span class="store"><s style="background:#C8102E"></s>Samsung Galaxy Store</span>
+      </div>
+      <div class="steps">
+        <div><b>Buy a proxy</b><span class="muted">Secure, region-matched session so you see the app as local users do.</span></div>
+        <div><b>Review an app</b><span class="muted">Look at the developer's screenshots, try the app, answer the questions.</span></div>
+        <div><b>Get paid</b><span class="muted">₦600 hits your wallet on submit. We verify within an hour.</span></div>
+      </div>
+    </div>
+    <div class="card login">
+      <h2>Log in to start reviewing</h2>
+      <p class="muted">New here? Enter your details to create your reviewer profile.</p>
+      <form onsubmit="return false">
+      <label class="f" for="lEmail">Email address</label>
+      <input class="t" id="lEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      <label class="f" for="lPass">Password</label>
+      <input class="t" id="lPass" type="password" placeholder="At least 8 characters" autocomplete="current-password">
+      <label class="f" for="lCountry">Country</label>
+      <select class="t" id="lCountry"><option>Nigeria</option><option>Ghana</option><option>Kenya</option><option>South Africa</option><option>United Kingdom</option><option>Canada</option></select>
+      <div class="err" id="lErr" role="alert"></div>
+      <button class="btn block" onclick="login()">Log in</button>
+      </form>
+      <div class="divider">or</div>
+      <button class="btn ghost block" onclick="login(true)">Continue with Google</button>
+      <p class="fine" style="margin-top:14px">One account per person. Duplicate accounts and copied answers are removed and unpaid.</p>
+    </div>
+  </div>
+  <div class="band">
+    <div class="band-in">
+      <div><b>₦600</b><span class="muted">paid per approved review</span></div>
+      <div><b>~1 hour</b><span class="muted">review time for each submission</span></div>
+      <div><b>3 stores</b><span class="muted">Play, App Store, Galaxy Store</span></div>
+      <div><b>Live rates</b><span class="muted">see earnings in USD, GBP, CAD and more</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="p-dash" class="hidden">
+  <div class="page-h"><div><h2 id="welcome">Welcome back</h2><span class="muted">Pick an app, review it honestly, get ₦600.</span></div></div>
+  <div class="grid g3">
+    <div class="card stat"><span>Earnings</span><b id="sBal">₦0</b><span id="sBalFx"></span></div>
+    <div class="card stat"><span>Reviews submitted</span><b id="sCnt">0</b><span>₦600 each</span></div>
+    <div class="card stat"><span>Awaiting verification</span><b id="sPend">0</b><span>checked within about an hour</span></div>
+  </div>
+  <div class="card gate" id="gate"></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3>Apps waiting for your review</h3><span class="pill" id="taskCnt"></span></div>
+    <div id="tasks"></div>
+  </div>
+</section>
+
+<!-- PROXY -->
+<section id="p-proxy" class="hidden">
+  <div class="page-h"><div><h2>Buy a proxy session</h2><span class="muted">Required before you can open any app task.</span></div></div>
+  <div class="layout" style="grid-template-columns:1.1fr .9fr">
+    <div>
+      <div class="card">
+        <h3 style="margin-bottom:4px">Why a proxy?</h3>
+        <p class="muted">Apps often show different content, prices and permissions in different countries. A proxy puts your session in the same region as the store listing, so what you review is what local users get. It also stops one person from reviewing the same app from many accounts.</p>
+        <div class="grid g2" style="margin-top:16px">
+          <button class="plan" id="plan0" aria-pressed="true" onclick="pickPlan(0)"><h3>Day pass</h3><div class="pr">₦300</div><ul><li>24 hours of access</li><li>Up to 10 app reviews</li><li>Region-matched session</li></ul></button>
+          <button class="plan" id="plan1" aria-pressed="false" onclick="pickPlan(1)"><h3>Weekly pass</h3><div class="pr">₦1,500</div><ul><li>7 days of access</li><li>Up to 10 reviews per day</li><li>Region-matched session</li></ul></button>
+        </div>
+        <p class="fine" style="margin-top:12px">Proxy fees pay for the connection only and are not part of your reward. Every review you finish pays ₦600 regardless of plan.</p>
+      </div>
+      <div class="card hidden" id="proxyActive" style="margin-top:16px;border-color:var(--green)">
+        <span class="pill g">Proxy active</span>
+        <h3 style="margin:8px 0 10px">Your session is ready</h3>
+        <div class="sess" id="sessId"></div>
+        <p class="muted" style="margin:10px 0">Time left: <b id="proxyLeft"></b></p>
+        <button class="btn" onclick="go('dash')">Start reviewing apps</button>
+      </div>
+    </div>
+    <div class="card" id="payCard">
+      <h3>Checkout</h3>
+      <p class="muted" id="payLine">Day pass · ₦300</p>
+      <label class="f" for="cName">Name on card</label><input class="t" id="cName" placeholder="Full name">
+      <label class="f" for="cNum">Card number</label><input class="t" id="cNum" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="19" oninput="this.value=this.value.replace(/\D/g,'').replace(/(.{4})/g,'$1 ').trim()">
+      <div class="row2"><div><label class="f" for="cExp">Expiry</label><input class="t" id="cExp" placeholder="MM/YY" maxlength="5"></div><div><label class="f" for="cCvv">CVV</label><input class="t" id="cCvv" inputmode="numeric" placeholder="123" maxlength="4"></div></div>
+      <div class="err" id="payErr" role="alert"></div>
+      <button class="btn block" id="payBtn" onclick="pay()">Pay ₦300</button>
+      <p class="fine" style="margin-top:10px">Prototype only. No real payment is taken.</p>
+    </div>
+  </div>
+</section>
+
+<!-- REVIEW -->
+<section id="p-review" class="hidden">
+  <div class="crumb"><button onclick="go('dash')">← All apps</button></div>
+  <div class="app-head">
+    <div class="ico" id="rIco"></div>
+    <div style="flex:1;min-width:200px"><h2 id="rName"></h2><div class="muted" id="rMeta"></div></div>
+    <span class="pill g">Proxy active</span>
+  </div>
+  <div class="layout">
+    <div class="card gal">
+      <h3 style="margin-bottom:2px">Screenshots from the store listing</h3>
+      <p class="muted" style="margin-bottom:10px;font-size:14px">Uploaded by the developer. Tap one to enlarge, then check them against the real app.</p>
+      <div class="shots" id="shots"></div>
+      <div class="note"><b>Developer description:</b> <span id="rDesc"></span></div>
+    </div>
+    <div class="card">
+      <div class="earn">₦600 reward when you submit <span style="font-weight:500">· verified within about 1 hour</span></div>
+      <div class="prog-l"><span id="stepName"></span><span id="stepNo"></span></div>
+      <div class="prog" id="prog"><div></div><div></div><div></div></div>
+      <div id="qbox"></div>
+      <div class="err" id="qErr" role="alert"></div>
+      <div class="nav-row">
+        <button class="btn ghost" id="bBack" onclick="stepGo(-1)">Back</button>
+        <button class="btn" id="bNext" onclick="stepGo(1)">Next</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DONE -->
+<section id="p-done" class="hidden">
+  <div class="card done">
+    <div class="tick"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg></div>
+    <h2>Review submitted</h2>
+    <p class="muted" style="margin:6px 0 4px">₦600 has been credited to your wallet.</p>
+    <div class="fx-big" id="doneFx"></div>
+    <div class="timeline">
+      <div class="d"><b>Review received</b><br><span class="muted" id="doneTime"></span></div>
+      <div class="d"><b>₦600 credited to your wallet</b><br><span class="muted">Available to see right now</span></div>
+      <div class="p"><b>Our team checks your answers</b><br><span class="muted">This takes about 1 hour. If a review fails our checks, the reward is taken back.</span></div>
+    </div>
+    <div class="note" id="doneFlags" style="text-align:left;margin-bottom:16px"></div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="btn" onclick="go('dash')">Review another app</button>
+      <button class="btn ghost" onclick="go('wallet')">Open wallet</button>
+    </div>
+  </div>
+</section>
+
+<!-- WALLET -->
+<section id="p-wallet" class="hidden">
+  <div class="page-h"><div><h2>Wallet</h2><span class="muted">Your earnings, converted at live exchange rates.</span></div><span class="live" id="liveTag"><i></i><span>Connecting…</span></span></div>
+  <div class="grid g2">
+    <div class="card">
+      <span class="muted">Total earnings</span>
+      <div style="font-size:34px;font-weight:800" id="wBal">₦0</div>
+      <hr style="border:0;border-top:1px solid var(--grey2);margin:16px 0">
+      <h3 style="margin-bottom:8px">Currency converter</h3>
+      <div class="row2">
+        <div><label class="f" style="margin-top:0" for="cvAmt">Amount in Naira (₦)</label><input class="t" id="cvAmt" type="number" min="0" oninput="renderFx()"></div>
+        <div><label class="f" style="margin-top:0" for="cvCur">Convert to</label><select class="t" id="cvCur" onchange="setCur(this.value)"></select></div>
+      </div>
+      <div class="fx-big" style="margin-top:14px" id="cvOut"></div>
+      <div class="fine" id="cvRate"></div>
+      <button class="btn ghost" style="margin-top:14px" onclick="toast('Withdrawals open after your first verified review.')">Withdraw</button>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h3>Exchange rates</h3><button class="btn ghost" style="padding:6px 12px" onclick="loadFx(true)">Refresh</button></div>
+      <p class="fine" style="margin-bottom:8px" id="fxStamp"></p>
+      <table><thead><tr><th>Currency</th><th class="n">₦600 is worth</th><th class="n">₦1 =</th></tr></thead><tbody id="fxRows"></tbody></table>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-bottom:6px">Activity</h3>
+    <table><thead><tr><th>Date</th><th>Description</th><th>Status</th><th class="n">Amount</th></tr></thead><tbody id="tx"></tbody></table>
+  </div>
+</section>
+</main>
+
+<footer>TrustLens · Honest reviews, paid fairly · Prototype interface for design review</footer>
+<div id="overlay"></div>
+
+<script>
+/* ---------- data ---------- */
+const APPS=[
+ {id:0,name:"FitPulse Tracker",short:"FP",store:"Google Play",color:"#157F3D",dev:"Pulse Labs Ltd",cat:"Health & Fitness",installs:"500K+",desc:"Track workouts, steps and sleep, and follow weekly plans built by coaches.",kind:"fit"},
+ {id:1,name:"CashBloom – Instant Loans",short:"CB",store:"Samsung Galaxy Store",color:"#C8102E",dev:"Bloom Fin Tech",cat:"Finance",installs:"10K+",desc:"Get up to ₦500,000 in minutes with no paperwork. Guaranteed approval for new users.",kind:"loan"},
+ {id:2,name:"NairaWise Budget",short:"NW",store:"Apple App Store",color:"#1B2024",dev:"Wise Ledger Inc.",cat:"Finance",installs:"100K+",desc:"Plan monthly spending, split bills and set savings goals in one place.",kind:"budget"}
+];
+const RATES_FALLBACK={USD:0.00065,GBP:0.00049,CAD:0.00090,EUR:0.00056,GHS:0.0100,KES:0.084,ZAR:0.0116,INR:0.054,AED:0.0024,NGN:1};
+const CURS={NGN:"Nigerian Naira",USD:"US Dollar",GBP:"British Pound",CAD:"Canadian Dollar",EUR:"Euro",GHS:"Ghanaian Cedi",KES:"Kenyan Shilling",ZAR:"South African Rand",INR:"Indian Rupee",AED:"UAE Dirham"};
+const PLANS=[{n:"Day pass",p:300,h:24},{n:"Weekly pass",p:1500,h:168}];
+
+const S={user:null,bal:0,cur:"NGN",rates:{...RATES_FALLBACK},live:false,stamp:null,
+ proxyUntil:0,plan:0,done:{},tx:[],pending:0,cur_app:null,step:0,ans:{},start:0};
+
+/* ---------- helpers ---------- */
+const $=id=>document.getElementById(id);
+const money=(v,c)=>new Intl.NumberFormat("en",{style:"currency",currency:c,maximumFractionDigits:c==="NGN"?0:(v<1?4:2)}).format(v);
+const conv=(ngn,c)=>ngn*(S.rates[c]||1);
+function toast(m){const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+const proxyOn=()=>Date.now()<S.proxyUntil;
+
+/* ---------- app-screen illustrations (generated, not real store images) ---------- */
+function shot(app,i){
+  const c=app.color,W=180,H=360;
+  const bar=`<rect x="0" y="0" width="${W}" height="34" fill="${c}"/><rect x="14" y="14" width="60" height="7" rx="3.5" fill="#fff" opacity=".9"/><circle cx="${W-18}" cy="18" r="6" fill="#fff" opacity=".7"/>`;
+  let body="";
+  if(i===0){
+    body=`<rect x="14" y="48" width="152" height="110" rx="10" fill="${c}" opacity=".14"/><text x="26" y="86" font-size="22" font-weight="700" fill="${c}" font-family="Arial">${app.kind==="loan"?"₦500,000":app.kind==="fit"?"8,420":"₦182k"}</text><text x="26" y="106" font-size="10" fill="#555" font-family="Arial">${app.kind==="loan"?"Approved for you":app.kind==="fit"?"steps today":"left this month"}</text><rect x="26" y="122" width="128" height="8" rx="4" fill="${c}" opacity=".35"/><rect x="26" y="122" width="${app.kind==="loan"?118:78}" height="8" rx="4" fill="${c}"/>`
+    +[0,1,2].map(k=>`<rect x="14" y="${176+k*50}" width="152" height="40" rx="8" fill="#f1f2f3"/><circle cx="34" cy="${196+k*50}" r="9" fill="${c}" opacity="${.9-k*.2}"/><rect x="52" y="${189+k*50}" width="70" height="6" rx="3" fill="#999"/><rect x="52" y="${201+k*50}" width="44" height="5" rx="2.5" fill="#ccc"/>`).join("");
+  }else if(i===1){
+    body=[0,1,2,3].map(k=>`<rect x="14" y="${48+k*68}" width="152" height="58" rx="10" fill="#f1f2f3"/><rect x="24" y="${58+k*68}" width="38" height="38" rx="8" fill="${c}" opacity="${.95-k*.18}"/><rect x="72" y="${62+k*68}" width="76" height="7" rx="3" fill="#888"/><rect x="72" y="${76+k*68}" width="56" height="6" rx="3" fill="#bbb"/><rect x="72" y="${88+k*68}" width="30" height="6" rx="3" fill="${c}" opacity=".6"/>`).join("");
+  }else if(i===2){
+    body=`<polyline points="14,170 44,130 74,150 104,96 134,118 166,70" fill="none" stroke="${c}" stroke-width="3.5" stroke-linejoin="round"/><rect x="14" y="196" width="72" height="60" rx="10" fill="${c}" opacity=".15"/><rect x="94" y="196" width="72" height="60" rx="10" fill="#f1f2f3"/><rect x="24" y="210" width="40" height="7" rx="3" fill="${c}"/><rect x="104" y="210" width="40" height="7" rx="3" fill="#999"/><rect x="14" y="270" width="152" height="38" rx="19" fill="${c}"/><rect x="62" y="286" width="56" height="7" rx="3.5" fill="#fff"/>`;
+  }else{
+    body=`<circle cx="90" cy="110" r="44" fill="${c}" opacity=".16"/><circle cx="90" cy="110" r="30" fill="${c}"/><rect x="38" y="178" width="104" height="9" rx="4.5" fill="#888"/><rect x="26" y="198" width="128" height="6" rx="3" fill="#bbb"/><rect x="40" y="212" width="100" height="6" rx="3" fill="#bbb"/><rect x="14" y="262" width="152" height="40" rx="20" fill="${c}"/><rect x="58" y="278" width="64" height="8" rx="4" fill="#fff"/><circle cx="76" cy="326" r="4" fill="${c}"/><circle cx="90" cy="326" r="4" fill="#ccc"/><circle cx="104" cy="326" r="4" fill="#ccc"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="#fff"/>${bar}${body}</svg>`;
+}
+
+/* ---------- navigation ---------- */
+const PAGES=["login","dash","proxy","review","done","wallet"];
+function go(p){
+  if(!S.user&&p!=="login")p="login";
+  PAGES.forEach(x=>$("p-"+x).classList.toggle("hidden",x!==p));
+  $("hdr").classList.toggle("hidden",p==="login");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.p===p));
+  $("nav").classList.remove("open");
+  if(p==="dash")renderDash();
+  if(p==="proxy")renderProxy();
+  if(p==="wallet")renderWallet();
+  window.scrollTo(0,0);
+}
+function login(g){
+  const e=$("lEmail").value.trim(),pw=$("lPass").value;
+  if(!g){
+    if(!/^\S+@\S+\.\S+$/.test(e)){$("lErr").textContent="Enter a valid email address, for example name@example.com.";return}
+    if(pw.length<8){$("lErr").textContent="Your password needs at least 8 characters.";return}
+  }
+  const nm=g?"Ade Okafor":e.split("@")[0].replace(/[._]/g," ");
+  S.user={name:nm.replace(/\b\w/g,m=>m.toUpperCase()),country:$("lCountry").value};
+  $("av").textContent=S.user.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  $("lErr").textContent="";
+  loadFx();go("dash");
+}
+
+/* ---------- currency ---------- */
+function fillCurs(){
+  ["hCur","cvCur"].forEach(id=>{$(id).innerHTML=Object.keys(CURS).map(c=>`<option value="${c}">${c}${id==="cvCur"?" – "+CURS[c]:""}</option>`).join("");$(id).value=S.cur});
+}
+function setCur(c){S.cur=c;$("hCur").value=c;$("cvCur").value=c;renderFx();renderDash(true)}
+async function loadFx(manual){
+  try{
+    const r=await fetch("https://open.er-api.com/v6/latest/NGN");
+    const j=await r.json();
+    if(j.result==="success"){Object.keys(CURS).forEach(c=>{if(j.rates[c])S.rates[c]=j.rates[c]});S.live=true;S.stamp=new Date();if(manual)toast("Rates updated")}
+  }catch(e){S.live=false;if(manual)toast("Could not reach the rate service. Showing reference rates.")}
+  renderFx();
+}
+setInterval(()=>{if(S.user)loadFx()},60000);
+function renderFx(){
+  const bal=S.bal;
+  $("hBal").textContent=S.cur==="NGN"?money(bal,"NGN"):"≈ "+money(conv(bal,S.cur),S.cur);
+  const lt=$("liveTag");lt.className="live"+(S.live?" on":"");
+  lt.lastElementChild.textContent=S.live?"Live rates":"Reference rates (offline)";
+  $("fxStamp").textContent=S.live?"Updated "+S.stamp.toLocaleTimeString()+". Refreshes every minute.":"Live feed unavailable. These are approximate reference rates.";
+  const amt=parseFloat($("cvAmt").value)||0;
+  $("cvOut").textContent=money(conv(amt,S.cur),S.cur);
+  $("cvRate").textContent=S.cur==="NGN"?"Choose a different currency to convert.":"₦1 = "+(S.rates[S.cur]).toPrecision(4)+" "+S.cur;
+  $("fxRows").innerHTML=Object.keys(CURS).filter(c=>c!=="NGN").map(c=>`<tr><td><b>${c}</b> <span class="muted">${CURS[c]}</span></td><td class="n"><b>${money(conv(600,c),c)}</b></td><td class="n muted">${S.rates[c].toPrecision(3)}</td></tr>`).join("");
+  const sf=$("sBalFx");if(sf)sf.textContent=S.cur==="NGN"?"in Naira":"≈ "+money(conv(bal,S.cur),S.cur)+" at today's rate";
+}
+
+/* ---------- dashboard ---------- */
+function renderDash(){
+  if(!S.user)return;
+  $("welcome").textContent="Welcome, "+S.user.name.split(" ")[0];
+  $("sBal").textContent=money(S.bal,"NGN");
+  $("sCnt").textContent=Object.keys(S.done).length;
+  $("sPend").textContent=S.pending;
+  const on=proxyOn();
+  $("gate").className="card gate"+(on?" ok":"");
+  $("gate").innerHTML=on
+   ?`<div style="flex:1"><b>Proxy active</b><div class="muted">Your region-matched session is ready. Pick an app below.</div></div><span class="pill g">Ready</span>`
+   :`<div style="flex:1"><b>Buy a proxy to unlock reviews</b><div class="muted">Day pass from ₦300. You need an active proxy before opening any app.</div></div><button class="btn red" onclick="go('proxy')">Buy proxy</button>`;
+  const open=APPS.filter(a=>!S.done[a.id]);
+  $("taskCnt").textContent=open.length+" open";
+  $("tasks").innerHTML=APPS.map(a=>`
+   <div class="task">
+     <div class="ico" style="background:${a.color}">${a.short}</div>
+     <div><h3>${a.name}</h3><div class="muted" style="font-size:14px">${a.cat} · ${a.installs} installs · by ${a.dev}</div>
+     <div style="margin-top:6px"><span class="pill">${a.store}</span> <span class="reward">₦600</span></div></div>
+     <div class="go">${S.done[a.id]?`<span class="pill g">Reviewed</span>`:`<button class="btn" onclick="openApp(${a.id})">Review app</button>`}</div>
+   </div>`).join("");
+  renderFx();
+}
+function openApp(id){
+  if(!proxyOn()){toast("Buy a proxy first to open this app.");go("proxy");return}
+  S.cur_app=APPS[id];S.step=0;S.ans={};S.start=Date.now();
+  const a=S.cur_app;
+  $("rIco").style.background=a.color;$("rIco").textContent=a.short;
+  $("rName").textContent=a.name;
+  $("rMeta").textContent=a.store+" · "+a.cat+" · by "+a.dev;
+  $("rDesc").textContent=a.desc;
+  $("shots").innerHTML=[0,1,2,3].map(i=>`<button onclick="zoom(${i})" aria-label="Enlarge screenshot ${i+1}">${shot(a,i)}</button>`).join("");
+  go("review");renderStep();
+}
+function zoom(i){
+  $("overlay").innerHTML=`<div class="modal" onclick="if(event.target===this)this.remove()"><div class="box"><button class="x" onclick="this.closest('.modal').remove()" aria-label="Close">×</button><div style="border-radius:26px;overflow:hidden;background:#fff">${shot(S.cur_app,i)}</div></div></div>`;
+}
+
+/* ---------- questions ---------- */
+const radio=(k,opts,warn)=>({t:"radio",k,opts,warn});
+const STEPS=[
+ {name:"First impressions",q:[
+  {k:"match",h:"Do the store screenshots match what the app really shows?",hint:"Open the app and compare it with the pictures on the left.",t:"radio",o:["Yes, they match","Mostly, with small differences","Not really","No, they look completely different"],w:[2,3]},
+  {k:"clear",h:"How clearly does the app explain what it does in the first minute?",t:"rate",lo:"Very unclear",hi:"Very clear"},
+  {k:"polish",h:"How well does the app run and look?",hint:"Think about speed, crashes, readability and design.",t:"rate",lo:"Poor",hi:"Excellent"},
+  {k:"attn",h:"Quality check: please select “Somewhat” for this question.",hint:"We use a few of these to catch rushed answers.",t:"radio",o:["Not at all","Somewhat","Very much"]}
+ ]},
+ {name:"Safety check",q:[
+  {k:"pay",h:"Did the app ask you for money, a deposit or a “registration fee” before showing you anything useful?",t:"radio",o:["Yes","No","I'm not sure"],w:[0]},
+  {k:"promise",h:"Did it promise guaranteed profit, guaranteed loan approval or very high returns?",t:"radio",o:["Yes","No","I'm not sure"],w:[0]},
+  {k:"asked",h:"Which of these did the app ask for?",hint:"Choose all that apply. Only choose what you actually saw.",t:"check",o:["BVN or NIN","Card details or PIN","OTP or SMS codes","Access to contacts, photos or files","Crypto wallet or seed phrase","Selfie or ID document","None of these"],w:[0,1,2,3,4],none:6},
+  {k:"signs",h:"Did you notice any of these warning signs?",hint:"Choose all that apply.",t:"check",o:["Fake countdown timers or pressure to hurry","Store reviews look copied or repeated","Developer name does not match the company shown in the app","Hidden or hard-to-read fees","No working support contact","Mentions of harassment or threats over repayments","None of these"],w:[0,1,2,3,4,5],none:6},
+  {k:"dev",h:"Does the developer look legitimate?",hint:"Check the developer name, website, privacy policy and support email.",t:"radio",o:["Yes, I could verify them","Partly, some details are missing","No, I couldn't verify them"],w:[2]}
+ ]},
+ {name:"In your own words",q:[
+  {k:"what",h:"In your own words, what does this app do and who is it for?",hint:"At least 25 words. Don't copy the store description.",t:"text",min:25},
+  {k:"bw",h:"What's the best and the worst thing about it? Give one real example of each.",hint:"At least 20 words. Say what you did, and what happened.",t:"text",min:20},
+  {k:"verdict",h:"What is your overall verdict?",t:"radio",o:["I would install and recommend it","I would install it with caution","I would not install it","I suspect this app is a scam"],w:[3]},
+  {k:"honest",h:"",t:"confirm",label:"I used this app myself, and these answers are my own honest opinion."}
+ ]}
+];
+function renderStep(){
+  const st=STEPS[S.step];
+  $("stepName").textContent=st.name;$("stepNo").textContent="Step "+(S.step+1)+" of 3";
+  [...$("prog").children].forEach((d,i)=>d.classList.toggle("on",i<=S.step));
+  $("qErr").textContent="";
+  $("bBack").style.visibility=S.step?"visible":"hidden";
+  $("bNext").textContent=S.step===2?"Submit review and get ₦600":"Next";
+  $("qbox").innerHTML=st.q.map(q=>{
+    const v=S.ans[q.k];
+    let inner="";
+    if(q.t==="radio")inner=`<div class="opts">${q.o.map((o,i)=>`<label class="opt${(q.w||[]).includes(i)?" warn":""}"><input type="radio" name="${q.k}" value="${i}" ${v===i?"checked":""} onchange="S.ans['${q.k}']=${i}">${o}</label>`).join("")}</div>`;
+    if(q.t==="check")inner=`<div class="opts">${q.o.map((o,i)=>`<label class="opt${(q.w||[]).includes(i)?" warn":""}"><input type="checkbox" value="${i}" ${(v||[]).includes(i)?"checked":""} onchange="chk('${q.k}',${i},this.checked,${q.none})">${o}</label>`).join("")}</div>`;
+    if(q.t==="rate")inner=`<div class="rate" role="radiogroup">${[1,2,3,4,5].map(n=>`<label><input type="radio" name="${q.k}" value="${n}" ${v===n?"checked":""} onchange="S.ans['${q.k}']=${n}"><span>${n}</span></label>`).join("")}</div><div class="scale"><span>${q.lo}</span><span>${q.hi}</span></div>`;
+    if(q.t==="text")inner=`<textarea class="t" id="t_${q.k}" oninput="S.ans['${q.k}']=this.value;wc('${q.k}',${q.min})">${v||""}</textarea><div class="wc" id="wc_${q.k}"></div>`;
+    if(q.t==="confirm")return `<div class="q"><label class="opt"><input type="checkbox" ${v?"checked":""} onchange="S.ans['${q.k}']=this.checked">${q.label}</label></div>`;
+    return `<div class="q"><h4>${q.h}</h4>${q.hint?`<div class="hint">${q.hint}</div>`:""}${inner}</div>`;
+  }).join("");
+  st.q.filter(q=>q.t==="text").forEach(q=>wc(q.k,q.min));
+}
+function chk(k,i,on,none){
+  let a=new Set(S.ans[k]||[]);
+  if(on){if(i===none)a=new Set([i]);else{a.delete(none);a.add(i)}}else a.delete(i);
+  S.ans[k]=[...a];renderStep0keep();
+}
+function renderStep0keep(){const y=window.scrollY;renderStep();window.scrollTo(0,y)}
+const words=s=>(s||"").trim().split(/\s+/).filter(Boolean).length;
+function wc(k,min){const n=words(S.ans[k]);const e=$("wc_"+k);if(e)e.textContent=n+" / "+min+" words"+(n>=min?" ✓":"")}
+function stepGo(d){
+  if(d<0){S.step--;renderStep();return}
+  const st=STEPS[S.step];
+  for(const q of st.q){
+    const v=S.ans[q.k];
+    if((q.t==="radio"||q.t==="rate")&&v===undefined)return fail("Answer every question to continue: "+(q.h||"").slice(0,60)+"…");
+    if(q.t==="check"&&(!v||!v.length))return fail("Choose at least one option, or “None of these”.");
+    if(q.t==="text"&&words(v)<q.min)return fail("Write at least "+q.min+" words in your own words to continue.");
+    if(q.t==="confirm"&&!v)return fail("Confirm that these are your own honest answers to submit.");
+  }
+  if(S.step<2){S.step++;renderStep();window.scrollTo(0,0);return}
+  submit();
+}
+function fail(m){$("qErr").textContent=m;return false}
+function submit(){
+  const a=S.ans,secs=Math.round((Date.now()-S.start)/1000);
+  let flags=0,reasons=[];
+  if(a.pay===0){flags++;reasons.push("asked for money upfront")}
+  if(a.promise===0){flags++;reasons.push("promised guaranteed returns")}
+  const sens=(a.asked||[]).filter(i=>i<=4).length;if(sens){flags+=sens;reasons.push(sens+" sensitive data request"+(sens>1?"s":""))}
+  const sg=(a.signs||[]).filter(i=>i<=5).length;if(sg){flags+=sg;reasons.push(sg+" warning sign"+(sg>1?"s":""))}
+  if(a.verdict===3){flags+=2;reasons.push("you suspect a scam")}
+  S.done[S.cur_app.id]=true;S.bal+=600;S.pending++;
+  S.tx.unshift({d:new Date(),t:"Review: "+S.cur_app.name,s:"Credited · under review",a:600});
+  $("doneFx").textContent=S.cur==="NGN"?"₦600":"₦600 ≈ "+money(conv(600,S.cur),S.cur);
+  $("doneTime").textContent=new Date().toLocaleString();
+  $("doneFlags").innerHTML=flags>=3
+   ?`<b style="color:var(--red)">Scam signals recorded.</b> You reported: ${reasons.join(", ")}. Our trust team will examine this app and its store listing. Thank you for flagging it.`
+   :flags>0?`<b>Concerns noted.</b> You reported: ${reasons.join(", ")}. We combine your answers with other reviewers before acting.`
+   :`<b style="color:var(--green-d)">No scam signals reported.</b> Your answers go to the developer and help other users decide with confidence.`;
+  renderFx();go("done");
+}
+
+/* ---------- proxy ---------- */
+function pickPlan(i){S.plan=i;[0,1].forEach(j=>$("plan"+j).setAttribute("aria-pressed",j===i));
+  $("payLine").textContent=PLANS[i].n+" · "+money(PLANS[i].p,"NGN");$("payBtn").textContent="Pay "+money(PLANS[i].p,"NGN")}
+function renderProxy(){
+  const on=proxyOn();
+  $("proxyActive").classList.toggle("hidden",!on);
+  $("payCard").classList.toggle("hidden",on);
+  if(on){$("sessId").textContent="Session TL-"+(S.sess||"0000")+" · Region: "+S.user.country+" · Status: connected"}
+  pickPlan(S.plan);
+}
+function pay(){
+  const n=$("cNum").value.replace(/\s/g,"");
+  if(!$("cName").value.trim())return $("payErr").textContent="Enter the name on your card.";
+  if(n.length<13)return $("payErr").textContent="Enter a valid card number.";
+  if(!/^\d\d\/\d\d$/.test($("cExp").value))return $("payErr").textContent="Enter the expiry as MM/YY.";
+  if($("cCvv").value.length<3)return $("payErr").textContent="Enter the 3 or 4 digit CVV.";
+  $("payErr").textContent="";$("payBtn").disabled=true;$("payBtn").textContent="Processing…";
+  setTimeout(()=>{
+    S.proxyUntil=Date.now()+PLANS[S.plan].h*3600e3;S.sess=Math.floor(1000+Math.random()*9000)+"-"+Math.floor(100+Math.random()*900);
+    S.tx.unshift({d:new Date(),t:"Proxy: "+PLANS[S.plan].n,s:"Paid",a:-PLANS[S.plan].p});
+    $("payBtn").disabled=false;toast("Proxy active. You can start reviewing.");renderProxy();
+  },1200);
+}
+setInterval(()=>{const e=$("proxyLeft");if(!e||!proxyOn())return;const s=Math.floor((S.proxyUntil-Date.now())/1000);
+  e.textContent=Math.floor(s/3600)+"h "+String(Math.floor(s%3600/60)).padStart(2,"0")+"m "+String(s%60).padStart(2,"0")+"s"},1000);
+
+/* ---------- wallet ---------- */
+function renderWallet(){
+  $("wBal").textContent=money(S.bal,"NGN");
+  if(!$("cvAmt").value)$("cvAmt").value=S.bal||600;
+  $("tx").innerHTML=S.tx.length?S.tx.map(t=>`<tr><td>${t.d.toLocaleDateString()}</td><td>${t.t}</td><td><span class="pill ${t.a>0?"g":""}">${t.s}</span></td><td class="n" style="color:${t.a>0?"var(--green-d)":"var(--red)"};font-weight:700">${t.a>0?"+":"−"}${money(Math.abs(t.a),"NGN")}</td></tr>`).join(""):`<tr><td colspan="4" class="muted">No activity yet. Buy a proxy and review your first app to earn ₦600.</td></tr>`;
+  renderFx();
+}
+fillCurs();
+</script>
+</body>
+</html>

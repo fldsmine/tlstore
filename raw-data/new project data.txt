@@ -79,9 +79,9 @@ users on subscription shares revenue from the platform from the each task they c
 );
 
 Data (`package_name`, `price`, `description`, `features`, `expiry_date`, `referral_bonus`, `is_percentage`, `priority`, `image`, `is_active`, `duration`, `payment_link`, `discount`, `bonus`, `threshold`, `mini_withdraw`, `plan_id`, `special`, `maxi_daily_earnings`,`currency`, `task_quota`) VALUES
-('Lite ',		1500,	'Standard package',	'Able to review apps but limited, Cannot report app',	30,	4,	1,	1, 'standard.png',	'yes',	'One months cycle',	'',	10,	50,	3000,	1200,	0,	0,	100, 'NGN', 25),
-('Premium',		3000,	'Popular package, with high earnings',	'Able to review apps, Can report app',	30,	10,	1,	2, 'premium.png',	'yes',	'One months cycle',	'',	12,	70,	7500,	2000,	0,	1,	250, 'NGN', 40),
-('Platinum',	5500,	'Most advance package, Maximum earnings',	'Able to review apps unlimited, Can report apps, Can make suggestions',	30,	15,	1,	3, 'platinum.png',	'yes',	'One months cycle',	'',	0,	100,	19500,	4000,	0,	1,	650, 'NGN', 60);
+('Lite ',		1500,	'Standard package',	'Able to review apps but limited, Cannot report app',	30,	4,	1,	1, 'standard.png',	'yes',	'One months cycle',	'',	10,	50,	3000,	1200,	0,	0,	600, 'NGN', 25),
+('Premium',		3000,	'Popular package, with high earnings',	'Able to review apps, Can report app',	30,	10,	1,	2, 'premium.png',	'yes',	'One months cycle',	'',	12,	70,	7500,	2000,	0,	1,	500, 'NGN', 40),
+('Platinum',	5500,	'Most advance package, Maximum earnings',	'Able to review apps unlimited, Can report apps, Can make suggestions',	30,	15,	1,	3, 'platinum.png',	'yes',	'One months cycle',	'',	0,	100,	19500,	4000,	0,	1,	850, 'NGN', 60);
 
 
 4. Proxy: This is a section of the platform that allows users perform task from different region else will be limited to his region. Both app review, share ads, task are region base, so for every earnable task listed its within a region which may be restricted to users region.
