@@ -1,0 +1,638 @@
+@import 'tailwindcss';
+@import 'remixicon/fonts/remixicon.css';
+
+/* ── Nextel brand tokens — identical to the web app (resources/css/app.css) ── */
+:root {
+    --ma-primary: #18443E;
+    --ma-primary-light: #48948A;
+    --ma-secondary: #DCEB6A;
+    --ma-bg: #F4F1EA;
+    --ma-surface: #FAF9F8;
+    --ma-text: #1A1A1A;
+    --ma-muted: #8C8C8C;
+    --ma-border: #CACACA;
+    --ma-success: #34C759;
+    --ma-danger: #FF3B30;
+    --ma-warning: #FF9500;
+    --ma-info: #007AFF;
+    --ma-card-shadow: 0 4px 9px rgba(194, 194, 194, 0.07), 0 16px 16px rgba(194, 194, 194, 0.06);
+    --ma-safe-top: env(safe-area-inset-top, 0px);
+    --ma-safe-bottom: env(safe-area-inset-bottom, 0px);
+    /* Compat aliases used by screens written against the earlier palette. */
+    --ma-accent: #DCEB6A;
+    --ma-accent-text: #18443E;
+    --ma-hint: #8C8C8C;
+}
+
+/* Nohemi heading font — same local files as the web app. */
+@font-face {
+    font-family: 'Nohemi';
+    src: url('../fonts/nohemi/Nohemi-Regular.woff') format('woff');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Nohemi';
+    src: url('../fonts/nohemi/Nohemi-Medium.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Nohemi';
+    src: url('../fonts/nohemi/Nohemi-Bold.woff') format('woff');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+html,
+body {
+    background: var(--ma-bg);
+    color: var(--ma-text);
+    overscroll-behavior: none;
+}
+
+.mini-app-body {
+    font-family: 'Sora', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ma-heading {
+    font-family: 'Nohemi', 'Sora', ui-sans-serif, system-ui, sans-serif;
+}
+
+#mini-app {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Layout shell ─────────────────────────────────────────────────── */
+.ma-view {
+    flex: 1;
+    width: 100%;
+    max-width: 28rem;
+    margin: 0 auto;
+    padding: calc(0.9rem + var(--ma-safe-top)) 1rem calc(5.6rem + var(--ma-safe-bottom));
+}
+
+/* Full-bleed screens (auth) keep their own padding — no tab bar reserve. */
+.ma-view.ma-view-bare {
+    max-width: none;
+    padding: 0;
+}
+
+/* App bar (matches x-app.app-bar: greeting + plan badge + actions) */
+.ma-appbar {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.35rem 0 0.9rem;
+}
+
+.ma-appbar-badge {
+    font-size: 0.62rem;
+    font-weight: 600;
+    border-radius: 999px;
+    background: var(--ma-secondary);
+    color: var(--ma-primary);
+    padding: 0.22rem 0.6rem;
+    white-space: nowrap;
+}
+
+.ma-bell {
+    position: relative;
+    width: 2.4rem;
+    height: 2.4rem;
+    flex: none;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--ma-muted) 25%, transparent);
+    background: var(--ma-surface);
+    color: var(--ma-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.ma-bell .ma-badge {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 1.05rem;
+    height: 1.05rem;
+    padding: 0 0.25rem;
+    border-radius: 999px;
+    background: var(--ma-danger);
+    color: #fff;
+    font-size: 0.58rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Bottom tab bar — mirrors the web bottom-nav (Home / … / Profile). */
+.ma-tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background: var(--ma-surface);
+    border-top: 1px solid color-mix(in srgb, var(--ma-border) 55%, transparent);
+    padding: 0.45rem 0.25rem calc(0.45rem + var(--ma-safe-bottom));
+}
+
+.ma-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 0.3rem 0;
+    font-size: 0.62rem;
+    color: var(--ma-muted);
+    border: 0;
+    background: none;
+}
+
+.ma-tab i {
+    font-size: 1.28rem;
+    line-height: 1;
+}
+
+.ma-tab.is-active {
+    color: var(--ma-primary);
+}
+
+/* ── Components ───────────────────────────────────────────────────── */
+.ma-card {
+    background: var(--ma-surface);
+    border-radius: 20px;
+    padding: 1rem;
+    box-shadow: var(--ma-card-shadow);
+}
+
+.ma-card-tight {
+    padding: 0.75rem;
+}
+
+.no-scrollbar {
+    scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.ma-section-title {
+    font-family: 'Nohemi', sans-serif;
+    font-weight: 500;
+    font-size: 1.05rem;
+}
+
+.ma-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 14px;
+    padding: 0.72rem 1rem;
+    font-weight: 600;
+    font-size: 0.88rem;
+    border: 0;
+    color: var(--ma-primary);
+    background: var(--ma-surface);
+    border: 1px solid color-mix(in srgb, var(--ma-border) 60%, transparent);
+    transition: opacity 0.15s ease, transform 0.06s ease;
+    width: 100%;
+}
+
+.ma-btn:active {
+    transform: scale(0.98);
+}
+
+.ma-btn:disabled {
+    opacity: 0.5;
+}
+
+.ma-btn-auto {
+    width: auto;
+}
+
+.ma-btn-sm {
+    width: auto;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    border-radius: 999px;
+}
+
+.ma-btn-primary {
+    background: var(--ma-primary);
+    border-color: var(--ma-primary);
+    color: #fff;
+}
+
+.ma-btn-accent {
+    background: var(--ma-secondary);
+    border-color: var(--ma-secondary);
+    color: var(--ma-primary);
+}
+
+.ma-btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ma-primary-light);
+}
+
+.ma-btn-danger {
+    background: color-mix(in srgb, var(--ma-danger) 10%, transparent);
+    border-color: transparent;
+    color: var(--ma-danger);
+}
+
+.ma-input {
+    width: 100%;
+    background: #fff;
+    border: 1px solid color-mix(in srgb, var(--ma-border) 80%, transparent);
+    border-radius: 14px;
+    padding: 0.75rem 0.9rem;
+    color: var(--ma-text);
+    font-size: 0.95rem;
+    outline: none;
+}
+
+.ma-input:focus {
+    border-color: var(--ma-primary);
+}
+
+.ma-hint {
+    color: var(--ma-muted);
+    font-size: 0.78rem;
+}
+
+.ma-muted {
+    color: var(--ma-muted);
+}
+
+.ma-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--ma-border) 35%, transparent);
+}
+
+.ma-row:last-child {
+    border-bottom: 0;
+}
+
+.ma-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--ma-muted) 25%, transparent);
+    background: var(--ma-surface);
+    color: var(--ma-primary);
+    font-size: 1.15rem;
+}
+
+/* Web-dashboard style circular quick-action tile. */
+.ma-quick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 4.4rem;
+    background: none;
+    border: 0;
+}
+
+.ma-quick .ma-quick-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--ma-muted) 25%, transparent);
+    background: var(--ma-surface);
+    color: var(--ma-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.ma-quick span {
+    font-size: 0.7rem;
+    text-align: center;
+    line-height: 1.2;
+    color: var(--ma-text);
+}
+
+.ma-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+}
+
+.ma-chip-success {
+    background: color-mix(in srgb, var(--ma-success) 16%, transparent);
+    color: #1d7a3d;
+}
+
+.ma-chip-danger {
+    background: color-mix(in srgb, var(--ma-danger) 14%, transparent);
+    color: var(--ma-danger);
+}
+
+.ma-chip-warning {
+    background: color-mix(in srgb, var(--ma-warning) 18%, transparent);
+    color: #a05c00;
+}
+
+.ma-chip-muted {
+    background: color-mix(in srgb, var(--ma-muted) 14%, transparent);
+    color: var(--ma-muted);
+}
+
+.ma-chip-accent {
+    background: var(--ma-secondary);
+    color: var(--ma-primary);
+}
+
+/* ── Feedback states ──────────────────────────────────────────────── */
+.ma-skeleton {
+    border-radius: 16px;
+    background: linear-gradient(
+        100deg,
+        color-mix(in srgb, var(--ma-muted) 12%, transparent) 40%,
+        color-mix(in srgb, var(--ma-muted) 22%, transparent) 50%,
+        color-mix(in srgb, var(--ma-muted) 12%, transparent) 60%
+    );
+    background-size: 200% 100%;
+    animation: ma-shimmer 1.3s infinite linear;
+}
+
+@keyframes ma-shimmer {
+    to {
+        background-position-x: -200%;
+    }
+}
+
+.ma-toast {
+    position: fixed;
+    top: calc(1rem + var(--ma-safe-top));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    max-width: 90vw;
+    background: var(--ma-primary);
+    color: #fff;
+    border-radius: 14px;
+    padding: 0.7rem 1rem;
+    font-size: 0.85rem;
+    box-shadow: 0 12px 30px rgb(24 68 62 / 0.35);
+    animation: ma-toast-in 0.2s ease;
+}
+
+.ma-toast.is-error {
+    background: var(--ma-danger);
+}
+
+.ma-toast.is-success {
+    background: var(--ma-primary);
+    border: 1.5px solid var(--ma-secondary);
+}
+
+@keyframes ma-toast-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -0.5rem);
+    }
+}
+
+.ma-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--ma-muted);
+}
+
+.ma-empty i {
+    font-size: 2.6rem;
+    display: block;
+    margin-bottom: 0.75rem;
+    color: color-mix(in srgb, var(--ma-muted) 60%, transparent);
+}
+
+.ma-spinner {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    border: 2.5px solid color-mix(in srgb, var(--ma-primary) 20%, transparent);
+    border-top-color: var(--ma-primary);
+    animation: ma-spin 0.8s linear infinite;
+}
+
+@keyframes ma-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Bottom sheet (PIN entry, pickers) ────────────────────────────── */
+.ma-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgb(26 26 26 / 0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.ma-sheet {
+    width: 100%;
+    max-width: 28rem;
+    background: var(--ma-surface);
+    border-radius: 24px 24px 0 0;
+    padding: 1.25rem 1.25rem calc(1.25rem + var(--ma-safe-bottom));
+    animation: ma-sheet-in 0.22s ease;
+}
+
+@keyframes ma-sheet-in {
+    from {
+        transform: translateY(40%);
+        opacity: 0.4;
+    }
+}
+
+/* ── Auth screens (login / register / forgot / verify) ────────────── */
+.ma-auth {
+    position: relative;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.ma-auth-circle {
+    position: absolute;
+    z-index: 0;
+    border-radius: 9999px;
+    background: var(--ma-primary);
+    pointer-events: none; /* purely decorative — never steal taps */
+}
+
+.ma-auth-inner {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 24rem;
+    margin: 0 auto;
+    padding: calc(1rem + var(--ma-safe-top)) 1.4rem 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* The form area is the only scrollable region — the circles, logo, heading
+   and footer stay pinned so the design never shifts while scrolling. */
+.ma-auth-body {
+    margin-top: 1.5rem;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 1rem;
+    scrollbar-width: none;
+}
+
+.ma-auth-body::-webkit-scrollbar {
+    display: none;
+}
+
+/* Push short forms lower on the canvas (forgot password). */
+.ma-auth-body-low {
+    margin-top: 4rem;
+}
+
+.ma-auth-foot {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.9rem 0 calc(1rem + var(--ma-safe-bottom));
+    font-size: 0.75rem;
+    color: var(--ma-muted);
+}
+
+.ma-auth-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin-top: 1.1rem;
+    padding: 1rem 1.35rem;
+    border-radius: 999px;
+    background: var(--ma-primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.92rem;
+    border: 0;
+}
+
+.ma-input.ma-pill {
+    border-radius: 999px;
+    padding: 0.9rem 2.9rem;
+    background: transparent;
+}
+
+.ma-check {
+    appearance: none;
+    width: 1.15rem;
+    height: 1.15rem;
+    border: 2px solid var(--ma-primary);
+    border-radius: 5px;
+    display: inline-block;
+    position: relative;
+    flex: none;
+    background: transparent;
+}
+
+.ma-check:checked {
+    background: var(--ma-primary);
+}
+
+.ma-check:checked::after {
+    content: '✓';
+    color: #fff;
+    font-size: 0.7rem;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ma-btn-peach {
+    background: #F3BFA0;
+    border-color: transparent;
+    color: #fff;
+}
+
+/* Text link buttons on auth screens — generous tap targets, above decor. */
+.ma-linkbtn {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    color: var(--ma-primary);
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
+    position: relative;
+    z-index: 2;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ma-linkbtn:active {
+    opacity: 0.65;
+}
+
+/* Chat bubbles */
+.ma-bubble {
+    max-width: 82%;
+    border-radius: 16px;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.86rem;
+    line-height: 1.35;
+    white-space: pre-line;
+}
+
+.ma-bubble-me {
+    background: var(--ma-primary);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+.ma-bubble-them {
+    background: #fff;
+    border: 1px solid color-mix(in srgb, var(--ma-border) 60%, transparent);
+    border-bottom-left-radius: 4px;
+}
