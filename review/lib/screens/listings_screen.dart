@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../features/ads/presentation/screens/ad_evidence_screen.dart';
@@ -29,13 +31,30 @@ class ListingsScreen extends StatefulWidget {
 }
 
 class _ListingsScreenState extends State<ListingsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   bool _loading = true;
+  bool _featuredOnly = false;
+  String _sort = 'latest';
+  String _location = 'all';
   String? _error;
   List<Map<String, dynamic>> _items = const [];
+  List<String> _locationOptions = const [];
+  int _loadGeneration = 0;
+  int _totalCount = 0;
 
-  String get _path => widget.kind == ListingKind.appReview
-      ? 'listings/apps?per_page=50'
-      : 'listings/ads?per_page=50';
+  String get _path {
+    final path = widget.kind == ListingKind.appReview
+        ? 'listings/apps'
+        : 'listings/ads';
+    final query = <String, String>{'per_page': '50'};
+    final search = _searchController.text.trim();
+    if (search.isNotEmpty) query['search'] = search;
+    if (_featuredOnly) query['featured'] = '1';
+    if (_location != 'all') query['location'] = _location;
+    if (_sort != 'latest') query['sort'] = _sort;
+    return '$path?${Uri(queryParameters: query).query}';
+  }
   String get _title =>
       widget.kind == ListingKind.appReview ? 'Review apps' : 'Share ads';
 
@@ -45,7 +64,15 @@ class _ListingsScreenState extends State<ListingsScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     setState(() {
       _loading = true;
       _error = null;
@@ -54,15 +81,29 @@ class _ListingsScreenState extends State<ListingsScreen> {
       await widget.api.loadExchangeRates(widget.token);
       final response = await widget.api.get(_path, widget.token);
       final list = response['data'];
-      if (!mounted) return;
+      final meta = response['meta'];
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _items = list is List
             ? list.whereType<Map<String, dynamic>>().toList()
             : const [];
+        final locations = _items
+            .map((item) => item['location']?.toString().trim() ?? '')
+            .where((location) => location.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+        final locationsFromServer = meta is Map<String, dynamic> && meta['locations'] is List
+            ? (meta['locations'] as List).map((value) => value.toString()).toSet()
+            : <String>{};
+        _locationOptions = {..._locationOptions, ...locations, ...locationsFromServer}.toList()..sort();
+        _totalCount = meta is Map<String, dynamic> && meta['total'] is num
+            ? (meta['total'] as num).toInt()
+            : _items.length;
         _loading = false;
       });
     } on AuthException catch (error) {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() {
           _error = error.message;
           _loading = false;
@@ -71,40 +112,97 @@ class _ListingsScreenState extends State<ListingsScreen> {
     }
   }
 
+  void _onSearchChanged(String _) {
+    setState(() {});
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), _load);
+  }
+
+  void _updateFilter(VoidCallback update) {
+    setState(update);
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    appBar: AppBar(
-      title: Text(_title, style: const TextStyle(fontWeight: FontWeight.w800)),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    ),
-    body: _loading
+	appBar: AppBar(
+	  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+	  elevation: 0,
+	  scrolledUnderElevation: 0,
+	  toolbarHeight: 60,
+	  titleSpacing: 0,
+	  title: SizedBox(
+		height: 48,
+		child: _buildToolbarSearch(),
+	  ),
+	  actions: [
+		  Padding(
+			padding: const EdgeInsets.only(right: 12, left: 8),
+			child: Container(
+			  width: 48,
+			  height: 48,
+			  clipBehavior: Clip.antiAlias,
+			  decoration: BoxDecoration(
+				color: Colors.grey[200],
+				borderRadius: BorderRadius.circular(12),
+			  ),
+			  child: Image.asset(
+				'assets/logo.jpg',
+				fit: BoxFit.cover,
+			  ),
+			),
+		  ),
+		],
+	),
+	
+    body: _loading && _items.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : _error != null
         ? ListingErrorState(message: _error!, retry: _load)
-        : _items.isEmpty
-        ? ListingEmptyState(
-            title: 'No tasks available yet',
-            message: 'There are no active campaigns to show right now. Available apps and ads are visible whether or not you have a subscription.',
-          )
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                ListingIntro(kind: widget.kind, count: _items.length),
+                ListingIntro(kind: widget.kind, count: _totalCount),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Browse campaigns across all locations. Each listing shows whether your current plan covers it.',
-                    style: TextStyle(
-                      color: mutedInk,
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
+                _buildSearchAndFilters(),
+                const SizedBox(height: 12),
+                const Text(
+                  'Browse campaigns across locations. Each listing shows whether your current plan covers it.',
+                  style: TextStyle(color: mutedInk, fontSize: 12, height: 1.4),
                 ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Text(
+                      'Available listings',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$_totalCount found',
+                      style: const TextStyle(
+                        color: mutedInk,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (_loading)
+                  const LinearProgressIndicator(minHeight: 2),
+                if (_items.isEmpty)
+                  ListingEmptyState(
+                    title: _searchController.text.trim().isEmpty
+                        ? 'No tasks available yet'
+                        : 'No matching listings',
+                    message: _searchController.text.trim().isEmpty
+                        ? 'There are no active campaigns to show right now. Available apps and ads are visible whether or not you have a subscription.'
+                        : 'Try a different search or clear one of the filters.',
+                  ),
                 ..._items.map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -160,6 +258,198 @@ class _ListingsScreenState extends State<ListingsScreen> {
             ),
           ),
   );
+
+
+  Widget _buildToolbarSearch() => TextField(
+    controller: _searchController,
+    textInputAction: TextInputAction.search,
+    onChanged: _onSearchChanged,
+    onSubmitted: (_) {
+      _searchDebounce?.cancel();
+      _load();
+    },
+    decoration: InputDecoration(
+      hintText: widget.kind == ListingKind.appReview
+          ? 'Search apps, stores or developers'
+          : 'Search ads by title or description',
+      prefixIcon: const Icon(Icons.search_rounded),
+      suffixIcon: _searchController.text.isEmpty
+          ? null
+          : IconButton(
+              tooltip: 'Clear search',
+              onPressed: () {
+                _searchDebounce?.cancel();
+                _searchController.clear();
+                setState(() {});
+                _load();
+              },
+              icon: const Icon(Icons.close_rounded),
+            ),
+      filled: true,
+      fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.55),
+      contentPadding: const EdgeInsets.symmetric(vertical: 13),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(
+          color: Theme.of(context).dividerColor.withOpacity(0.35),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: brandGreen, width: 1.4),
+      ),
+      isDense: true,
+    ),
+  );
+
+  bool get _hasActiveFilters =>
+      _featuredOnly || _sort != 'latest' || _location != 'all';
+
+  void _clearFilters() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _featuredOnly = false;
+      _sort = 'latest';
+      _location = 'all';
+    });
+    _load();
+  }
+
+  Widget _buildSearchAndFilters() {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.45)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.tune_rounded, size: 18, color: brandGreen),
+              const SizedBox(width: 7),
+              const Text(
+                'Refine results',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+              const Spacer(),
+              if (_hasActiveFilters || _searchController.text.trim().isNotEmpty)
+                TextButton(
+                  onPressed: _clearFilters,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: const Text('Clear all'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilterChip(
+                label: const Text('Featured'),
+                avatar: const Icon(Icons.star_rounded, size: 17),
+                selected: _featuredOnly,
+                showCheckmark: false,
+                onSelected: (value) =>
+                    _updateFilter(() => _featuredOnly = value),
+                selectedColor: brandGreen.withOpacity(0.13),
+                side: BorderSide(
+                  color: _featuredOnly
+                      ? brandGreen.withOpacity(0.55)
+                      : theme.dividerColor.withOpacity(0.55),
+                ),
+                labelStyle: TextStyle(
+                  color: _featuredOnly ? brandGreen : null,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.sort_rounded, size: 17),
+                label: Text(
+                  _sort == 'reward_desc' ? 'Highest reward' : 'Newest',
+                ),
+                onPressed: () => _updateFilter(() {
+                  _sort = _sort == 'latest' ? 'reward_desc' : 'latest';
+                }),
+                side: BorderSide(
+                  color: theme.dividerColor.withOpacity(0.55),
+                ),
+                backgroundColor: theme.colorScheme.surface,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          if (_locationOptions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _location,
+              isExpanded: true,
+              isDense: true,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.public_rounded, size: 19),
+                labelText: 'Target location',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(13),
+                  borderSide: BorderSide(
+                    color: theme.dividerColor.withOpacity(0.55),
+                  ),
+                ),
+              ),
+              items: [
+                const DropdownMenuItem(
+                  value: 'all',
+                  child: Text('All locations'),
+                ),
+                const DropdownMenuItem(
+                  value: 'global',
+                  child: Text('Global'),
+                ),
+                ..._locationOptions.map(
+                  (location) => DropdownMenuItem(
+                    value: location,
+                    child: Text(location, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  _updateFilter(() => _location = value);
+                }
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
 }
 
 class ListingDetailScreen extends StatefulWidget {
@@ -224,6 +514,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             _app['location']?.toString() ??
             'this location',
       );
+
       if (mounted) await _loadListingGuidance();
       return;
     }

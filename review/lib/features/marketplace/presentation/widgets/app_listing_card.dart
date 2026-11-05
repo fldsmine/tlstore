@@ -173,8 +173,8 @@ class AppListingCard extends StatelessWidget {
   }
 
   String _actionLabel(String? status) => switch (status) {
-    'marketplace_plan_required' => 'View marketplace plans',
-    'location_coverage_required' => 'Add location coverage',
+    'marketplace_plan_required' => 'Review & Earn',
+    'location_coverage_required' => 'Review App Now',
     _ => 'Review this app',
   };
 }
@@ -279,9 +279,9 @@ class _AccessNotice extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final ready = status == 'eligible';
     final text = switch (status) {
-      'marketplace_plan_required' => 'Plan required to start this review',
-      'location_coverage_required' => 'Location add-on required to start',
-      _ => 'Ready to review with your plan',
+      'marketplace_plan_required' => 'Make Your Review & Earn',
+      'location_coverage_required' => 'Review this app & earn',
+      _ => 'Review now & earn your reward',
     };
     final color = ready ? scheme.primary : scheme.tertiary;
     return Container(

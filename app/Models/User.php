@@ -186,4 +186,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserAnnouncementDismissal::class);
     }
+
+    public function rankQualifications(): HasMany
+    {
+        return $this->hasMany(UserRankQualification::class);
+    }
 }

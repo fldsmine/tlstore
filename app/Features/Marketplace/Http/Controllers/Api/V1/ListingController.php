@@ -13,8 +13,14 @@ final class ListingController
 {
     public function apps(Request $request, ListEligibleListings $listings, ListingEligibility $eligibility): JsonResponse
     {
-        $validated = $request->validate(['per_page' => ['sometimes', 'integer', 'min:1', 'max:50']]);
-        $result = $listings->apps($request->user(), $validated['per_page'] ?? 20);
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'location' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'featured' => ['sometimes', 'boolean'],
+            'sort' => ['sometimes', 'in:latest,reward_desc'],
+        ]);
+        $result = $listings->apps($request->user(), $validated['per_page'] ?? 20, $validated['search'] ?? null, $validated['location'] ?? null, (bool) ($validated['featured'] ?? false), $validated['sort'] ?? 'latest');
         $result->getCollection()->each(fn (AppReviewCampaign $campaign) => $campaign->setAttribute(
             'task_access_status', $eligibility->taskAccessStatus($request->user(), $campaign->location),
         ));
@@ -24,13 +30,20 @@ final class ListingController
             'per_page' => $result->perPage(),
             'total' => $result->total(),
             'last_page' => $result->lastPage(),
+            'locations' => AppReviewCampaign::query()->where('status', 'active')->whereNotNull('location')->distinct()->orderBy('location')->pluck('location'),
         ]]);
     }
 
     public function ads(Request $request, ListEligibleListings $listings, ListingEligibility $eligibility): JsonResponse
     {
-        $validated = $request->validate(['per_page' => ['sometimes', 'integer', 'min:1', 'max:50']]);
-        $result = $listings->ads($request->user(), $validated['per_page'] ?? 20);
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'location' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'featured' => ['sometimes', 'boolean'],
+            'sort' => ['sometimes', 'in:latest,reward_desc'],
+        ]);
+        $result = $listings->ads($request->user(), $validated['per_page'] ?? 20, $validated['search'] ?? null, $validated['location'] ?? null, (bool) ($validated['featured'] ?? false), $validated['sort'] ?? 'latest');
         $result->getCollection()->each(fn (Ad $ad) => $ad->setAttribute(
             'task_access_status', $eligibility->taskAccessStatus($request->user(), $ad->location),
         ));
@@ -40,6 +53,7 @@ final class ListingController
             'per_page' => $result->perPage(),
             'total' => $result->total(),
             'last_page' => $result->lastPage(),
+            'locations' => Ad::query()->where('status', 'active')->whereNotNull('location')->distinct()->orderBy('location')->pluck('location'),
         ]]);
     }
 

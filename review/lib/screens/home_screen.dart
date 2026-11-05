@@ -28,6 +28,7 @@ import 'support_ticket_demo_screen.dart';
 import 'about_screen.dart';
 import 'topup_screen.dart';
 import 'wallet_transfer_screen.dart';
+import 'user_ranking_screen.dart';
 import '../services/push_notification_service.dart';
 
 const _dashboardInk = Color(0xFF202A38);
@@ -767,6 +768,11 @@ class _HomeScreenState extends State<HomeScreen>
             token: widget.result.token,
             user: widget.result.user,
           ),
+          0,
+        );
+      case AppDrawerDestination.rankings:
+        _pushPage(
+          UserRankingScreen(api: widget.api, token: widget.result.token),
           0,
         );
       case AppDrawerDestination.notifications:

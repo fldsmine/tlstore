@@ -35,6 +35,7 @@ final class LedgerEntryObserver
             str_contains($entry->entry_type, 'withdrawal') => 'withdrawal',
             str_contains($entry->entry_type, 'subscription') => 'subscription_plan',
             str_contains($entry->entry_type, 'location') => 'location_addons',
+            str_contains($entry->entry_type, 'rank') => 'rank_earning',
             str_contains($entry->entry_type, 'transfer') => 'fund_transfer',
             str_contains($entry->entry_type, 'topup') || str_contains($entry->entry_type, 'deposit') => 'top_up_fund',
             default => 'fund_transfer',

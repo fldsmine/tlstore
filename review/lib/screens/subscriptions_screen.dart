@@ -176,149 +176,227 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final active = _activeMarketplace;
+    final activePlan = _map(active?['plan']);
+
     return Scaffold(
+      backgroundColor: colors.surface,
       appBar: AppBar(
-        title: const Text('Marketplace subscription'),
-        centerTitle: true,
+        title: const Text('Subscriptions'),
+        centerTitle: false,
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Refresh subscriptions',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 6),
+        ],
       ),
       body: _loading && _plans.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_error!, textAlign: TextAlign.center),
-                    const SizedBox(height: 10),
-                    FilledButton.tonal(
-                      onPressed: _load,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (_activeMarketplace case final active?)
-                    Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () => _showActiveDetails(active),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              const CircleAvatar(
-                                child: Icon(Icons.verified_rounded),
-                              ),
-                              const SizedBox(width: 13),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Your active package',
-                                      style: theme.textTheme.labelLarge,
-                                    ),
-                                    Text(
-                                      _map(
-                                            active['plan'],
-                                          )['name']?.toString() ??
-                                          'Marketplace package',
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                    ),
-                                    Text(
-                                      'Tap to view plan and location add-ons · Ends ${_formatDate(active['ends_at'])}',
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.chevron_right_rounded),
-                            ],
-                          ),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cloud_off_rounded,
+                            size: 46, color: colors.error),
+                        const SizedBox(height: 14),
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 18),
+                        FilledButton.icon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Try again'),
                         ),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Text(
-                        'Choose a marketplace package to review apps and share ads. You can browse all listings before subscribing.',
-                      ),
-                    ),
-                  if (_activeAddons.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Card(
-                      child: ExpansionTile(
-                        leading: const Icon(Icons.public_rounded),
-                        title: Text(
-                          'Active location add-ons (${_activeAddons.length})',
-                        ),
-                        subtitle: const Text(
-                          'These stay active when you switch marketplace packages.',
-                        ),
-                        children: _activeAddons.map((addon) {
-                          final plan = _map(addon['plan']);
-                          final coverage = _coverageSummary(plan);
-                          return ListTile(
-                            title: Text(
-                              plan['name']?.toString() ?? 'Location add-on',
-                            ),
-                            subtitle: Text(
-                              '${coverage.isEmpty ? 'Coverage not configured' : coverage} · Ends ${_formatDate(addon['ends_at'])}',
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  Text(
-                    'Available packages',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  if (_plans.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 30),
-                      child: Center(
-                        child: Text(
-                          'No marketplace packages are available right now.',
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+                    children: [
+                      _SubscriptionHero(
+                        active: active != null,
+                        planName: activePlan['name']?.toString() ?? 'No active plan',
+                        endsAt: active?['ends_at'],
+                        onTap: active == null ? null : () => _showActiveDetails(active),
+                      ),
+                      const SizedBox(height: 22),
+                      if (active != null) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _MetricTile(
+                                icon: Icons.rate_review_outlined,
+                                label: 'Review tasks',
+                                value: activePlan['max_review_tasks']?.toString() ?? '—',
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _MetricTile(
+                                icon: Icons.campaign_outlined,
+                                label: 'Ad shares',
+                                value: activePlan['max_ad_shares']?.toString() ?? '—',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+                      ],
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('CHOOSE YOUR PLAN',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colors.primary,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.3,
+                                    )),
+                                const SizedBox(height: 5),
+                                Text('Marketplace packages',
+                                    style: theme.textTheme.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -.5,
+                                    )),
+                              ],
+                            ),
+                          ),
+                          if (_plans.isNotEmpty)
+                            Text('${_plans.length} available',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                )),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        'Pick the access level that matches how you want to explore, review and share listings.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.4,
                         ),
                       ),
-                    )
-                  else
-                    ..._plans.map(
-                      (plan) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _PlanCard(
-                          plan: plan,
-                          active: _isActivePlan(plan),
-                          purchasing: _purchasing == _asInt(plan['id']),
-                          onTap: () => _openPurchase(plan),
+                      const SizedBox(height: 16),
+                      if (_plans.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.inventory_2_outlined, size: 34),
+                              SizedBox(height: 10),
+                              Text('No marketplace packages are available right now.'),
+                            ],
+                          ),
+                        )
+                      else
+                        ..._plans.map((plan) => Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: _PlanCard(
+                                plan: plan,
+                                active: _isActivePlan(plan),
+                                purchasing: _purchasing == _asInt(plan['id']),
+                                onTap: () => _openPurchase(plan),
+                              ),
+                            )),
+                      if (_activeAddons.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: colors.outlineVariant),
+                          ),
+                          child: Theme(
+                            data: theme.copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                              leading: Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: colors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(13),
+                                ),
+                                child: Icon(Icons.public_rounded,
+                                    color: colors.onPrimaryContainer),
+                              ),
+                              title: Text('Location add-ons (${_activeAddons.length})',
+                                  style: const TextStyle(fontWeight: FontWeight.w800)),
+                              subtitle: const Text('Your extra market coverage'),
+                              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              children: _activeAddons.map((addon) {
+                                final plan = _map(addon['plan']);
+                                final coverage = _coverageSummary(plan);
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.check_circle_rounded),
+                                  title: Text(plan['name']?.toString() ?? 'Location add-on'),
+                                  subtitle: Text(
+                                    '${coverage.isEmpty ? 'Coverage not configured' : coverage}\nActive until ${_formatDate(addon['ends_at'])}',
+                                  ),
+                                  isThreeLine: true,
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: colors.outlineVariant),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.lock_outline_rounded, color: colors.primary),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Secure subscription payments',
+                                      style: TextStyle(fontWeight: FontWeight.w800)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Choose a supported payment currency and gateway at checkout. You can also pay with your funded wallet.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ),
+                    ],
+                  ),
+                ),
     );
   }
+
 }
 
 class _PlanCard extends StatelessWidget {
@@ -328,6 +406,7 @@ class _PlanCard extends StatelessWidget {
     required this.purchasing,
     required this.onTap,
   });
+
   final Map<String, dynamic> plan;
   final bool active;
   final bool purchasing;
@@ -338,121 +417,197 @@ class _PlanCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final currency = plan['currency']?.toString() ?? 'USD';
-    final digits = _asInt(
-      plan['currency_minor_units'],
-      fallback: 2,
-    ).clamp(0, 4);
-    final priceMinor = _asInt(plan['price_minor']);
-    final discount = _asDouble(plan['discount']);
-    final payable = (priceMinor * (100 - discount.clamp(0, 100)) / 100).round();
+    final digits = _asInt(plan['currency_minor_units'], fallback: 2).clamp(0, 4);
+    final original = _asInt(plan['price_minor']);
+    final discount = _asDouble(plan['discount']).clamp(0, 100);
+    final payable = (original * (100 - discount) / 100).round();
     final bonus = _asDouble(plan['bonus']);
     final special = _asInt(plan['is_special']) == 1;
     final features = _planFeatures(plan);
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 0,
-      color: colors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: active ? colors.primary : colors.outlineVariant,
-          width: active ? 1.7 : 1,
+    final name = plan['name']?.toString() ?? 'Plan';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: active ? colors.primary : special ? colors.tertiary : colors.outlineVariant,
+          width: active || special ? 1.6 : 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withOpacity(.045),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(17),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(21),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    plan['name']?.toString() ?? 'Plan',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+            if (active || special)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                color: active ? colors.primary : colors.tertiaryContainer,
+                child: Row(
+                  children: [
+                    Icon(
+                      active ? Icons.verified_rounded : Icons.auto_awesome_rounded,
+                      size: 15,
+                      color: active ? colors.onPrimary : colors.onTertiaryContainer,
                     ),
-                  ),
+                    const SizedBox(width: 7),
+                    Text(
+                      active ? 'CURRENT PACKAGE' : 'RECOMMENDED',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: active ? colors.onPrimary : colors.onTertiaryContainer,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
-                if (special)
-                  Chip(
-                    label: const Text('FEATURED'),
-                    visualDensity: VisualDensity.compact,
-                    backgroundColor: colors.tertiaryContainer,
-                  ),
-                if (active) Icon(Icons.verified_rounded, color: colors.primary),
-              ],
-            ),
-            const SizedBox(height: 5),
-            Text(
-              '${_money(payable, currency, digits)} / ${plan['duration_count'] ?? 1} ${plan['billing_interval'] ?? 'monthly'}',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colors.primary,
-                fontWeight: FontWeight.w800,
               ),
-            ),
-            if (discount > 0)
-              Text(
-                '${discount.toStringAsFixed(0)}% discount',
-                style: theme.textTheme.bodySmall,
-              ),
-            if (bonus > 0 && plan['bonus_active'] != false)
-              Text(
-                'Includes ${_money(_asInt((bonus * math.pow(10, digits)).round()), currency, digits)} welcome bonus',
-                style: theme.textTheme.bodySmall,
-              ),
-            if (features.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              ...features
-                  .take(6)
-                  .map(
-                    (feature) => Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_rounded,
-                            color: colors.primary,
-                            size: 17,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(19, 18, 19, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -.3,
+                                )),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${plan['duration_count'] ?? 1} ${plan['billing_interval'] ?? 'monthly'} access',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (discount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: colors.secondaryContainer,
+                            borderRadius: BorderRadius.circular(30),
                           ),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              feature,
-                              style: theme.textTheme.bodySmall,
+                          child: Text('${discount.toStringAsFixed(0)}% OFF',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colors.onSecondaryContainer,
+                                fontWeight: FontWeight.w900,
+                              )),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(_money(payable, currency, digits),
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: colors.primary,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1,
+                          )),
+                      const SizedBox(width: 7),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 5),
+                        child: Text('/ ${plan['billing_interval'] ?? 'month'}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            )),
+                      ),
+                    ],
+                  ),
+                  if (discount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text('Regular price ${_money(original, currency, digits)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            decoration: TextDecoration.lineThrough,
+                          )),
+                    ),
+                  if (bonus > 0 && plan['bonus_active'] != false) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(Icons.card_giftcard_rounded, size: 17, color: colors.tertiary),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            'Includes ${_money(_asInt((bonus * math.pow(10, digits)).round()), currency, digits)} welcome bonus',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Divider(color: colors.outlineVariant),
+                  const SizedBox(height: 8),
+                  Text('WHAT’S INCLUDED',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      )),
+                  const SizedBox(height: 10),
+                  if (features.isNotEmpty)
+                    ...features.take(6).map((feature) => _PlanFeature(text: feature))
+                  else ...[
+                    if (plan['max_review_tasks'] != null)
+                      _PlanFeature(text: 'Up to ${plan['max_review_tasks']} app reviews'),
+                    if (plan['max_ad_shares'] != null)
+                      _PlanFeature(text: 'Up to ${plan['max_ad_shares']} ad shares'),
+                    if (plan['global_listing_access'] == true)
+                      const _PlanFeature(text: 'Access to global listings'),
+                  ],
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      onPressed: purchasing ? null : onTap,
+                      style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
+                      child: purchasing
+                          ? const SizedBox(
+                              width: 19,
+                              height: 19,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(active ? 'View current package' : 'Continue with $name'),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward_rounded, size: 18),
+                              ],
+                            ),
                     ),
                   ),
-            ] else ...[
-              if (plan['max_review_tasks'] != null)
-                _feature(
-                  context,
-                  'Up to ${plan['max_review_tasks']} app reviews',
-                ),
-              if (plan['max_ad_shares'] != null)
-                _feature(context, 'Up to ${plan['max_ad_shares']} ad shares'),
-              if (plan['global_listing_access'] == true)
-                _feature(context, 'Access to global listings'),
-            ],
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: purchasing ? null : onTap,
-                child: purchasing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        active
-                            ? 'Already active · View details'
-                            : 'Join Package',
-                      ),
+                ],
               ),
             ),
           ],
@@ -460,23 +615,180 @@ class _PlanCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _feature(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.only(top: 6),
-    child: Row(
-      children: [
-        Icon(
-          Icons.check_rounded,
-          size: 16,
-          color: Theme.of(context).colorScheme.primary,
+class _PlanFeature extends StatelessWidget {
+  const _PlanFeature({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle_rounded, size: 18, color: colors.primary),
+          const SizedBox(width: 9),
+          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionHero extends StatelessWidget {
+  const _SubscriptionHero({
+    required this.active,
+    required this.planName,
+    required this.endsAt,
+    required this.onTap,
+  });
+
+  final bool active;
+  final String planName;
+  final Object? endsAt;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final foreground = colors.onPrimary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colors.primary, Color.lerp(colors.primary, colors.tertiary, .55)!],
+            ),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -12,
+                top: -18,
+                child: Icon(Icons.workspace_premium_rounded,
+                    size: 125, color: foreground.withOpacity(.10)),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.auto_awesome_rounded, color: foreground, size: 17),
+                      const SizedBox(width: 7),
+                      Text('YOUR MARKETPLACE ACCESS',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: foreground.withOpacity(.9),
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                          )),
+                    ],
+                  ),
+                  const SizedBox(height: 17),
+                  Text(active ? planName : 'Unlock more opportunities',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -.5,
+                      )),
+                  const SizedBox(height: 7),
+                  Text(
+                    active
+                        ? 'Your package is active until ${_formatDate(endsAt)}.'
+                        : 'Choose a package to review apps and share ads across the marketplace.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: foreground.withOpacity(.9),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 17),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: foreground.withOpacity(.15),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: foreground.withOpacity(.22)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(active ? Icons.verified_rounded : Icons.explore_rounded,
+                            size: 16, color: foreground),
+                        const SizedBox(width: 7),
+                        Text(active ? 'Subscription active' : 'Explore packages',
+                            style: TextStyle(color: foreground, fontWeight: FontWeight.w700)),
+                        if (active) ...[
+                          const SizedBox(width: 7),
+                          Icon(Icons.arrow_forward_rounded, size: 15, color: foreground),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(text, style: Theme.of(context).textTheme.bodySmall),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: colors.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 19, color: colors.onPrimaryContainer),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                )),
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    )),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Future<String?> showPlanPurchaseSheet({

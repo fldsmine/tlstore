@@ -30,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _currency = TextEditingController();
   final _email = TextEditingController();
   final _country = TextEditingController();
+
   bool _editing = false;
   bool _saving = false;
   bool _mediaBusy = false;
@@ -98,6 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
       if (mounted) {
         setState(() => _editing = false);
+        _fillControllers();
         showAuthMessage(context, 'Profile updated.');
       }
     } on AuthException catch (error) {
@@ -116,16 +118,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (picked == null || picked.files.isEmpty) return;
       final image = picked.files.first;
       if (image.size > 5 * 1024 * 1024) {
-        if (mounted)
-          showAuthMessage(context, 'Choose an image smaller than 5 MB.');
+        if (mounted) showAuthMessage(context, 'Choose an image smaller than 5 MB.');
         return;
       }
       setState(() => _mediaBusy = true);
-      final response = await widget.api.uploadProfileImage(
-        widget.token,
-        type,
-        image,
-      );
+      final response = await widget.api.uploadProfileImage(widget.token, type, image);
       if (response['data'] is Map<String, dynamic>) {
         _user.addAll(response['data'] as Map<String, dynamic>);
       }
@@ -163,6 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final submit = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text('Change password'),
         content: Form(
           key: formKey,
@@ -172,13 +170,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               TextFormField(
                 controller: current,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Current password',
-                ),
+                decoration: const InputDecoration(labelText: 'Current password'),
                 validator: (value) => value == null || value.isEmpty
                     ? 'Enter your current password'
                     : null,
               ),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: next,
                 obscureText: true,
@@ -187,12 +184,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ? 'Use at least 10 characters'
                     : null,
               ),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: confirm,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm new password',
-                ),
+                decoration: const InputDecoration(labelText: 'Confirm new password'),
                 validator: (value) =>
                     value != next.text ? 'Passwords do not match' : null,
               ),
@@ -210,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.pop(dialogContext, true);
               }
             },
-            child: const Text('Update'),
+            child: const Text('Update password'),
           ),
         ],
       ),
@@ -248,10 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (response?['data'] is Map<String, dynamic> && mounted) {
         setState(() => _user.addAll(response!['data'] as Map<String, dynamic>));
-        showAuthMessage(
-          context,
-          response?['message']?.toString() ?? 'PIN updated.',
-        );
+        showAuthMessage(context, response?['message']?.toString() ?? 'PIN updated.');
       }
     } finally {
       if (mounted) setState(() => _securityBusy = false);
@@ -263,13 +256,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final code = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text('Remove withdrawal PIN'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Enter your current PIN to turn off withdrawal verification.',
-            ),
+            const Text('Enter your current PIN to turn off withdrawal verification.'),
             const SizedBox(height: 12),
             _pinField(pin, 'Current 4-digit PIN'),
           ],
@@ -311,20 +303,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TextEditingController controller,
     String label, {
     String? Function(String?)? validator,
-  }) => TextFormField(
-    controller: controller,
-    obscureText: true,
-    keyboardType: TextInputType.number,
-    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-    maxLength: 4,
-    textAlign: TextAlign.center,
-    decoration: InputDecoration(labelText: label, counterText: ''),
-    validator:
-        validator ??
-        (value) => value == null || value.length != 4
-            ? 'Enter exactly 4 digits.'
-            : null,
-  );
+  }) =>
+      TextFormField(
+        controller: controller,
+        obscureText: true,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        maxLength: 4,
+        textAlign: TextAlign.center,
+        decoration: InputDecoration(labelText: label, counterText: ''),
+        validator: validator ??
+            (value) => value == null || value.length != 4
+                ? 'Enter exactly 4 digits.'
+                : null,
+      );
 
   Future<void> _setupTwoFactor() async {
     if (_securityBusy) return;
@@ -364,6 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text('Save your recovery codes'),
         content: SingleChildScrollView(
           child: Column(
@@ -385,8 +378,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton.icon(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: codes.join('\n')));
-              if (dialogContext.mounted)
+              if (dialogContext.mounted) {
                 showAuthMessage(dialogContext, 'Recovery codes copied.');
+              }
             },
             icon: const Icon(Icons.copy_rounded),
             label: const Text('Copy codes'),
@@ -405,6 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final enteredCode = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text('Turn off authenticator verification'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -463,7 +458,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final user = _user;
     final name = user['full_name']?.toString().trim() ?? '';
     final email = user['email']?.toString() ?? '';
@@ -474,287 +468,255 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final country = (countryName == null || countryName.isEmpty)
         ? (countryCode.isEmpty ? 'Not set' : countryCode)
         : '$countryName ($countryCode)';
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_editing ? 'Edit profile' : 'My profile'),
-        actions: [
-          if (_editing)
-            TextButton(
-              onPressed: _saving
-                  ? null
-                  : () => setState(() {
-                      _editing = false;
-                      _fillControllers();
-                    }),
-              child: const Text('Cancel'),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextButton.icon(
-                onPressed: () => setState(() => _editing = true),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Edit'),
-              ),
-            ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: [
-          _ProfileHero(
-            name: name.isEmpty ? 'Your profile' : name,
-            username: user['username']?.toString() ?? '',
-            email: email,
-            avatarUrl: avatar,
-            coverUrl: cover,
-            verified: user['email_verified'] == true,
+    return Theme(
+      data: theme.copyWith(
+        scaffoldBackgroundColor: const Color(0xFFF5F7F5),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(19),
+            side: const BorderSide(color: Color(0xFFE7ECE8)),
           ),
-          const SizedBox(height: 16),
-          if (_editing) ...[
-            if (_mediaBusy) const LinearProgressIndicator(minHeight: 2),
-            _SectionCard(
-              title: 'Profile photos',
-              subtitle: 'Add a photo and cover to personalize your profile.',
-              child: Column(
-                children: [
-                  _MediaRow(
-                    title: 'Profile photo',
-                    url: avatar,
-                    isAvatar: true,
-                    busy: _mediaBusy,
-                    onPick: () => _pickImage('avatar'),
-                    onRemove: avatar == null
-                        ? null
-                        : () => _removeImage('avatar'),
-                  ),
-                  const Divider(height: 22),
-                  _MediaRow(
-                    title: 'Cover image',
-                    url: cover,
-                    busy: _mediaBusy,
-                    onPick: () => _pickImage('cover'),
-                    onRemove: cover == null
-                        ? null
-                        : () => _removeImage('cover'),
-                  ),
-                ],
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFFFAFBFA),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: const BorderSide(color: Color(0xFFE4EAE5)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: const BorderSide(color: Color(0xFFE4EAE5)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: const BorderSide(color: brandGreen, width: 1.4),
+          ),
+        ),
+      ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            _editing ? 'Edit profile' : 'My profile',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+          ),
+          backgroundColor: const Color(0xFFF5F7F5),
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          actions: [
+            if (_editing)
+              TextButton(
+                onPressed: _saving
+                    ? null
+                    : () => setState(() {
+                          _editing = false;
+                          _fillControllers();
+                        }),
+                child: const Text('Cancel'),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _editing = true),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit'),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _SectionCard(
-              title: 'Personal details',
-              child: Column(
-                children: [
-                  _EditField(
-                    controller: _name,
-                    label: 'Full name',
-                    icon: Icons.person_outline,
-                  ),
-                  _EditField(
-                    controller: _username,
-                    label: 'Username',
-                    icon: Icons.alternate_email,
-                  ),
-                  _EditField(
-                    controller: _email,
-                    label: 'Email address',
-                    icon: Icons.email_outlined,
-                    readOnly: true,
-                  ),
-                  _EditField(
-                    controller: _phone,
-                    label: 'Phone number',
-                    icon: Icons.phone_outlined,
-                    keyboard: TextInputType.phone,
-                  ),
-                  _EditField(
-                    controller: _country,
-                    label: 'Country',
-                    icon: Icons.public,
-                    readOnly: true,
-                  ),
-                  _EditField(
-                    controller: _currency,
-                    label: 'Preferred currency',
-                    icon: Icons.currency_exchange,
-                    capitalization: TextCapitalization.characters,
-                  ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 17,
-                              height: 17,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.check_rounded),
-                      label: Text(_saving ? 'Saving…' : 'Save changes'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            _SectionCard(
-              title: 'Personal details',
-              child: Column(
-                children: [
-                  _DetailRow(
-                    icon: Icons.person_outline,
-                    label: 'Full name',
-                    value: name,
-                  ),
-                  _DetailRow(
-                    icon: Icons.alternate_email,
-                    label: 'Username',
-                    value: user['username']?.toString(),
-                  ),
-                  _DetailRow(
-                    icon: Icons.email_outlined,
-                    label: 'Email address',
-                    value: email,
-                    trailing: user['email_verified'] == true
-                        ? Icon(
-                            Icons.verified_rounded,
-                            color: theme.colorScheme.primary,
-                            size: 18,
-                          )
-                        : null,
-                  ),
-                  _DetailRow(
-                    icon: Icons.phone_outlined,
-                    label: 'Phone number',
-                    value: user['phone']?.toString(),
-                  ),
-                  _DetailRow(
-                    icon: Icons.public,
-                    label: 'Country',
-                    value: country,
-                  ),
-                  _DetailRow(
-                    icon: Icons.currency_exchange,
-                    label: 'Preferred currency',
-                    value: user['preferred_currency']?.toString(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SectionCard(
-              title: 'Account',
-              child: Column(
-                children: [
-                  _DetailRow(
-                    icon: Icons.calendar_month_outlined,
-                    label: 'Member since',
-                    value: _formatDate(user['created_at']?.toString()),
-                  ),
-                  _DetailRow(
-                    icon: Icons.shield_outlined,
-                    label: 'Account status',
-                    value: _statusLabel(user['status']?.toString()),
-                    last: true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SectionCard(
-              title: 'Security',
-              subtitle: 'Protect your account and withdrawals.',
-              child: Column(
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.lock_reset_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    title: const Text(
-                      'Password',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: const Text('Change your account password'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: _changePassword,
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.pin_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    title: const Text(
-                      'Withdrawal PIN',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: Text(
-                      user['security_pin_set'] == true
-                          ? 'Required before every withdrawal'
-                          : 'Add a 4-digit PIN for withdrawals',
-                    ),
-                    trailing: TextButton(
-                      onPressed: _securityBusy ? null : _manageSecurityPin,
-                      child: Text(
-                        user['security_pin_set'] == true ? 'Manage' : 'Set up',
-                      ),
-                    ),
-                    onTap: _securityBusy ? null : _manageSecurityPin,
-                  ),
-                  if (user['security_pin_set'] == true)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: _securityBusy ? null : _removeSecurityPin,
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 18,
-                        ),
-                        label: const Text('Remove withdrawal PIN'),
-                      ),
-                    ),
-                  const Divider(height: 1),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    secondary: CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.phonelink_lock_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    title: const Text(
-                      'Google Authenticator',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: Text(
-                      user['two_factor'] == true
-                          ? 'A verification code is required after sign in'
-                          : 'Add a second verification step at sign in',
-                    ),
-                    value: user['two_factor'] == true,
-                    onChanged: _securityBusy
-                        ? null
-                        : (enabled) =>
-                              enabled ? _setupTwoFactor() : _disableTwoFactor(),
-                  ),
-                ],
-              ),
-            ),
           ],
-        ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _refreshProfile,
+          color: brandGreen,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 5, 16, 30),
+            children: [
+              _ProfileHero(
+                name: name.isEmpty ? 'Your profile' : name,
+                username: user['username']?.toString() ?? '',
+                email: email,
+                avatarUrl: avatar,
+                coverUrl: cover,
+                verified: user['email_verified'] == true,
+              ),
+              const SizedBox(height: 15),
+              if (_editing) ...[
+                if (_mediaBusy)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: LinearProgressIndicator(
+                      minHeight: 3,
+                      color: brandGreen,
+                    ),
+                  ),
+                _SectionCard(
+                  title: 'Profile appearance',
+                  subtitle: 'Add a photo and cover to personalize your profile.',
+                  child: Column(
+                    children: [
+                      _MediaRow(
+                        title: 'Profile photo',
+                        url: avatar,
+                        isAvatar: true,
+                        busy: _mediaBusy,
+                        onPick: () => _pickImage('avatar'),
+                        onRemove: avatar == null ? null : () => _removeImage('avatar'),
+                      ),
+                      const Divider(height: 22),
+                      _MediaRow(
+                        title: 'Cover image',
+                        url: cover,
+                        busy: _mediaBusy,
+                        onPick: () => _pickImage('cover'),
+                        onRemove: cover == null ? null : () => _removeImage('cover'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _SectionCard(
+                  title: 'Personal details',
+                  subtitle: 'Keep your contact and account information current.',
+                  child: Column(
+                    children: [
+                      _EditField(controller: _name, label: 'Full name', icon: Icons.person_outline),
+                      _EditField(controller: _username, label: 'Username', icon: Icons.alternate_email),
+                      _EditField(controller: _email, label: 'Email address', icon: Icons.email_outlined, readOnly: true),
+                      _EditField(controller: _phone, label: 'Phone number', icon: Icons.phone_outlined, keyboard: TextInputType.phone),
+                      _EditField(controller: _country, label: 'Country', icon: Icons.public, readOnly: true),
+                      _EditField(controller: _currency, label: 'Preferred currency', icon: Icons.currency_exchange, capitalization: TextCapitalization.characters),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : _save,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: brandGreen,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                          ),
+                          icon: _saving
+                              ? const SizedBox.square(
+                                  dimension: 17,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.check_rounded),
+                          label: Text(_saving ? 'Saving…' : 'Save changes'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                _SectionCard(
+                  title: 'Personal details',
+                  subtitle: 'Your profile and contact information.',
+                  child: Column(
+                    children: [
+                      _DetailRow(icon: Icons.person_outline, label: 'Full name', value: name),
+                      _DetailRow(icon: Icons.alternate_email, label: 'Username', value: user['username']?.toString()),
+                      _DetailRow(
+                        icon: Icons.email_outlined,
+                        label: 'Email address',
+                        value: email,
+                        trailing: user['email_verified'] == true
+                            ? const _TinyStatus(label: 'Verified', color: Color(0xFF218653))
+                            : const _TinyStatus(label: 'Unverified', color: Color(0xFFB27A20)),
+                      ),
+                      _DetailRow(icon: Icons.phone_outlined, label: 'Phone number', value: user['phone']?.toString()),
+                      _DetailRow(icon: Icons.public, label: 'Country', value: country),
+                      _DetailRow(icon: Icons.currency_exchange, label: 'Preferred currency', value: user['preferred_currency']?.toString(), last: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _SectionCard(
+                  title: 'Account overview',
+                  child: Column(
+                    children: [
+                      _DetailRow(icon: Icons.calendar_month_outlined, label: 'Member since', value: _formatDate(user['created_at']?.toString())),
+                      _DetailRow(
+                        icon: Icons.verified_user_outlined,
+                        label: 'Account status',
+                        value: _statusLabel(user['status']?.toString()),
+                        trailing: _StatusDot(active: user['status'] == null || user['status'] == 'active'),
+                        last: true,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _SectionCard(
+                  title: 'Security centre',
+                  subtitle: 'Manage the ways your account and earnings are protected.',
+                  child: Column(
+                    children: [
+                      _SecurityAction(
+                        icon: Icons.lock_reset_rounded,
+                        title: 'Password',
+                        subtitle: 'Change your account password',
+                        onTap: _changePassword,
+                      ),
+                      const Divider(height: 1),
+                      _SecurityAction(
+                        icon: Icons.pin_rounded,
+                        title: 'Withdrawal PIN',
+                        subtitle: user['security_pin_set'] == true
+                            ? 'A PIN is enabled for withdrawal requests'
+                            : 'Add a 4-digit PIN for withdrawals',
+                        trailing: Text(
+                          user['security_pin_set'] == true ? 'Manage' : 'Set up',
+                          style: const TextStyle(color: brandGreen, fontWeight: FontWeight.w800, fontSize: 12),
+                        ),
+                        onTap: _securityBusy ? null : _manageSecurityPin,
+                      ),
+                      if (user['security_pin_set'] == true)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: _securityBusy ? null : _removeSecurityPin,
+                            icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                            label: const Text('Remove withdrawal PIN'),
+                          ),
+                        ),
+                      const Divider(height: 1),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: _securityIcon(Icons.phonelink_lock_rounded),
+                        title: const Text('Google Authenticator', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                        subtitle: Text(
+                          user['two_factor'] == true
+                              ? 'Extra sign-in verification is enabled'
+                              : 'Add a second verification step at sign in',
+                          style: const TextStyle(fontSize: 12, color: mutedInk),
+                        ),
+                        value: user['two_factor'] == true,
+                        activeColor: brandGreen,
+                        onChanged: _securityBusy
+                            ? null
+                            : (enabled) => enabled ? _setupTwoFactor() : _disableTwoFactor(),
+                      ),
+                      if (_securityBusy)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: LinearProgressIndicator(minHeight: 2, color: brandGreen),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 13),
+              const _PrivacyNote(),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -762,30 +724,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _formatDate(String? value) {
     final date = DateTime.tryParse(value ?? '')?.toLocal();
     if (date == null) return '—';
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   String _statusLabel(String? status) => switch (status) {
-    'active' => 'Active',
-    'pending' => 'Pending',
-    'suspended' => 'Suspended',
-    null || '' => 'Active',
-    _ => status,
-  };
+        'active' => 'Active',
+        'pending' => 'Pending',
+        'suspended' => 'Suspended',
+        null || '' => 'Active',
+        _ => status,
+      };
 }
 
 class _SecurityPinDialog extends StatefulWidget {
@@ -830,8 +779,7 @@ class _SecurityPinDialogState extends State<_SecurityPinDialog> {
         'pin': _newPin.text,
         'pin_confirmation': _confirmPin.text,
         if (widget.pinIsSet) 'current_pin': _currentPin.text,
-        if (!widget.pinIsSet && widget.hasPassword)
-          'current_password': _password.text,
+        if (!widget.pinIsSet && widget.hasPassword) 'current_password': _password.text,
       });
       if (mounted) Navigator.of(context).pop(result);
     } on AuthException catch (error) {
@@ -842,34 +790,28 @@ class _SecurityPinDialogState extends State<_SecurityPinDialog> {
     }
   }
 
-  Widget _pinInput(
-    TextEditingController controller,
-    String label, {
-    String? Function(String?)? validator,
-  }) => TextFormField(
-    controller: controller,
-    obscureText: true,
-    keyboardType: TextInputType.number,
-    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-    maxLength: 4,
-    textAlign: TextAlign.center,
-    decoration: InputDecoration(labelText: label, counterText: ''),
-    validator:
-        validator ??
-        (value) => value == null || value.length != 4
-            ? 'Enter exactly 4 digits.'
-            : null,
-  );
+  Widget _pinInput(TextEditingController controller, String label, {String? Function(String?)? validator}) =>
+      TextFormField(
+        controller: controller,
+        obscureText: true,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        maxLength: 4,
+        textAlign: TextAlign.center,
+        decoration: InputDecoration(labelText: label, counterText: ''),
+        validator: validator ?? (value) => value == null || value.length != 4 ? 'Enter exactly 4 digits.' : null,
+      );
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: SizedBox(
         width: size.width < 432 ? size.width - 40 : 392,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: size.height * 0.84),
+          constraints: BoxConstraints(maxHeight: size.height * .84),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -878,10 +820,8 @@ class _SecurityPinDialogState extends State<_SecurityPinDialog> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    widget.pinIsSet
-                        ? 'Change withdrawal PIN'
-                        : 'Set withdrawal PIN',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    widget.pinIsSet ? 'Change withdrawal PIN' : 'Set withdrawal PIN',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -893,11 +833,9 @@ class _SecurityPinDialogState extends State<_SecurityPinDialog> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          widget.pinIsSet
-                              ? 'Enter your current PIN, then choose a new 4-digit PIN.'
-                              : 'This 4-digit PIN will be required before every withdrawal request.',
-                        ),
+                        Text(widget.pinIsSet
+                            ? 'Enter your current PIN, then choose a new 4-digit PIN.'
+                            : 'This 4-digit PIN will be required before every withdrawal request.'),
                         if (widget.pinIsSet) ...[
                           const SizedBox(height: 14),
                           _pinInput(_currentPin, 'Current PIN'),
@@ -906,24 +844,14 @@ class _SecurityPinDialogState extends State<_SecurityPinDialog> {
                           TextFormField(
                             controller: _password,
                             obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Account password',
-                            ),
-                            validator: (value) => value == null || value.isEmpty
-                                ? 'Confirm your account password'
-                                : null,
+                            decoration: const InputDecoration(labelText: 'Account password'),
+                            validator: (value) => value == null || value.isEmpty ? 'Confirm your account password' : null,
                           ),
                         ],
                         const SizedBox(height: 14),
                         _pinInput(_newPin, 'New 4-digit PIN'),
                         const SizedBox(height: 12),
-                        _pinInput(
-                          _confirmPin,
-                          'Confirm PIN',
-                          validator: (value) => value != _newPin.text
-                              ? 'The PINs do not match.'
-                              : null,
-                        ),
+                        _pinInput(_confirmPin, 'Confirm PIN', validator: (value) => value != _newPin.text ? 'The PINs do not match.' : null),
                       ],
                     ),
                   ),
@@ -935,19 +863,11 @@ class _SecurityPinDialogState extends State<_SecurityPinDialog> {
                   alignment: WrapAlignment.end,
                   spacing: 8,
                   children: [
-                    TextButton(
-                      onPressed: _saving ? null : () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
+                    TextButton(onPressed: _saving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
                     FilledButton(
                       onPressed: _saving ? null : _submit,
-                      child: Text(
-                        _saving
-                            ? 'Saving…'
-                            : widget.pinIsSet
-                            ? 'Update PIN'
-                            : 'Set PIN',
-                      ),
+                      style: FilledButton.styleFrom(backgroundColor: brandGreen),
+                      child: Text(_saving ? 'Saving…' : widget.pinIsSet ? 'Update PIN' : 'Set PIN'),
                     ),
                   ],
                 ),
@@ -961,12 +881,7 @@ class _SecurityPinDialogState extends State<_SecurityPinDialog> {
 }
 
 class _TwoFactorSetupDialog extends StatefulWidget {
-  const _TwoFactorSetupDialog({
-    required this.api,
-    required this.token,
-    required this.setup,
-  });
-
+  const _TwoFactorSetupDialog({required this.api, required this.token, required this.setup});
   final AuthApi api;
   final String token;
   final Map<String, dynamic> setup;
@@ -987,19 +902,12 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
 
   Future<void> _confirm() async {
     if (_code.text.trim().length != 6) {
-      showAuthMessage(
-        context,
-        'Enter the 6-digit code shown in your authenticator app.',
-      );
+      showAuthMessage(context, 'Enter the 6-digit code shown in your authenticator app.');
       return;
     }
     setState(() => _busy = true);
     try {
-      final result = await widget.api.post(
-        'me/two-factor/confirm',
-        widget.token,
-        {'code': _code.text.trim()},
-      );
+      final result = await widget.api.post('me/two-factor/confirm', widget.token, {'code': _code.text.trim()});
       if (mounted) Navigator.pop(context, result);
     } on AuthException catch (error) {
       if (mounted) {
@@ -1016,10 +924,11 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
     final screen = MediaQuery.sizeOf(context);
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: SizedBox(
         width: screen.width < 432 ? screen.width - 40 : 392,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: screen.height * 0.84),
+          constraints: BoxConstraints(maxHeight: screen.height * .84),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1027,10 +936,7 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
                 padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Set up Google Authenticator',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+                  child: Text('Set up Google Authenticator', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                 ),
               ),
               Flexible(
@@ -1039,37 +945,19 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Scan this QR code with Google Authenticator, or enter the setup key manually.',
-                      ),
+                      const Text('Scan this QR code with Google Authenticator, or enter the setup key manually.'),
                       const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: SizedBox.square(
-                          dimension: 190,
-                          child: QrImageView(data: uri),
-                        ),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE7ECE8))),
+                        child: SizedBox.square(dimension: 190, child: QrImageView(data: uri)),
                       ),
                       const SizedBox(height: 12),
-                      SelectableText(
-                        secret,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
+                      SelectableText(secret, textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w800, letterSpacing: 1.2)),
                       TextButton.icon(
                         onPressed: () async {
                           await Clipboard.setData(ClipboardData(text: secret));
-                          if (context.mounted) {
-                            showAuthMessage(context, 'Setup key copied.');
-                          }
+                          if (context.mounted) showAuthMessage(context, 'Setup key copied.');
                         },
                         icon: const Icon(Icons.copy_rounded, size: 18),
                         label: const Text('Copy setup key'),
@@ -1081,10 +969,7 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         maxLength: 6,
                         textAlign: TextAlign.center,
-                        decoration: const InputDecoration(
-                          labelText: '6-digit authenticator code',
-                          counterText: '',
-                        ),
+                        decoration: const InputDecoration(labelText: '6-digit authenticator code', counterText: ''),
                       ),
                     ],
                   ),
@@ -1097,21 +982,14 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    TextButton(
-                      onPressed: _busy ? null : () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
+                    TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Cancel')),
                     FilledButton.icon(
                       onPressed: _busy ? null : _confirm,
+                      style: FilledButton.styleFrom(backgroundColor: brandGreen),
                       icon: _busy
-                          ? const SizedBox.square(
-                              dimension: 17,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
+                          ? const SizedBox.square(dimension: 17, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.verified_user_outlined),
-                      label: Text(
-                        _busy ? 'Verifying…' : 'Enable 2-step verification',
-                      ),
+                      label: Text(_busy ? 'Verifying…' : 'Enable 2-step verification'),
                     ),
                   ],
                 ),
@@ -1143,10 +1021,16 @@ class _ProfileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: const Color(0xFFE7ECE8)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: .025), blurRadius: 14, offset: const Offset(0, 5)),
+        ],
+      ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1155,91 +1039,58 @@ class _ProfileHero extends StatelessWidget {
             height: 132,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: scheme.primaryContainer,
-              image: coverUrl == null
-                  ? null
-                  : DecorationImage(
-                      image: NetworkImage(coverUrl!),
-                      fit: BoxFit.cover,
-                    ),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF104A35), Color(0xFF287653), Color(0xFF4A9870)],
+              ),
+              image: coverUrl == null ? null : DecorationImage(image: NetworkImage(coverUrl!), fit: BoxFit.cover),
             ),
             child: coverUrl == null
-                ? Align(
+                ? const Align(
                     alignment: Alignment.topRight,
                     child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Icon(
-                        Icons.person_pin_circle_outlined,
-                        size: 45,
-                        color: scheme.onPrimaryContainer.withValues(alpha: .35),
-                      ),
+                      padding: EdgeInsets.all(17),
+                      child: Icon(Icons.person_pin_circle_outlined, size: 48, color: Color(0x55FFFFFF)),
                     ),
                   )
                 : null,
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.fromLTRB(17, 0, 17, 17),
             child: Transform.translate(
-              offset: const Offset(0, -33),
+              offset: const Offset(0, -34),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 39,
-                    backgroundColor: theme.cardColor,
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .08), blurRadius: 8)]),
                     child: CircleAvatar(
-                      radius: 35,
+                      radius: 34,
                       backgroundColor: scheme.secondaryContainer,
-                      backgroundImage: avatarUrl == null
-                          ? null
-                          : NetworkImage(avatarUrl!),
-                      child: avatarUrl == null
-                          ? Icon(
-                              Icons.person_outline_rounded,
-                              size: 38,
-                              color: scheme.onSecondaryContainer,
-                            )
-                          : null,
+                      backgroundImage: avatarUrl == null ? null : NetworkImage(avatarUrl!),
+                      child: avatarUrl == null ? Icon(Icons.person_outline_rounded, size: 36, color: scheme.onSecondaryContainer) : null,
                     ),
                   ),
-                  const SizedBox(height: 7),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      if (verified)
-                        Icon(
-                          Icons.verified_rounded,
-                          size: 19,
-                          color: scheme.primary,
-                        ),
+                      Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: ink, fontSize: 20, fontWeight: FontWeight.w900))),
+                      if (verified) const Icon(Icons.verified_rounded, size: 19, color: brandGreen),
                     ],
                   ),
                   if (username.isNotEmpty) ...[
                     const SizedBox(height: 3),
-                    Text(
-                      '@$username',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.primary,
-                      ),
-                    ),
+                    Text('@$username', style: const TextStyle(color: brandGreen, fontSize: 13, fontWeight: FontWeight.w700)),
                   ],
                   if (email.isNotEmpty) ...[
                     const SizedBox(height: 5),
-                    Text(
-                      email,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
+                    Text(email, style: const TextStyle(color: mutedInk, fontSize: 12)),
+                  ],
+                  if (verified) ...[
+                    const SizedBox(height: 10),
+                    const _TinyStatus(label: 'Email verified', color: Color(0xFF218653)),
                   ],
                 ],
               ),
@@ -1256,89 +1107,70 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget child;
+
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: const Color(0xFFE7ECE8)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .02), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(color: ink, fontSize: 16, fontWeight: FontWeight.w900)),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(subtitle!, style: const TextStyle(color: mutedInk, fontSize: 12, height: 1.4)),
+            ],
+            const SizedBox(height: 13),
+            child,
           ],
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    this.value,
-    this.trailing,
-    this.last = false,
-  });
+  const _DetailRow({required this.icon, required this.label, this.value, this.trailing, this.last = false});
   final IconData icon;
   final String label;
   final String? value;
   final Widget? trailing;
   final bool last;
+
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Icon(icon, size: 19, color: scheme.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      value == null || value!.isEmpty ? 'Not added' : value!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+  Widget build(BuildContext context) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(color: const Color(0xFFEDF5EF), borderRadius: BorderRadius.circular(11)),
+                  child: Icon(icon, size: 18, color: brandGreen),
                 ),
-              ),
-              if (trailing != null) trailing!,
-            ],
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: const TextStyle(color: mutedInk, fontSize: 11)),
+                      const SizedBox(height: 4),
+                      Text(value == null || value!.isEmpty ? 'Not added' : value!, style: const TextStyle(color: ink, fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+                if (trailing != null) trailing!,
+              ],
+            ),
           ),
-        ),
-        if (!last) const Divider(height: 1),
-      ],
-    );
-  }
+          if (!last) const Divider(height: 1, color: Color(0xFFEEF1EE)),
+        ],
+      );
 }
 
 class _EditField extends StatelessWidget {
@@ -1359,21 +1191,19 @@ class _EditField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextField(
-      controller: controller,
-      readOnly: readOnly,
-      keyboardType: keyboard,
-      textCapitalization: capitalization,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        helperText: label == 'Country'
-            ? 'Country is fixed from registration.'
-            : null,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          controller: controller,
+          readOnly: readOnly,
+          keyboardType: keyboard,
+          textCapitalization: capitalization,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon, size: 19),
+            helperText: label == 'Country' ? 'Country is fixed from registration.' : null,
+          ),
+        ),
+      );
 }
 
 class _MediaRow extends StatelessWidget {
@@ -1394,56 +1224,119 @@ class _MediaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    Widget preview;
-    if (isAvatar) {
-      preview = CircleAvatar(
-        radius: 26,
-        backgroundColor: scheme.secondaryContainer,
-        backgroundImage: url == null ? null : NetworkImage(url!),
-        child: url == null
-            ? Icon(Icons.person_outline, color: scheme.onSecondaryContainer)
-            : null,
-      );
-    } else {
-      preview = ClipRRect(
-        borderRadius: BorderRadius.circular(9),
-        child: SizedBox(
-          width: 76,
-          height: 48,
-          child: url == null
-              ? ColoredBox(
-                  color: scheme.secondaryContainer,
-                  child: Icon(
-                    Icons.panorama_outlined,
-                    color: scheme.onSecondaryContainer,
-                  ),
-                )
-              : Image.network(url!, fit: BoxFit.cover),
-        ),
-      );
-    }
+    final preview = isAvatar
+        ? CircleAvatar(
+            radius: 25,
+            backgroundColor: const Color(0xFFEAF3EC),
+            backgroundImage: url == null ? null : NetworkImage(url!),
+            child: url == null ? const Icon(Icons.person_outline, color: brandGreen) : null,
+          )
+        : ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: SizedBox(
+              width: 76,
+              height: 48,
+              child: url == null
+                  ? const ColoredBox(color: Color(0xFFEAF3EC), child: Icon(Icons.panorama_outlined, color: brandGreen))
+                  : Image.network(url!, fit: BoxFit.cover),
+            ),
+          );
     return Row(
       children: [
         preview,
         const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-        TextButton(
-          onPressed: busy ? null : onPick,
-          child: Text(url == null ? 'Add' : 'Change'),
-        ),
+        Expanded(child: Text(title, style: const TextStyle(color: ink, fontSize: 13, fontWeight: FontWeight.w700))),
+        TextButton(onPressed: busy ? null : onPick, child: Text(url == null ? 'Add' : 'Change')),
         if (onRemove != null)
           IconButton(
             onPressed: busy ? null : onRemove,
             tooltip: 'Remove $title',
-            icon: const Icon(Icons.delete_outline_rounded),
+            icon: const Icon(Icons.delete_outline_rounded, size: 19),
           ),
       ],
     );
   }
+}
+
+class _SecurityAction extends StatelessWidget {
+  const _SecurityAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.trailing,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: _securityIcon(icon),
+        title: Text(title, style: const TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 14)),
+        subtitle: Text(subtitle, style: const TextStyle(color: mutedInk, fontSize: 11)),
+        trailing: trailing ?? const Icon(Icons.chevron_right_rounded, color: mutedInk),
+        onTap: onTap,
+      );
+}
+
+Widget _securityIcon(IconData icon) => Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(color: const Color(0xFFEAF3EC), borderRadius: BorderRadius.circular(13)),
+      child: Icon(icon, color: brandGreen, size: 21),
+    );
+
+class _TinyStatus extends StatelessWidget {
+  const _TinyStatus({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(color: color.withValues(alpha: .10), borderRadius: BorderRadius.circular(20)),
+        child: Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800)),
+      );
+}
+
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.active});
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 7, height: 7, decoration: BoxDecoration(color: active ? const Color(0xFF218653) : const Color(0xFFB27A20), shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text(active ? 'Active' : 'Review', style: TextStyle(color: active ? const Color(0xFF218653) : const Color(0xFFB27A20), fontSize: 11, fontWeight: FontWeight.w800)),
+        ],
+      );
+}
+
+class _PrivacyNote extends StatelessWidget {
+  const _PrivacyNote();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(color: const Color(0xFFEDF4EF), borderRadius: BorderRadius.circular(14)),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.shield_outlined, color: brandGreen, size: 19),
+            SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'Your personal information is used to manage your account. Keep your password, withdrawal PIN, and authenticator recovery codes private.',
+                style: TextStyle(color: Color(0xFF52685A), fontSize: 11, height: 1.45),
+              ),
+            ),
+          ],
+        ),
+      );
 }

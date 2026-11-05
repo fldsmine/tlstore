@@ -31,6 +31,8 @@ use App\Features\Admin\Http\Controllers\Api\V1\QuestionnaireController;
 use App\Features\SocialFollow\Http\Controllers\Api\V1\SocialFollowController;
 use App\Features\System\Http\Controllers\Api\V1\AnnouncementController as PublicAnnouncementController;
 use App\Features\Admin\Http\Controllers\Api\V1\AnnouncementController as AdminAnnouncementController;
+use App\Features\Rankings\Http\Controllers\Api\V1\UserRankingController;
+use App\Features\Admin\Http\Controllers\Api\V1\UserRankLevelController;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('api.v1.health');
@@ -69,6 +71,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me/referral-code', [ReferralController::class, 'code'])->name('api.v1.referral.code');
         Route::get('/me/referrals', [ReferralController::class, 'attributions'])->name('api.v1.referrals.index');
         Route::get('/me', [AuthController::class, 'me'])->name('api.v1.me');
+        Route::get('/me/ranking', [UserRankingController::class, 'show'])->name('api.v1.me.ranking');
         Route::get('/me/social-handles', [SocialFollowController::class, 'index'])->name('api.v1.me.social-handles');
         Route::post('/me/social-handles/{socialHandle}/follow', [SocialFollowController::class, 'follow'])->name('api.v1.me.social-handles.follow');
         Route::patch('/me', [AuthController::class, 'updateProfile'])->name('api.v1.me.update');
@@ -143,6 +146,10 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/moderation/withdrawals/{withdrawal}/settle', [ModerationController::class, 'settleWithdrawal'])->name('moderation.withdrawals.settle');
         Route::get('/settings', [SystemSettingController::class, 'index'])->name('settings.index');
         Route::put('/settings/{settingKey}', [SystemSettingController::class, 'update'])->name('settings.update');
+        Route::get('/rank-levels', [UserRankLevelController::class, 'index'])->name('rank-levels.index');
+        Route::post('/rank-levels', [UserRankLevelController::class, 'store'])->name('rank-levels.store');
+        Route::patch('/rank-levels/{rankLevel}', [UserRankLevelController::class, 'update'])->name('rank-levels.update');
+        Route::delete('/rank-levels/{rankLevel}', [UserRankLevelController::class, 'destroy'])->name('rank-levels.destroy');
         Route::get('/apps', [AppCatalogController::class, 'index'])->name('apps.index');
         Route::post('/apps', [AppCatalogController::class, 'store'])->name('apps.store');
         Route::patch('/apps/{app}', [AppCatalogController::class, 'update'])->name('apps.update');

@@ -234,12 +234,12 @@ class AccessBadge extends StatelessWidget {
         const Color(0xFF9A6811),
       ),
       'location_coverage_required' => (
-        'Location add-on needed to start',
+        'Share ads & earn',
         Icons.public_rounded,
         const Color(0xFF9A6811),
       ),
       _ => (
-        'Ready to start with your plan',
+        'Share ads & earn',
         Icons.check_circle_outline_rounded,
         brandGreen,
       ),

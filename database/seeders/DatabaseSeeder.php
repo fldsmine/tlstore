@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call([
+            UserRankLevelSeeder::class,
             CountryAndRegionSeeder::class,
             DemoAdminSeeder::class,
             AppListingSeeder::class,
