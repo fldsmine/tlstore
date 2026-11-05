@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Application\Actions\Marketplace;
+
+use App\Models\Ad;
+use App\Models\AppReviewCampaign;
+use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+
+final class ListEligibleListings
+{
+    /** @return LengthAwarePaginator<AppReviewCampaign> */
+    public function apps(User $user, int $perPage = 20): LengthAwarePaginator
+    {
+        $query = AppReviewCampaign::query()
+            ->with(['app.screenshots', 'app.storeListingSnapshots'])
+            ->where('status', 'active')
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->where(fn ($query) => $query->whereNull('maximum_review')->orWhereRaw('completed_reviews + reserved_reviews < maximum_review'))
+            ->latest('id');
+        return $query->paginate(min(max($perPage, 1), 50));
+    }
+
+    /** @return \Illuminate\Support\Collection<int, Ad> */
+    public function featuredAds(int $limit = 5)
+    {
+        return Ad::query()
+            ->where('featured', true)
+            ->where('status', 'active')
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->where(fn ($query) => $query->whereNull('maximum_share')->orWhereRaw('total_share + reserved_share < maximum_share'))
+            ->latest('id')
+            ->limit(min(max($limit, 1), 20))
+            ->get();
+    }
+
+    /** @return LengthAwarePaginator<AppReviewCampaign> */
+    public function app_sport(int $perPage = 5): LengthAwarePaginator
+    {
+        $query = AppReviewCampaign::query()
+            ->with(['app.screenshots', 'app.storeListingSnapshots'])
+            ->whereHas('app', fn (Builder $app) => $app->where('featured', true))
+            ->where('status', 'active')
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->where(fn ($query) => $query->whereNull('maximum_review')->orWhereRaw('completed_reviews + reserved_reviews < maximum_review'))
+            ->latest('id');
+
+        return $query->paginate(min(max($perPage, 1), 50));
+    }
+	
+    /** @return LengthAwarePaginator<Ad> */
+    public function ads(User $user, int $perPage = 20): LengthAwarePaginator
+    {
+        $query = Ad::query()
+            ->where('status', 'active')
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->where(fn ($query) => $query->whereNull('maximum_share')->orWhereRaw('total_share + reserved_share < maximum_share'))
+            ->latest('id');
+        return $query->paginate(min(max($perPage, 1), 50));
+    }
+
+    public function appDetail(User $user, AppReviewCampaign $campaign): AppReviewCampaign
+    {
+        $query = AppReviewCampaign::query()->with(['app.screenshots', 'app.storeListingSnapshots'])
+            ->whereKey($campaign->id)->where('status', 'active')
+            ->where(fn ($builder) => $builder->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($builder) => $builder->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->where(fn ($builder) => $builder->whereNull('maximum_review')->orWhereRaw('completed_reviews + reserved_reviews < maximum_review'));
+        return $query->firstOrFail();
+    }
+
+    public function adDetail(User $user, Ad $ad): Ad
+    {
+        $query = Ad::query()->whereKey($ad->id)->where('status', 'active')
+            ->where(fn ($builder) => $builder->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn ($builder) => $builder->whereNull('ends_at')->orWhere('ends_at', '>', now()))
+            ->where(fn ($builder) => $builder->whereNull('maximum_share')->orWhereRaw('total_share + reserved_share < maximum_share'));
+        return $query->firstOrFail();
+    }
+}

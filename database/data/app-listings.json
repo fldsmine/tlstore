@@ -1,0 +1,87 @@
+{
+  "name": "TrustLens demo app listings",
+  "version": 1,
+  "source": "project-overview.html",
+  "apps": [
+    {
+      "prototype_id": 0,
+      "featured": true,
+      "name": "FitPulse Tracker",
+      "short_code": "FP",
+      "store": "Google Play",
+      "brand_color": "#157F3D",
+      "developer": "Pulse Labs Ltd",
+      "category": "Health & Fitness",
+      "install_count_label": "500K+",
+      "description": "Track workouts, steps and sleep, and follow weekly plans built by coaches.",
+      "illustration_kind": "fit",
+      "paid_amount": "320000.00",
+      "location": "NG",
+      "currency": "NGN",
+      "rating": null,
+      "total_reviews": null,
+      "review_reward": "250.00",
+      "app_icon": "images/apps-image-view.avif",
+      "maximum_review": 0,
+      "screenshots": [
+        {"position": 1, "source_type": "prototype_svg", "illustration_index": 0, "alt_text": "Generated TrustLens prototype view 1 of 4 for FitPulse Tracker.", "storage_disk": "local", "storage_path": "images/app-image-1.jpg"},
+        {"position": 2, "source_type": "prototype_svg", "illustration_index": 1, "alt_text": "Generated TrustLens prototype view 2 of 4 for FitPulse Tracker.", "storage_disk": "local", "storage_path": "images/app-image-2.jpg"},
+        {"position": 3, "source_type": "prototype_svg", "illustration_index": 2, "alt_text": "Generated TrustLens prototype view 3 of 4 for FitPulse Tracker.", "storage_disk": "local", "storage_path": "images/app-image-3.jpg"},
+        {"position": 4, "source_type": "prototype_svg", "illustration_index": 3, "alt_text": "Generated TrustLens prototype view 4 of 4 for FitPulse Tracker.", "storage_disk": "local", "storage_path": "images/app-image-4.jpg"}
+      ]
+    },
+    {
+      "prototype_id": 1,
+      "featured": true,
+      "name": "CashBloom – Instant Loans",
+      "short_code": "CB",
+      "store": "Samsung Galaxy Store",
+      "brand_color": "#C8102E",
+      "developer": "Bloom Fin Tech",
+      "category": "Finance",
+      "install_count_label": "10K+",
+      "description": "Get up to ₦500,000 in minutes with no paperwork. Guaranteed approval for new users.",
+      "illustration_kind": "loan",
+      "paid_amount": "400.00",
+      "location": null,
+      "currency": "USD",
+      "rating": null,
+      "total_reviews": null,
+      "review_reward": "0.12",
+      "app_icon": "images/top-view-app.avif",
+      "maximum_review": 450,
+      "screenshots": [
+        {"position": 1, "source_type": "prototype_svg", "illustration_index": 0, "alt_text": "Generated TrustLens prototype view 1 of 4 for CashBloom – Instant Loans.", "storage_disk": "local", "storage_path": "images/app-image-5.jpg"},
+        {"position": 2, "source_type": "prototype_svg", "illustration_index": 1, "alt_text": "Generated TrustLens prototype view 2 of 4 for CashBloom – Instant Loans.", "storage_disk": "local", "storage_path": "images/app-image-6.jpg"},
+        {"position": 3, "source_type": "prototype_svg", "illustration_index": 2, "alt_text": "Generated TrustLens prototype view 3 of 4 for CashBloom – Instant Loans.", "storage_disk": "local", "storage_path": "images/app-image-7.jpg"},
+        {"position": 4, "source_type": "prototype_svg", "illustration_index": 3, "alt_text": "Generated TrustLens prototype view 4 of 4 for CashBloom – Instant Loans.", "storage_disk": "local", "storage_path": "images/app-image-8.jpg"}
+      ]
+    },
+    {
+      "prototype_id": 2,
+      "name": "NairaWise Budget",
+      "short_code": "NW",
+      "store": "Apple App Store",
+      "brand_color": "#1B2024",
+      "developer": "Wise Ledger Inc.",
+      "category": "Finance",
+      "install_count_label": "100K+",
+      "description": "Plan monthly spending, split bills and set savings goals in one place.",
+      "illustration_kind": "budget",
+      "paid_amount": "200.00",
+      "location": "UK",
+      "currency": "USD",
+      "rating": null,
+      "total_reviews": null,
+      "review_reward": "0.10",
+      "app_icon": "images/design-templates.jpg",
+      "maximum_review": 300,
+      "screenshots": [
+        {"position": 1, "source_type": "prototype_svg", "illustration_index": 0, "alt_text": "Generated TrustLens prototype view 1 of 4 for NairaWise Budget.", "storage_disk": "local", "storage_path": "images/app-image-9.jpg"},
+        {"position": 2, "source_type": "prototype_svg", "illustration_index": 1, "alt_text": "Generated TrustLens prototype view 2 of 4 for NairaWise Budget.", "storage_disk": "local", "storage_path": "images/app-image-10.jpg"},
+        {"position": 3, "source_type": "prototype_svg", "illustration_index": 2, "alt_text": "Generated TrustLens prototype view 3 of 4 for NairaWise Budget.", "storage_disk": "local", "storage_path": "images/app-image-11.jpg"},
+        {"position": 4, "source_type": "prototype_svg", "illustration_index": 3, "alt_text": "Generated TrustLens prototype view 4 of 4 for NairaWise Budget.", "storage_disk": "local", "storage_path": "images/app-image-12.jpg"}
+      ]
+    }
+  ]
+}

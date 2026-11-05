@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "option_id": "bank_transfer",
+    "name": "Bank Transfer",
+    "icon": "🏦",
+    "description": "Transfer to your bank account",
+    "fields": ["bank_name", "account_number", "account_name"],
+    "tax": "10.00",
+    "min_withdrawal": "16.00",
+    "is_available": true,
+    "order": 1,
+    "created_at": "2026-07-23 13:48:55",
+    "updated_at": "2026-08-15 01:19:56"
+  },
+  {
+    "id": 2,
+    "option_id": "mobile_money",
+    "name": "Zambia",
+    "icon": "📱",
+    "description": "M-Pesa, MTN MoMo, Airtel Money",
+    "fields": ["phone_number", "provider"],
+    "tax": "10.00",
+    "min_withdrawal": "16.00",
+    "is_available": true,
+    "order": 2,
+    "created_at": "2026-07-23 13:48:55",
+    "updated_at": "2026-08-15 01:21:31"
+  },
+  {
+    "id": 3,
+    "option_id": "paypal",
+    "name": "PayPal",
+    "icon": "💰",
+    "description": "Transfer to PayPal account",
+    "fields": ["paypal_email"],
+    "tax": "4.00",
+    "min_withdrawal": "20.00",
+    "is_available": true,
+    "order": 3,
+    "created_at": "2026-07-23 13:48:55",
+    "updated_at": "2026-08-15 01:21:51"
+  },
+  {
+    "id": 4,
+    "option_id": "crypto",
+    "name": "Cryptocurrency",
+    "icon": "₿",
+    "description": "BTC, ETH, USDT",
+    "fields": ["wallet_address", "network"],
+    "tax": "10.00",
+    "min_withdrawal": "16.00",
+    "is_available": true,
+    "order": 4,
+    "created_at": "2026-07-23 13:48:55",
+    "updated_at": "2026-08-15 01:22:13"
+  }
+]

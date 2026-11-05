@@ -1,0 +1,1 @@
+enum ListingKind { appReview, adShare }

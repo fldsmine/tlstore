@@ -1,0 +1,10 @@
+'/payment/paypal.png'
+
+'/payment/google.png'
+
+'/payment/bank.png'
+
+'/payment/master.png'
+
+'/payment/apple.png'
+

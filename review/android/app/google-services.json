@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1068160277012",
+    "project_id": "tl-store-application",
+    "storage_bucket": "tl-store-application.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1068160277012:android:1c22d70f8519b8a10fe501",
+        "android_client_info": {
+          "package_name": "pynith.tlstore.review"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1068160277012-09tingt8uim23h7il679gf9n377lc1uq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "pynith.tlstore.review",
+            "certificate_hash": "ca0e03fec999a0c14d5e07f04fba6129ed1c8fef"
+          }
+        },
+        {
+          "client_id": "1068160277012-c3ch9j3accl0qngquv7s0mje6iv908jc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7RH2ootGlKo9nRJPo7deTmHu4-hQl0UQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1068160277012-c3ch9j3accl0qngquv7s0mje6iv908jc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1068160277012-996rmgsc63bm17fml7o7dkj7lb8dhjpa.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "pynith.tlstore.review"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

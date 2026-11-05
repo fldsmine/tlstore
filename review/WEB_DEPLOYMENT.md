@@ -1,0 +1,29 @@
+# Flutter web build
+
+The web bundle is hosted by Laravel from `public/web`, while Laravel serves the
+Flutter entry page at `/` and its client-side routes. Build the bundle with the
+web base path before copying `build/web/*` to `public/web/`. Firebase Web
+values for this project are configured by default. The environment variables
+below can override them when needed:
+
+```powershell
+# Optional overrides for the Firebase Web config.
+# $env:FIREBASE_WEB_API_KEY = '...'
+# $env:FIREBASE_WEB_APP_ID = '...'
+# $env:FIREBASE_WEB_AUTH_DOMAIN = '...'
+# $env:FIREBASE_WEB_VAPID_KEY = '...'
+.\tool\build_web.ps1
+```
+
+Use the Web app registered under the `tl-store-application` Firebase project.
+The VAPID key is the public key from Firebase Cloud Messaging's Web Push
+certificates page. These values are public client configuration, not the
+Firebase service-account credentials used by Laravel to send notifications.
+
+The build script creates `build/web/firebase-messaging-sw.js`. Copy the
+contents of `build/web` into Laravel's `public/web` directory. Laravel serves
+the worker at `/firebase-messaging-sw.js` with root scope so it can receive
+background notifications while the Flutter page is served at `/`.
+
+The site must be hosted over HTTPS (or localhost during development) for
+browser secure storage and Firebase messaging.

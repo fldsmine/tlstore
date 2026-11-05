@@ -1,0 +1,110 @@
+<?php
+
+namespace App\Application\Actions\Moderation;
+
+use App\Application\Actions\Referrals\CreditReferralReward;
+use App\Models\Admin;
+use App\Models\AppReviewCampaign;
+use App\Models\AuditLog;
+use App\Models\App as StoreApp;
+use App\Models\LedgerEntry;
+use App\Models\ModerationDecision;
+use App\Models\Notification;
+use App\Models\ReviewSubmission;
+use App\Models\Wallet;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+final class DecideReviewSubmission
+{
+    public function handle(Admin $admin, ReviewSubmission $submission, string $decision, ?string $reasonCode, ?string $reason): ReviewSubmission
+    {
+        return DB::transaction(function () use ($admin, $submission, $decision, $reasonCode, $reason): ReviewSubmission {
+            $submission = ReviewSubmission::query()->with('task.campaign')->lockForUpdate()->findOrFail($submission->id);
+            if ($submission->status->value !== 'pending_review') {
+                throw ValidationException::withMessages(['submission' => 'This review has already been decided.']);
+            }
+            if (! in_array($decision, ['approved', 'rejected'], true)) {
+                throw ValidationException::withMessages(['decision' => 'Decision must be approved or rejected.']);
+            }
+
+            /** @var AppReviewCampaign $campaign */
+            $campaign = AppReviewCampaign::query()->lockForUpdate()->findOrFail($submission->task->app_review_campaign_id);
+            $now = now();
+            ModerationDecision::query()->create([
+                'decision_key' => 'review-'.$submission->id.'-'.\Illuminate\Support\Str::uuid(),
+                'review_submission_id' => $submission->id,
+                'ad_share_event_id' => null,
+                'decided_by' => null,
+                'decided_by_admin_id' => $admin->id,
+                'decision' => $decision,
+                'reason_code' => $reasonCode,
+                'reason' => $reason,
+                'decided_at' => $now,
+            ]);
+
+            $submission->update(['status' => $decision, 'decided_at' => $now]);
+            $submission->task->update(['status' => $decision === 'approved' ? 'completed' : 'cancelled']);
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'review-decision-'.$submission->id],
+                [
+                    'user_id' => $submission->reviewer_id,
+                    'type' => 'review_decision',
+                    'title' => $decision === 'approved' ? 'App review approved' : 'App review not approved',
+                    'body' => $decision === 'approved'
+                        ? 'Your app review was approved. The reward was added to your Review wallet.'
+                        : 'Your app review was not approved. '.($reason ?? 'Please review the task requirements.'),
+                    'data' => ['review_submission_id' => $submission->id, 'status' => $decision],
+                ],
+            );
+            $campaign->reserved_reviews = max(0, $campaign->reserved_reviews - 1);
+
+            if ($decision === 'approved') {
+                $campaign->completed_reviews++;
+                $app = StoreApp::query()->lockForUpdate()->findOrFail($campaign->app_id);
+                $app->total_reviews = (int) ($app->total_reviews ?? 0) + 1;
+                $app->save();
+                $wallet = Wallet::query()->firstOrCreate([
+                    'user_id' => $submission->reviewer_id,
+                    'wallet_type' => 'review',
+                    'currency' => $campaign->currency,
+                ], ['status' => 'active']);
+                $reviewLedger = LedgerEntry::query()->firstOrCreate(['idempotency_key' => 'review-approved-'.$submission->id], [
+                    'wallet_id' => $wallet->id,
+                    'entry_type' => 'review_reward',
+                    'direction' => 'credit',
+                    'amount_minor' => $submission->task->reserved_reward_minor,
+                    'status' => 'posted',
+                    'source_type' => 'review_submission',
+                    'source_id' => $submission->id,
+                    'description' => 'Approved app review reward',
+                    'available_at' => $now,
+                    'posted_at' => $now,
+                ]);
+                app(CreditReferralReward::class)->handle(
+                    $submission->reviewer, $reviewLedger->amount_minor, $campaign->currency, 'task',
+                    'review_submission', $submission->id, 'referral-review:'.$submission->id,
+                    'Referral reward for approved app review', null, $submission->task->claimed_at,
+                );
+            }
+
+            $spentMinor = $campaign->completed_reviews * $campaign->review_reward_minor;
+            if (($campaign->maximum_review !== null && $campaign->completed_reviews >= $campaign->maximum_review)
+                || $spentMinor >= $campaign->paid_amount_minor) {
+                $campaign->status = 'exhausted';
+            }
+            $campaign->save();
+
+            AuditLog::query()->create([
+                'actor_admin_id' => $admin->id,
+                'action' => 'review_submission.'.$decision,
+                'entity_type' => 'review_submission',
+                'entity_id' => (string) $submission->id,
+                'after_values' => ['decision' => $decision, 'reason_code' => $reasonCode, 'reason' => $reason],
+                'created_at' => $now,
+            ]);
+
+            return $submission->refresh();
+        });
+    }
+}

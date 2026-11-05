@@ -1,0 +1,138 @@
+{
+  "name": "TrustLens app review questionnaire",
+  "version": 1,
+  "source": "project-overview.html",
+  "steps": [
+    {
+      "name": "First impressions",
+      "order": 1,
+      "questions": [
+        {
+          "key": "match",
+          "order": 1,
+          "prompt": "Do the store screenshots match what the app really shows?",
+          "hint": "Open the app and compare it with the pictures on the left.",
+          "type": "single_choice",
+          "options": ["Yes, they match", "Mostly, with small differences", "Not really", "No, they look completely different"],
+          "risk_option_indexes": [2, 3]
+        },
+        {
+          "key": "clear",
+          "order": 2,
+          "prompt": "How clearly does the app explain what it does in the first minute?",
+          "hint": null,
+          "type": "rating",
+          "scale": {"min": 1, "max": 5, "low_label": "Very unclear", "high_label": "Very clear"}
+        },
+        {
+          "key": "polish",
+          "order": 3,
+          "prompt": "How well does the app run and look?",
+          "hint": "Think about speed, crashes, readability and design.",
+          "type": "rating",
+          "scale": {"min": 1, "max": 5, "low_label": "Poor", "high_label": "Excellent"}
+        },
+        {
+          "key": "attn",
+          "order": 4,
+          "prompt": "Quality check: please select “Somewhat” for this question.",
+          "hint": "We use a few of these to catch rushed answers.",
+          "type": "single_choice",
+          "options": ["Not at all", "Somewhat", "Very much"]
+        }
+      ]
+    },
+    {
+      "name": "Safety check",
+      "order": 2,
+      "questions": [
+        {
+          "key": "pay",
+          "order": 1,
+          "prompt": "Did the app ask you for money, a deposit or a “registration fee” before showing you anything useful?",
+          "hint": null,
+          "type": "single_choice",
+          "options": ["Yes", "No", "I'm not sure"],
+          "risk_option_indexes": [0]
+        },
+        {
+          "key": "promise",
+          "order": 2,
+          "prompt": "Did it promise guaranteed profit, guaranteed loan approval or very high returns?",
+          "hint": null,
+          "type": "single_choice",
+          "options": ["Yes", "No", "I'm not sure"],
+          "risk_option_indexes": [0]
+        },
+        {
+          "key": "asked",
+          "order": 3,
+          "prompt": "Which of these did the app ask for?",
+          "hint": "Choose all that apply. Only choose what you actually saw.",
+          "type": "multiple_choice",
+          "options": ["BVN or NIN", "Card details or PIN", "OTP or SMS codes", "Access to contacts, photos or files", "Crypto wallet or seed phrase", "Selfie or ID document", "None of these"],
+          "risk_option_indexes": [0, 1, 2, 3, 4],
+          "exclusive_option_index": 6
+        },
+        {
+          "key": "signs",
+          "order": 4,
+          "prompt": "Did you notice any of these warning signs?",
+          "hint": "Choose all that apply.",
+          "type": "multiple_choice",
+          "options": ["Fake countdown timers or pressure to hurry", "Store reviews look copied or repeated", "Developer name does not match the company shown in the app", "Hidden or hard-to-read fees", "No working support contact", "Mentions of harassment or threats over repayments", "None of these"],
+          "risk_option_indexes": [0, 1, 2, 3, 4, 5],
+          "exclusive_option_index": 6
+        },
+        {
+          "key": "dev",
+          "order": 5,
+          "prompt": "Does the developer look legitimate?",
+          "hint": "Check the developer name, website, privacy policy and support email.",
+          "type": "single_choice",
+          "options": ["Yes, I could verify them", "Partly, some details are missing", "No, I couldn't verify them"],
+          "risk_option_indexes": [2]
+        }
+      ]
+    },
+    {
+      "name": "In your own words",
+      "order": 3,
+      "questions": [
+        {
+          "key": "what",
+          "order": 1,
+          "prompt": "In your own words, what does this app do and who is it for?",
+          "hint": "At least 25 words. Don't copy the store description.",
+          "type": "long_text",
+          "min_words": 25
+        },
+        {
+          "key": "bw",
+          "order": 2,
+          "prompt": "What's the best and the worst thing about it? Give one real example of each.",
+          "hint": "At least 20 words. Say what you did, and what happened.",
+          "type": "long_text",
+          "min_words": 20
+        },
+        {
+          "key": "verdict",
+          "order": 3,
+          "prompt": "What is your overall verdict?",
+          "hint": null,
+          "type": "single_choice",
+          "options": ["I would install and recommend it", "I would install it with caution", "I would not install it", "I suspect this app is a scam"],
+          "risk_option_indexes": [3]
+        },
+        {
+          "key": "honest",
+          "order": 4,
+          "prompt": null,
+          "hint": null,
+          "type": "confirmation",
+          "confirmation_label": "I used this app myself, and these answers are my own honest opinion."
+        }
+      ]
+    }
+  ]
+}

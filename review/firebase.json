@@ -1,0 +1,31 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "tl-store-application",
+          "appId": "1:1068160277012:android:1c22d70f8519b8a10fe501",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/config/firebase_options.dart": {
+          "projectId": "tl-store-application",
+          "configurations": {
+            "android": "1:1068160277012:android:1c22d70f8519b8a10fe501",
+            "ios": "1:1068160277012:ios:1f73fa8f9449d3870fe501",
+            "web": "1:1068160277012:web:20fd2e58c0ce62a60fe501"
+          }
+        }
+      },
+      "web": {
+        "default": {
+          "projectId": "tl-store-application",
+          "measurementId": "G-QK7ZJYHMHH",
+          "authDomain": "tl-store-application.firebaseapp.com",
+          "appId": "1:1068160277012:web:20fd2e58c0ce62a60fe501"
+        }
+      }
+    }
+  }
+}
