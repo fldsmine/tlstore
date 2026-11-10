@@ -34,7 +34,7 @@ class LegalDocumentSeeder extends Seeder
                         'heading' => 'How information is used',
                         'items' => [
                             'Create and secure your account, and respond to support requests.',
-                            'Determine campaign eligibility from your registration country, subscription, and location entitlements.',
+                            'Determine campaign eligibility from your registration country and active subscription package.',
                             'Review task evidence and manage pending or approved rewards.',
                             'Process selected payment, notification, and media features you use.',
                             'Protect the service, investigate misuse, and maintain financial records.',
@@ -86,12 +86,12 @@ class LegalDocumentSeeder extends Seeder
                         'body' => 'Task submissions remain pending until human review. Rewards are credited after approval according to the campaign’s stated amount and currency. A submission that does not follow the instructions or cannot be verified may be rejected.',
                     ],
                     [
-                        'heading' => 'Subscriptions and locations',
-                        'body' => 'Marketplace plans provide the access and limits shown in the app. Location add-ons provide eligibility for the countries or regions listed for the purchased plan; they do not track your device location. Plan availability, price, and duration are shown before purchase.',
+                        'heading' => 'Subscriptions and task eligibility',
+                        'body' => 'Marketplace packages define which tasks you may perform, any app-store or category restrictions, task limits, and withdrawal terms. Listings targeted to a country or region are available only to users whose profile country matches. Package availability, price, and duration are shown before purchase.',
                     ],
                     [
                         'heading' => 'Wallets and withdrawals',
-                        'body' => 'Top-up funds may be used for eligible subscriptions and location add-ons. Top-up funds cannot be withdrawn directly, but may be transferred without a transfer fee to an eligible earned wallet. Withdrawal methods, minimum amounts, and percentage fees are displayed in the app before a request is submitted.',
+                        'body' => 'Top-up funds may be used to purchase subscriptions. Top-up funds cannot be withdrawn directly, but may be transferred without a transfer fee to an eligible earned wallet. Withdrawal methods, package schedules, minimum amounts, and percentage fees are displayed in the app before a request is submitted.',
                     ],
                     [
                         'heading' => 'Fair use and moderation',

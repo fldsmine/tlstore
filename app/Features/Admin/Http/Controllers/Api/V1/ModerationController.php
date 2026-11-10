@@ -78,7 +78,7 @@ final class ModerationController
     public function withdrawals(): JsonResponse
     {
         return response()->json(['data' => WithdrawalRequest::query()
-            ->with(['user:id,full_name,username,email', 'wallet', 'option'])
+            ->with(['user:id,full_name,username,email', 'wallet', 'option', 'userSubscription.plan.group'])
             ->where('status', 'pending')->oldest('requested_at')->paginate(30)]);
     }
 
@@ -91,7 +91,7 @@ final class ModerationController
         ]);
         $result = $settle->handle($request->user(), $withdrawal, $data['decision'], $data['provider_reference'] ?? null, $data['reason'] ?? null);
 
-        return response()->json(['data' => $result, 'message' => 'Withdrawal settlement recorded.']);
+        return response()->json(['data' => $result->load(['user:id,full_name,username,email', 'wallet', 'option', 'userSubscription.plan.group']), 'message' => 'Withdrawal settlement recorded.']);
     }
 
     public function depositProof(ManualDepositSubmission $deposit)

@@ -26,6 +26,14 @@ final class SystemSettingController
             'is_public' => ['sometimes', 'boolean'],
         ]);
 
+        if ($settingKey === 'account_validation.provider') {
+            $provider = is_array($data['value']) ? ($data['value']['provider'] ?? null) : $data['value'];
+            if (! is_string($provider) || ! in_array(strtolower($provider), ['paystack', 'flutterwave', 'korapay', 'bachs'], true)) {
+                return response()->json(['message' => 'Account validation provider must be Paystack, Flutterwave, Korapay, or Bachs.'], 422);
+            }
+            $data['value'] = ['provider' => strtolower($provider)];
+        }
+
         if ($settingKey === 'payment.active_gateways') {
             $gateways = $data['value'];
             $allowed = ['korapay', 'paystack', 'flutterwave', 'bachs', 'manual'];

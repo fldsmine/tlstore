@@ -15,7 +15,7 @@ class Ad extends Model
 
     protected $table = 'ads';
     protected $fillable = [
-        'campaign_key', 'title', 'description', 'share_message', 'owner_id', 'creative_path',
+        'campaign_key', 'title', 'type', 'description', 'share_message', 'owner_id', 'creative_path',
         'destination_url', 'paid_amount', 'location', 'currency', 'total_share', 'reserved_share',
         'share_reward', 'maximum_share', 'status', 'starts_at', 'ends_at', 'featured',
     ];

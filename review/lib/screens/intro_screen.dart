@@ -34,9 +34,9 @@ class _IntroScreenState extends State<IntroScreen> {
     ),
     _IntroSlide(
       asset: 'assets/intro3.svg',
-      title: 'Find opportunities for your region',
+      title: 'Find tasks across regions',
       description:
-          'Your country helps us show eligible listings. Optional location plans can unlock campaigns in more regions.',
+          'Explore app reviews and sponsored ad tasks from every region. Your active package determines which task types you can complete.',
     ),
   ];
 

@@ -1,7 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
+import '../../../../core/currency/money.dart' as currency_money;
 import '../../../../services/auth_api.dart';
 import '../../../../services/media_url.dart';
 import '../../../../widgets/auth_components.dart';
@@ -209,10 +208,10 @@ class ListingCard extends StatelessWidget {
                     ),
                 ],
               ),
-              if (item['task_access_status'] != null) ...[
+              /*if (item['task_access_status'] != null) ...[
                 const SizedBox(height: 10),
                 AccessBadge(status: item['task_access_status'].toString()),
-              ],
+              ],*/
             ],
           ),
         ),
@@ -229,20 +228,26 @@ class AccessBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, icon, color) = switch (status) {
       'marketplace_plan_required' => (
-        'Marketplace plan needed to start',
+        'Subscription package needed',
         Icons.lock_outline_rounded,
         const Color(0xFF9A6811),
       ),
-      'location_coverage_required' => (
-        'Share ads & earn',
-        Icons.public_rounded,
+      'subscription_questionnaire_required' => (
+        'Complete package setup',
+        Icons.assignment_outlined,
         const Color(0xFF9A6811),
       ),
-      _ => (
-        'Share ads & earn',
-        Icons.check_circle_outline_rounded,
-        brandGreen,
+      'store_package_required' => (
+        'Different review package needed',
+        Icons.storefront_outlined,
+        const Color(0xFF9A6811),
       ),
+      'review_package_required' || 'share_package_required' => (
+        'Different package needed',
+        Icons.card_membership_outlined,
+        const Color(0xFF9A6811),
+      ),
+      _ => ('Share ads & earn', Icons.check_circle_outline_rounded, brandGreen),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -428,61 +433,14 @@ String moneyConverted(
   dynamic precision,
   String preferredCurrency, {
   required bool isMinor,
-}) {
-  final source = sourceCurrency.toUpperCase();
-  final digits = (precision as num?)?.toInt() ?? _precisionFor(source);
-  final raw = double.tryParse(amount?.toString() ?? '') ?? 0;
-  final major = isMinor ? raw / math.pow(10, digits) : raw;
-  final converted = api?.convertMajor(
-    major,
-    source,
-    preferredCurrency.toUpperCase(),
-  );
-  final currency = converted == null ? source : preferredCurrency.toUpperCase();
-  final value = converted ?? major;
-  return _formatMajorMoney(value, currency);
-}
-
-int _precisionFor(String code) {
-  if (const {
-    'BIF',
-    'CLP',
-    'DJF',
-    'GNF',
-    'ISK',
-    'JPY',
-    'KMF',
-    'KRW',
-    'PYG',
-    'RWF',
-    'UGX',
-    'VND',
-    'VUV',
-    'XAF',
-    'XOF',
-    'XPF',
-  }.contains(code)) {
-    return 0;
-  }
-  if (const {'BHD', 'IQD', 'JOD', 'KWD', 'LYD', 'OMR', 'TND'}.contains(code)) {
-    return 3;
-  }
-  return 2;
-}
-
-String _formatMajorMoney(double amount, String currency) {
-  final symbols = {
-    'USD': r'$',
-    'NGN': '₦',
-    'GBP': '£',
-    'EUR': '€',
-    'GHS': '₵',
-    'ZAR': 'R',
-    'KES': 'KSh',
-    'INR': '₹',
-  };
-  return '${symbols[currency] ?? '$currency '}${amount.toStringAsFixed(_precisionFor(currency))}';
-}
+}) => currency_money.moneyConverted(
+  api,
+  amount,
+  sourceCurrency,
+  precision,
+  preferredCurrency,
+  isMinor: isMinor,
+);
 
 String formatExpiry(String value) {
   final date = DateTime.tryParse(value)?.toLocal();

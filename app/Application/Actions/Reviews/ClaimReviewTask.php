@@ -18,13 +18,31 @@ final class ClaimReviewTask
     {
         return DB::transaction(function () use ($user, $campaign, $idempotencyKey): ReviewTask {
             $campaign = AppReviewCampaign::query()->lockForUpdate()->findOrFail($campaign->id);
-            $subscription = $this->eligibility->activeMarketplaceSubscription($user);
+            $subscription = $this->eligibility->subscriptionForTask(
+                $user,
+                'review',
+                $campaign->app?->store,
+                $campaign->app?->category,
+                true,
+            );
 
             if (! $subscription) {
-                throw ValidationException::withMessages(['subscription' => 'Subscribe to a marketplace plan before starting review tasks.']);
+                throw ValidationException::withMessages(['subscription' => 'Join an active app review package for this store before starting review tasks.']);
             }
-            if (! $this->eligibility->canAccess($user, $campaign->location)) {
-                throw ValidationException::withMessages(['location_coverage' => 'This app is outside your current location coverage. Purchase a location add-on to review it.']);
+            if (! $this->eligibility->appAllowed($user, $campaign->location, $campaign->app?->store, $campaign->app?->category)) {
+                if (in_array($subscription->plan?->group?->group_key, ['group_b', 'group_c'], true)
+                    && ! in_array($subscription->plan->group->group_key, $user->subscription_questionnaire_completed_groups ?? [], true)) {
+                    throw ValidationException::withMessages(['subscription_questionnaire' => 'Complete your app tester qualification questions before starting tasks.']);
+                }
+            }
+            if (($subscription->plan?->max_review_tasks ?? 0) < 1) {
+                throw ValidationException::withMessages(['subscription' => 'Your current package does not include app reviews. Join a review package to continue.']);
+            }
+            if ($subscription->plan?->eligible_app_store && strcasecmp($subscription->plan->eligible_app_store, (string) $campaign->app?->store) !== 0) {
+                throw ValidationException::withMessages(['subscription' => 'This review package only covers '.$subscription->plan->eligible_app_store.' apps.']);
+            }
+            if ($subscription->plan?->eligible_app_category && strcasecmp($subscription->plan->eligible_app_category, (string) $campaign->app?->category) !== 0) {
+                throw ValidationException::withMessages(['subscription' => 'This review package only covers '.$subscription->plan->eligible_app_category.' category apps.']);
             }
             if ($campaign->status->value !== 'active' || ($campaign->starts_at && $campaign->starts_at->isFuture()) || ($campaign->ends_at && $campaign->ends_at->isPast())) {
                 throw ValidationException::withMessages(['campaign' => 'This campaign is not active.']);
@@ -49,10 +67,33 @@ final class ClaimReviewTask
                 throw ValidationException::withMessages(['campaign' => 'This campaign has no reward budget remaining.']);
             }
             if ($subscription->plan?->max_review_tasks !== null) {
-                $claimed = ReviewTask::query()->where('reviewer_id', $user->id)
-                    ->whereBetween('claimed_at', [$subscription->starts_at, $subscription->ends_at])->count();
+                $claimedQuery = ReviewTask::query()->where('reviewer_id', $user->id)
+                    ->whereBetween('claimed_at', [$subscription->starts_at, $subscription->ends_at]);
+                if ($subscription->plan->eligible_app_store) {
+                    $claimedQuery->whereHas('campaign.app', fn ($query) => $query->where('store', $subscription->plan->eligible_app_store));
+                }
+                if ($subscription->plan->eligible_app_category) {
+                    $claimedQuery->whereHas('campaign.app', fn ($query) => $query->where('category', $subscription->plan->eligible_app_category));
+                }
+                $claimed = $claimedQuery->count();
                 if ($claimed >= $subscription->plan->max_review_tasks) {
                     throw ValidationException::withMessages(['subscription' => 'Your plan review task limit has been reached.']);
+                }
+            }
+            if ($subscription->plan?->daily_task_limit !== null) {
+                $todayReviewsQuery = ReviewTask::query()->where('reviewer_id', $user->id)->whereDate('claimed_at', today());
+                if ($subscription->plan->eligible_app_store) {
+                    $todayReviewsQuery->whereHas('campaign.app', fn ($query) => $query->where('store', $subscription->plan->eligible_app_store));
+                }
+                if ($subscription->plan->eligible_app_category) {
+                    $todayReviewsQuery->whereHas('campaign.app', fn ($query) => $query->where('category', $subscription->plan->eligible_app_category));
+                }
+                $todayReviews = $todayReviewsQuery->count();
+                $todayShares = ($subscription->plan->max_ad_shares ?? 0) > 0
+                    ? \App\Models\AdShareTask::query()->where('user_id', $user->id)->whereDate('claimed_at', today())->count()
+                    : 0;
+                if ($todayReviews + $todayShares >= $subscription->plan->daily_task_limit) {
+                    throw ValidationException::withMessages(['subscription' => 'Your package daily task limit has been reached.']);
                 }
             }
 

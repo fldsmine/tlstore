@@ -39,8 +39,4 @@ class UserSubscription extends Model
         return $this->belongsTo(PaymentIntent::class, 'payment_intent_id');
     }
 
-    public function locationEntitlements(): HasMany
-    {
-        return $this->hasMany(UserLocationEntitlement::class);
-    }
 }

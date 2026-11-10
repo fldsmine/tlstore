@@ -81,17 +81,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Text(
                 'Display currency',
-                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: Theme.of(ctx).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800),
               ),
             ),
             for (final item in _currencies)
               ListTile(
                 title: Text(item['code']?.toString() ?? ''),
                 trailing: item['code'] == current
-                    ? Icon(Icons.check_circle_rounded,
-                        color: Theme.of(ctx).colorScheme.primary)
+                    ? Icon(
+                        Icons.check_circle_rounded,
+                        color: Theme.of(ctx).colorScheme.primary,
+                      )
                     : null,
                 onTap: () => Navigator.pop(ctx, item['code']?.toString()),
               ),
@@ -109,6 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (result['data'] is Map<String, dynamic>) {
         widget.user.addAll(result['data'] as Map<String, dynamic>);
       }
+      widget.api.setPreferredCurrency(selected);
       if (mounted) {
         setState(() {});
         showAuthMessage(
@@ -155,8 +157,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        icon: Icon(Icons.warning_amber_rounded,
-            color: Theme.of(dialogContext).colorScheme.error, size: 34),
+        icon: Icon(
+          Icons.warning_amber_rounded,
+          color: Theme.of(dialogContext).colorScheme.error,
+          size: 34,
+        ),
         title: const Text('Delete account?'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -198,10 +203,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     try {
-      await widget.api.delete('me', widget.token,
-          body: {'current_password': password.text});
+      await widget.api.delete(
+        'me',
+        widget.token,
+        body: {'current_password': password.text},
+      );
       await PushNotificationService.instance.disconnect(
-          widget.api, widget.token);
+        widget.api,
+        widget.token,
+      );
       await widget.api.clearSession();
       if (mounted) {
         Navigator.pop(context);
@@ -233,7 +243,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
         children: [
-          const _SectionHeading(title: 'APPEARANCE', icon: Icons.palette_outlined),
+          const _SectionHeading(
+            title: 'APPEARANCE',
+            icon: Icons.palette_outlined,
+          ),
           const SizedBox(height: 12),
           _Panel(
             child: Column(
@@ -253,13 +266,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Theme',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w800)),
+                            Text(
+                              'Theme',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                             const SizedBox(height: 3),
-                            Text('Choose your appearance',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: scheme.onSurfaceVariant)),
+                            Text(
+                              'Choose your appearance',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -324,13 +343,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Accent color',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700)),
+                            Text(
+                              'Accent color',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             const SizedBox(height: 3),
-                            Text('More color options coming soon',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                    color: scheme.onSurfaceVariant)),
+                            Text(
+                              'More color options coming soon',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -356,7 +381,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : null,
                   onTap: _currencyLoading ? null : _chooseCurrency,
                 ),
@@ -373,7 +399,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2))
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : null,
                     onTap: _updates.checking ? null : _checkUpdate,
                   ),
@@ -383,7 +410,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           const SizedBox(height: 28),
-          const _SectionHeading(title: 'SHARE & CONNECT', icon: Icons.ios_share_rounded),
+          const _SectionHeading(
+            title: 'SHARE & CONNECT',
+            icon: Icons.ios_share_rounded,
+          ),
           const SizedBox(height: 12),
           _Panel(
             child: Column(
@@ -437,7 +467,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           const SizedBox(height: 28),
-          const _SectionHeading(title: 'ADMIN PAGES', icon: Icons.admin_panel_settings_outlined),
+          const _SectionHeading(
+            title: 'ADMIN PAGES',
+            icon: Icons.admin_panel_settings_outlined,
+          ),
           const SizedBox(height: 12),
           _Panel(
             child: Column(
@@ -457,11 +490,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.payments_outlined,
                   title: 'Payment gateway settings',
-                  subtitle: 'Admin access: active gateways and supported currencies',
+                  subtitle:
+                      'Admin access: active gateways and supported currencies',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
-                      builder: (_) => AdminPaymentGatewaysScreen(api: widget.api),
+                      builder: (_) =>
+                          AdminPaymentGatewaysScreen(api: widget.api),
                     ),
                   ),
                 ),
@@ -470,7 +505,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.campaign_outlined,
                   title: 'Home announcements',
-                  subtitle: 'Admin access: create, schedule, and manage home notices',
+                  subtitle:
+                      'Admin access: create, schedule, and manage home notices',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
@@ -478,7 +514,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-
 
                 const _PanelDivider(),
                 _SettingsTile(
@@ -488,7 +523,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
-                      builder: (_) => AdminRewardSettingsScreen(api: widget.api),
+                      builder: (_) =>
+                          AdminRewardSettingsScreen(api: widget.api),
                     ),
                   ),
                 ),
@@ -497,7 +533,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.military_tech_outlined,
                   title: 'User ranking management',
-                  subtitle: 'Admin access: ranks, requirements, and monthly rewards',
+                  subtitle:
+                      'Admin access: ranks, requirements, and monthly rewards',
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
@@ -505,14 +542,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-				
               ],
             ),
           ),
 
-
           const SizedBox(height: 28),
-          const _SectionHeading(title: 'ACCOUNT', icon: Icons.manage_accounts_outlined),
+          const _SectionHeading(
+            title: 'ACCOUNT',
+            icon: Icons.manage_accounts_outlined,
+          ),
           const SizedBox(height: 12),
           _Panel(
             child: Column(
@@ -542,17 +580,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Center(
             child: Column(
               children: [
-                Icon(Icons.shield_moon_outlined,
-                    size: 25, color: scheme.primary),
+                Icon(
+                  Icons.shield_moon_outlined,
+                  size: 25,
+                  color: scheme.primary,
+                ),
                 const SizedBox(height: 8),
-                Text('TrustLens',
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  'TrustLens',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 3),
-                Text('Privacy-first task participation',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  'Privacy-first task participation',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
           ),
@@ -586,10 +633,10 @@ class _SectionHeading extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.05,
-              ),
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.05,
+          ),
         ),
       ],
     );
@@ -609,9 +656,7 @@ class _Panel extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
-        side: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: 0.45),
-        ),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.45)),
       ),
       child: child,
     );
@@ -632,14 +677,14 @@ class _IconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Icon(icon, color: foreground, size: size * 0.52),
-      );
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(15),
+    ),
+    child: Icon(icon, color: foreground, size: size * 0.52),
+  );
 }
 
 class _SettingsTile extends StatelessWidget {
@@ -693,10 +738,13 @@ class _SettingsTile extends StatelessWidget {
           ),
         ),
       ),
-      trailing: trailing ??
+      trailing:
+          trailing ??
           (showChevron
-              ? Icon(Icons.chevron_right_rounded,
-                  color: scheme.onSurfaceVariant)
+              ? Icon(
+                  Icons.chevron_right_rounded,
+                  color: scheme.onSurfaceVariant,
+                )
               : null),
       onTap: onTap,
     );
@@ -708,12 +756,10 @@ class _PanelDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Divider(
-        height: 1,
-        indent: 78,
-        color: Theme.of(context).colorScheme.outlineVariant.withValues(
-              alpha: 0.55,
-            ),
-      );
+    height: 1,
+    indent: 78,
+    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.55),
+  );
 }
 
 class _ThemeChoice extends StatelessWidget {
@@ -773,20 +819,18 @@ class _ThemeChoice extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: selected
-                          ? scheme.onPrimaryContainer
-                          : scheme.onSurfaceVariant,
-                      fontWeight:
-                          selected ? FontWeight.w800 : FontWeight.w500,
-                    ),
+                  color: selected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                ),
               ),
               if (!enabled) ...[
                 const SizedBox(height: 3),
                 Text(
                   'Unavailable',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ],
             ],
@@ -829,8 +873,11 @@ class _UpdateDetailsScreen extends StatelessWidget {
               color: scheme.primaryContainer,
               borderRadius: BorderRadius.circular(26),
             ),
-            child: Icon(Icons.system_update_alt_rounded,
-                size: 46, color: scheme.onPrimaryContainer),
+            child: Icon(
+              Icons.system_update_alt_rounded,
+              size: 46,
+              color: scheme.onPrimaryContainer,
+            ),
           ),
           const SizedBox(height: 22),
           Text(
@@ -838,8 +885,9 @@ class _UpdateDetailsScreen extends StatelessWidget {
                 ? info.title!
                 : 'TrustLens ${info.versionName}',
             textAlign: TextAlign.center,
-            style: theme.textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w800),
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 16),
           Card(
@@ -855,8 +903,7 @@ class _UpdateDetailsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed:
-                info.hasDownloadUrl ? () => _openUpdate(context) : null,
+            onPressed: info.hasDownloadUrl ? () => _openUpdate(context) : null,
             icon: const Icon(Icons.download_rounded),
             label: const Text('Update now'),
           ),

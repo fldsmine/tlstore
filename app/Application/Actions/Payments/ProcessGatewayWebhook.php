@@ -248,7 +248,7 @@ final class ProcessGatewayWebhook
                     'fee' => 0,
                     'wallet' => null,
                     'status' => 'completed',
-                    'description' => ($plan->product_type->value === 'location_coverage' ? 'Location coverage add-on purchase: ' : 'Subscription package purchase: ').$plan->name,
+                    'description' => 'Subscription package purchase: '.$plan->name,
                     'meta' => [
                         'payment_intent_id' => $intent->id,
                         'plan_id' => $intent->source_id,

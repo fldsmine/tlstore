@@ -11,7 +11,7 @@ class Wallet extends Model
 {
     protected $table = 'wallets';
     protected $fillable = ['user_id', 'wallet_type', 'currency', 'status'];
-    protected $casts = ['wallet_type' => WalletType::class];
+    protected $casts = ['wallet_type' => WalletType::class, 'balance_minor' => 'integer'];
 
     public function user(): BelongsTo
     {

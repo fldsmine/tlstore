@@ -9,7 +9,6 @@ use App\Models\PaymentIntent;
 use App\Models\SubscriptionPlan;
 use App\Models\SystemSetting;
 use App\Models\User;
-use App\Models\UserLocationEntitlement;
 use App\Models\UserSubscription;
 use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
@@ -21,10 +20,13 @@ final class ActivateSubscription
         return DB::transaction(function () use ($user, $plan, $intent): UserSubscription {
             $existing = UserSubscription::query()->where('payment_intent_id', $intent->id)->first();
             if ($existing) {
-                return $existing->load(['plan.features', 'locationEntitlements']);
+                return $existing->load(['plan.group', 'plan.features']);
             }
 
-            $plan = SubscriptionPlan::query()->with(['features', 'locationCoverage'])->lockForUpdate()->findOrFail($plan->id);
+            $plan = SubscriptionPlan::query()->with(['features', 'group'])->lockForUpdate()->findOrFail($plan->id);
+            if ($plan->product_type->value !== 'marketplace_access') {
+                throw new \RuntimeException('Location coverage packages are no longer offered.');
+            }
             $now = $intent->paid_at ?? now();
             $startsAt = $now;
             $endsAt = match ($plan->billing_interval->value) {
@@ -33,20 +35,14 @@ final class ActivateSubscription
                 'quarterly' => $startsAt->copy()->addMonthsNoOverflow(3 * $plan->duration_count),
                 default => throw new \RuntimeException('Unsupported subscription duration.'),
             };
-            $targets = $plan->locationCoverage;
-
-            if ($plan->product_type->value === 'location_coverage' && $targets->isEmpty()) {
-                throw new \RuntimeException('The selected location plan has no configured coverage.');
-            }
-
-            // Switching marketplace packages replaces only the marketplace plan.
-            // Active location add-ons and their entitlements remain independent.
-            if ($plan->product_type->value === 'marketplace_access') {
+            // A user may keep one active package in each subscription group.
+            // Switching packages replaces only the active package in this plan's group.
+            $groupKey = $plan->group?->group_key;
+            if ($groupKey !== null) {
                 UserSubscription::query()
-                    ->where('user_id', $user->id)
-                    ->where('product_type', 'marketplace_access')
-                    ->where('status', 'active')
-                    ->where('ends_at', '>', $now)
+                    ->where('user_id', $user->id)->where('product_type', 'marketplace_access')
+                    ->where('status', 'active')->where('ends_at', '>', $now)
+                    ->whereHas('plan.group', fn ($query) => $query->where('group_key', $groupKey))
                     ->update(['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now]);
             }
 
@@ -70,24 +66,17 @@ final class ActivateSubscription
                     'bonus' => $plan->bonus,
                     'max_review_tasks' => $plan->max_review_tasks,
                     'max_ad_shares' => $plan->max_ad_shares,
-                    'global_listing_access' => $plan->global_listing_access,
-                    'coverage' => $targets->map(fn ($target) => ['type' => $target->target_type, 'code' => $target->target_code])->all(),
+                    'group_key' => $plan->group?->group_key,
+                    'eligible_app_store' => $plan->eligible_app_store,
+                    'eligible_app_category' => $plan->eligible_app_category,
+                    'minimum_withdrawal_minor' => $plan->minimum_withdrawal_minor,
+                    'withdrawal_days' => $plan->withdrawal_days,
+                    'daily_revenue_minor' => $plan->daily_revenue_minor,
+                    'task_reward_minor' => $plan->task_reward_minor,
+                    'daily_task_limit' => $plan->daily_task_limit,
                 ],
             ]);
 
-            if ($plan->product_type->value === 'location_coverage') {
-                foreach ($targets as $target) {
-                    UserLocationEntitlement::query()->create([
-                        'user_id' => $user->id,
-                        'user_subscription_id' => $subscription->id,
-                        'target_type' => $target->target_type,
-                        'target_code' => $target->target_code,
-                        'starts_at' => $startsAt,
-                        'ends_at' => $endsAt,
-                        'status' => 'active',
-                    ]);
-                }
-            }
 
             $bonusMinor = CurrencyMinorUnits::toMinor($plan->bonus, $plan->currency);
             if ($bonusMinor > 0 && $this->rewardSettingEnabled('rewards.subscription_bonus_active')) {
@@ -121,7 +110,7 @@ final class ActivateSubscription
                 $plan,
             );
 
-            return $subscription->load(['plan.features', 'locationEntitlements']);
+            return $subscription->load(['plan.group', 'plan.features']);
         });
     }
 

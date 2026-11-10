@@ -60,7 +60,7 @@ class DemoUserSeeder extends Seeder
                 $walletRows[] = [
                     'user_id' => $user->id,
                     'wallet_type' => $walletType,
-                    'currency' => 'USD',
+                    'currency' => 'NGN',
                     'status' => 'active',
                     'created_at' => $now,
                     'updated_at' => $now,

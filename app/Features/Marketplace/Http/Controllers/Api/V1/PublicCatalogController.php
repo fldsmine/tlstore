@@ -133,22 +133,30 @@ final class PublicCatalogController
     public function plans(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'product_type' => ['sometimes', 'in:marketplace_access,location_coverage'],
+            'product_type' => ['sometimes', 'in:marketplace_access'],
         ]);
 
         $plans = SubscriptionPlan::query()
             ->where('is_active', true)
             ->when(isset($validated['product_type']), fn ($query) => $query->where('product_type', $validated['product_type']))
-            ->with(['features', 'locationCoverage'])
+            ->with(['features', 'group'])
             ->orderBy('product_type')
             ->orderBy('price_minor')
             ->get();
         $bonusSetting = SystemSetting::query()->where('setting_key', 'rewards.subscription_bonus_active')->value('value');
         $bonusActive = $bonusSetting === null || filter_var(is_array($bonusSetting) ? ($bonusSetting['enabled'] ?? true) : $bonusSetting, FILTER_VALIDATE_BOOLEAN);
 
-        return response()->json(['data' => $plans->map(fn (SubscriptionPlan $plan) => array_merge(
-            $plan->toArray(), ['bonus_active' => $bonusActive],
-        ))->values()]);
+        $decorated = $plans->map(fn (SubscriptionPlan $plan) => array_merge($plan->toArray(), ['bonus_active' => $bonusActive]))->values();
+        return response()->json([
+            'data' => $decorated,
+            'groups' => $plans->filter(fn (SubscriptionPlan $plan) => $plan->group?->is_active)
+                ->groupBy(fn (SubscriptionPlan $plan) => $plan->group->group_key)
+                ->map(function ($rows) use ($decorated): array {
+                    $group = $rows->first()->group->toArray();
+                    $group['plans'] = $rows->map(fn ($plan) => $decorated->firstWhere('id', $plan->id))->values()->all();
+                    return $group;
+                })->values(),
+        ]);
     }
 
     public function paymentGateways(): JsonResponse

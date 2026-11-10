@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('tasks:expire-reservations')->everyMinute();
 Schedule::command('rankings:check-eligibility')->dailyAt('00:05');
 Schedule::command('rankings:reward-monthly')->dailyAt('00:10');
+Schedule::command('demo:generate-listings')
+    ->dailyAt('00:20')
+    ->environments(['local', 'testing', 'staging'])
+    ->withoutOverlapping();

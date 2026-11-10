@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 import '../widgets/auth_components.dart';
 
@@ -50,6 +51,7 @@ class _WalletTransferScreenState extends State<WalletTransferScreen> {
       _error = null;
     });
     try {
+      await widget.api.loadExchangeRates(widget.token);
       final wallets = (await widget.api.wallets(widget.token))
           .where(
             (wallet) =>
@@ -87,7 +89,7 @@ class _WalletTransferScreenState extends State<WalletTransferScreen> {
       return;
     }
     final currency = source['currency']?.toString().toUpperCase() ?? 'USD';
-    final digits = _precision(currency);
+    final digits = currencyPrecision(currency);
     final amount = double.tryParse(_amount.text.trim().replaceAll(',', ''));
     if (amount == null || amount <= 0) {
       showAuthMessage(context, 'Enter a valid transfer amount.');
@@ -202,7 +204,7 @@ class _WalletTransferScreenState extends State<WalletTransferScreen> {
                       items: _wallets.map((wallet) {
                         final currency =
                             wallet['currency']?.toString() ?? 'USD';
-                        final digits = _precision(currency);
+                        final digits = currencyPrecision(currency);
                         final balance =
                             (wallet['available_balance_minor'] as num?)
                                 ?.toInt() ??
@@ -210,7 +212,7 @@ class _WalletTransferScreenState extends State<WalletTransferScreen> {
                         return DropdownMenuItem(
                           value: (wallet['id'] as num).toInt(),
                           child: Text(
-                            '$currency ${(balance / _pow10(digits)).toStringAsFixed(digits)} available',
+                            '${moneyConverted(widget.api, balance, currency, digits, widget.api.preferredCurrency, isMinor: true)} available · $currency',
                           ),
                         );
                       }).toList(),
@@ -294,37 +296,5 @@ Widget _panel({required List<Widget> children}) => Container(
     children: children,
   ),
 );
-int _precision(String currency) {
-  if (const {
-    'BIF',
-    'CLP',
-    'DJF',
-    'GNF',
-    'ISK',
-    'JPY',
-    'KMF',
-    'KRW',
-    'PYG',
-    'RWF',
-    'UGX',
-    'VND',
-    'VUV',
-    'XAF',
-    'XOF',
-    'XPF',
-  }.contains(currency))
-    return 0;
-  if (const {
-    'BHD',
-    'IQD',
-    'JOD',
-    'KWD',
-    'LYD',
-    'OMR',
-    'TND',
-  }.contains(currency))
-    return 3;
-  return 2;
-}
 
 double _pow10(int digits) => digits == 0 ? 1 : (digits == 3 ? 1000 : 100);

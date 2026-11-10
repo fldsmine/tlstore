@@ -141,10 +141,10 @@ class AppListingCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (status != null) ...[
+              /*if (status != null) ...[
                 const SizedBox(height: 11),
                 _AccessNotice(status: status),
-              ],
+              ],*/
               if (!expanded) ...[
                 const SizedBox(height: 12),
                 SizedBox(
@@ -174,7 +174,9 @@ class AppListingCard extends StatelessWidget {
 
   String _actionLabel(String? status) => switch (status) {
     'marketplace_plan_required' => 'Review & Earn',
-    'location_coverage_required' => 'Review App Now',
+    'store_package_required' => 'Choose review package',
+    'review_package_required' => 'Join review package',
+    'subscription_questionnaire_required' => 'Complete package setup',
     _ => 'Review this app',
   };
 }
@@ -280,7 +282,9 @@ class _AccessNotice extends StatelessWidget {
     final ready = status == 'eligible';
     final text = switch (status) {
       'marketplace_plan_required' => 'Make Your Review & Earn',
-      'location_coverage_required' => 'Review this app & earn',
+      'store_package_required' => 'Join the matching store package',
+      'review_package_required' => 'Join a review package',
+      'subscription_questionnaire_required' => 'Complete package setup',
       _ => 'Review now & earn your reward',
     };
     final color = ready ? scheme.primary : scheme.tertiary;

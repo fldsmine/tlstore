@@ -8,6 +8,18 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Configuration and reference data. These rows used to be written by
+        // data migrations (payment gateways, reward switches, about page copy,
+        // package groups), so they belong in every environment - a fresh
+        // production database needs them before the app can boot.
+        $this->call([
+            SystemSettingSeeder::class,
+            AboutPageSettingsSeeder::class,
+            SubscriptionGroupSeeder::class,
+        ]);
+
+        // Everything below is demo content. It is only safe to insert in
+        // non-production environments.
         if (! app()->environment(['local', 'testing', 'staging'])) {
             return;
         }
@@ -28,11 +40,13 @@ class DatabaseSeeder extends Seeder
             SocialFollowSeeder::class,
             TestimonialSeeder::class,
             FaqSeeder::class,
+            BankSeeder::class,
             LegalDocumentSeeder::class,
-            AboutPageSettingsSeeder::class,
             AnnouncementSeeder::class,
             DemoPlatformActivitySeeder::class,
             PaymentOptionSeeder::class,
+			WalletCreditSeeder::class,
+            WalletBalanceSyncSeeder::class,
         ]);
     }
 }

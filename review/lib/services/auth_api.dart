@@ -138,6 +138,14 @@ class AuthApi {
   Future<List<CountryOption>>? _countriesInFlight;
   final Map<String, Future<Map<String, dynamic>>> _legalInFlight = {};
   Future<List<Map<String, dynamic>>>? _faqsInFlight;
+  String _preferredCurrency = 'USD';
+
+  String get preferredCurrency => _preferredCurrency;
+
+  void setPreferredCurrency(String currency) {
+    final normalized = currency.trim().toUpperCase();
+    if (normalized.isNotEmpty) _preferredCurrency = normalized;
+  }
 
   Future<void> loadExchangeRates(String token) async {
     if (_usdRates != null &&
@@ -181,6 +189,7 @@ class AuthApi {
       final session = jsonDecode(saved) as Map<String, dynamic>;
       final token = session['token'] as String;
       final profile = session['user'] as Map<String, dynamic>;
+      setPreferredCurrency(profile['preferred_currency']?.toString() ?? 'USD');
       try {
         final response = await _request('GET', 'me', token: token);
         final user = response['data'];
@@ -196,7 +205,10 @@ class AuthApi {
         }
         // Keep a valid saved session available when the device is temporarily offline.
       }
-      return AuthResult(token: token, user: profile);
+      final restored = AuthResult(token: token, user: profile);
+      _preferredCurrency = (profile['preferred_currency']?.toString() ?? 'USD')
+          .toUpperCase();
+      return restored;
     } on FormatException {
       await clearSession();
       return null;
@@ -206,12 +218,22 @@ class AuthApi {
     }
   }
 
-  Future<void> _saveSession(AuthResult result) => _storage.write(
-    key: _sessionKey,
-    value: jsonEncode({'token': result.token, 'user': result.user}),
-  );
+  Future<void> _saveSession(AuthResult result) async {
+    setPreferredCurrency(
+      result.user['preferred_currency']?.toString() ?? 'USD',
+    );
+    await _storage.write(
+      key: _sessionKey,
+      value: jsonEncode({'token': result.token, 'user': result.user}),
+    );
+  }
 
-  Future<void> clearSession() => _storage.delete(key: _sessionKey);
+  Future<void> clearSession() async {
+    _preferredCurrency = 'USD';
+    _usdRates = null;
+    _ratesLoadedAt = null;
+    await _storage.delete(key: _sessionKey);
+  }
 
   Future<Map<String, dynamic>> requestPasswordReset(String email) =>
       postPublic('auth/forgot-password', {'email': email.trim()});
@@ -461,6 +483,34 @@ class AuthApi {
         .toList(growable: false);
   }
 
+  Future<Map<String, String>> socialAccounts(String token) async {
+    final response = await get('me/social-accounts', token);
+    final data = response['data'];
+    if (data is! Map) return const {};
+    return data.map((key, value) => MapEntry(key.toString(), value.toString()));
+  }
+
+  Future<Map<String, dynamic>> setSocialAccount(String token, String platform, String handle) =>
+      put('me/social-accounts/${Uri.encodeComponent(platform)}', token, {'handle': handle});
+
+  Future<List<Map<String, dynamic>>> banks(String token, {required String country, String? search, String? type}) async {
+    final query = <String, String>{'country': country};
+    if (search != null && search.trim().isNotEmpty) query['search'] = search.trim();
+    if (type != null && type.isNotEmpty) query['type'] = type;
+    final response = await get('banks?${Uri(queryParameters: query).query}', token);
+    final data = response['data'];
+    return data is List ? data.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList() : const [];
+  }
+
+  Future<Map<String, dynamic>> dailyTasks(
+    String token,
+    String type, {
+    String? search,
+  }) => get(
+    'me/daily-tasks/$type${search == null || search.trim().isEmpty ? '' : '?search=${Uri.encodeQueryComponent(search.trim())}'}',
+    token,
+  );
+
   Future<Map<String, dynamic>> claimSocialFollow(String token, int handleId) =>
       post('me/social-handles/$handleId/follow', token, const {});
 
@@ -541,6 +591,15 @@ class AuthApi {
     'gateway': gateway,
     'currency': currency,
     'idempotency_key': idempotencyKey,
+  });
+
+  Future<Map<String, dynamic>> submitSubscriptionQuestionnaire({
+    required String token,
+    required String groupKey,
+    required Map<String, dynamic> answers,
+  }) => post('me/subscription-questionnaire', token, {
+    'group_key': groupKey,
+    'answers': answers,
   });
 
   Future<Map<String, dynamic>> checkSubscriptionPayment(

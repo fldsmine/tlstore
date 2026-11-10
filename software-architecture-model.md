@@ -4,11 +4,13 @@
 **Source:** `project-overview.html` (owner-provided prototype)  
 **Purpose:** Translate the visible product flow, prototype data, and owner decisions into the implementation architecture.
 
-**Scope update:** Section 12 incorporates the expanded requirements provided after the prototype review. Where earlier sections imply that users must buy a location session before earning, the updated rule is that an active marketplace subscription is required and additional location coverage is optional. Section 12 is the current architecture baseline.
+**Latest package decision (2026-11-08):** This supersedes earlier references below to purchasable location coverage, global listing access, and separate active location add-ons. Subscriptions are presented as Groups A, B, and C. Group A (Lite, Premium, Gold) allows ad shares only; Group B (Playstore review, Samsung store) allows reviews only in its assigned store; Group C (Apple store) allows Apple app reviews only. A user has one active marketplace package at a time; joining another switches packages. Country and region eligibility is determined from the user's profile country and listing target. There are no location coverage packages and no `global_listing_access` plan field. Withdrawal currency, minimum, and allowed days come from the active package.
+
+**Scope update:** Section 12 incorporates the expanded product requirements. The package decision dated 2026-11-08 supersedes earlier location add-on descriptions in this document; consult that decision and the implemented package-group sections for the current plan behavior.
 
 ## 1. Scope and evidence
 
-The HTML presents a platform where people review mobile apps from Google Play, Apple App Store, and Samsung Galaxy Store. Reviewers select eligible app-review work, complete a questionnaire, submit the review for human approval, and see earnings and activity in a wallet. The expanded product also includes public sponsor-ad shares. Marketplace subscriptions are required; optional location coverage expands listing eligibility based on admin-defined country/region groups and does not use a technical location service.
+The HTML presents a platform where people review mobile apps from Google Play, Apple App Store, and Samsung Galaxy Store. Reviewers select eligible app-review work, complete a questionnaire, submit the review for human approval, and see earnings and activity in a wallet. The expanded product also includes public sponsor-ad shares. Marketplace subscriptions grant task access, and listing location is matched against the profile country.
 
 The prototype includes three illustrative app records and hard-coded questionnaire rules. Its login, Google sign-in, checkout, location provisioning, review approval, and crediting are not connected to real services. State is kept in a JavaScript object and is lost on reload. Currency conversion fetches an external NGN exchange-rate feed and has hard-coded fallback rates.
 

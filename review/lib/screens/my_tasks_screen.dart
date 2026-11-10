@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../features/ads/presentation/screens/ad_evidence_screen.dart';
+import '../features/ads/presentation/screens/social_ad_task_screen.dart';
+import '../features/marketplace/presentation/screens/review_task_screen.dart';
 import '../services/auth_api.dart';
 
 class MyTasksScreen extends StatefulWidget {
-  const MyTasksScreen({super.key, required this.api, required this.token});
+  const MyTasksScreen({
+    super.key,
+    required this.api,
+    required this.token,
+    this.user = const {},
+  });
 
   final AuthApi api;
   final String token;
+  final Map<String, dynamic> user;
 
   @override
   State<MyTasksScreen> createState() => _MyTasksScreenState();
@@ -136,6 +145,8 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
               task['claimed_at'] ??
               task['created_at'],
           decision: _lastDecision(status),
+          task: task,
+          canResume: task['status']?.toString() == 'reserved' && status == null,
         ),
       );
     }
@@ -153,6 +164,8 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
               'in_progress',
           date: event?['shared_at'] ?? task['claimed_at'] ?? task['created_at'],
           decision: _lastDecision(event),
+          task: task,
+          canResume: task['status']?.toString() == 'reserved' && event == null,
         ),
       );
     }
@@ -179,6 +192,8 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     required String status,
     required dynamic date,
     String? decision,
+    Map<String, dynamic>? task,
+    bool canResume = false,
   }) => {
     'id': id,
     'title': title,
@@ -186,10 +201,78 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     'status': status,
     'date': DateTime.tryParse(date?.toString() ?? '') ?? DateTime(2000),
     'decision': decision,
+    'task': task,
+    'can_resume': canResume,
   };
+
+  String _adType(Map<String, dynamic> task) {
+    final ad = _map(task['ad']);
+    return (ad?['type']?.toString() ?? 'others').trim().toLowerCase();
+  }
+
+  bool _hasSocialFlow(String type) =>
+      const {
+        'telegram',
+        'facebook',
+        'youtube',
+        'instagram',
+        'tiktok',
+        'x',
+        'whatsapp',
+      }.any(
+        (platform) =>
+            type.contains(platform) ||
+            (platform == 'x' && type.contains('twitter')),
+      );
+
+  Future<void> _resumeTask(Map<String, dynamic> row) async {
+    final task = _map(row['task']);
+    if (task == null) return;
+    final isReview = row['kind'] == 'App review';
+    if (!isReview && task['status']?.toString() != 'reserved') {
+      return;
+    }
+    if (!isReview && !_hasSocialFlow(_adType(task))) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => AdEvidenceScreen(
+            api: widget.api,
+            token: widget.token,
+            task: task,
+            user: widget.user,
+          ),
+        ),
+      );
+    } else if (!isReview) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SocialAdTaskScreen(
+            api: widget.api,
+            token: widget.token,
+            task: task,
+            user: widget.user,
+          ),
+        ),
+      );
+    } else {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ReviewTaskScreen(
+            api: widget.api,
+            token: widget.token,
+            task: task,
+            user: widget.user,
+          ),
+        ),
+      );
+    }
+    if (mounted) await _load(reset: true);
+  }
 
   String _statusLabel(String value) {
     switch (value.toLowerCase()) {
+      case 'reserved':
+        return 'Proof not submitted';
       case 'pending_validation':
       case 'submitted':
       case 'under_review':
@@ -207,15 +290,17 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
         return 'Expired';
       case 'cancelled':
         return 'Cancelled';
-      default:
+      case 'in_progress':
         return 'In progress';
+      default:
+        return 'Proof not submitted';
     }
   }
 
   bool _matches(String filter, String status) {
     final label = _statusLabel(status);
     return filter == 'All' ||
-        (filter == 'In progress' && label == 'In progress') ||
+        (filter == 'Proof needed' && label == 'Proof not submitted') ||
         (filter == 'Pending review' &&
             (label == 'Pending review' ||
                 label == 'More information needed')) ||
@@ -232,6 +317,8 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
         return colors.error;
       case 'Pending review':
       case 'More information needed':
+        return colors.tertiary;
+      case 'Proof not submitted':
         return colors.tertiary;
       default:
         return colors.primary;
@@ -287,7 +374,7 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
                 children: [
                   for (final filter in const [
                     'All',
-                    'In progress',
+                    'Proof needed',
                     'Pending review',
                     'Completed',
                   ]) ...[
@@ -357,73 +444,95 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
                 final status = row['status'] as String;
                 final color = _statusColor(colors, status);
                 final date = row['date'] as DateTime;
+                final canResume = row['can_resume'] == true;
                 return Card(
                   margin: const EdgeInsets.only(top: 10),
-                  child: Padding(
-                    padding: const EdgeInsets.all(15),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: colors.primaryContainer,
-                          foregroundColor: colors.onPrimaryContainer,
-                          child: Icon(
-                            row['kind'] == 'App review'
-                                ? Icons.rate_review_rounded
-                                : Icons.campaign_rounded,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: canResume ? () => _resumeTask(row) : null,
+                    child: Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: colors.primaryContainer,
+                            foregroundColor: colors.onPrimaryContainer,
+                            child: Icon(
+                              row['kind'] == 'App review'
+                                  ? Icons.rate_review_rounded
+                                  : Icons.campaign_rounded,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 13),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                row['title'] as String,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                '${row['kind']} · ${_formatDate(date)}',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colors.onSurfaceVariant,
-                                ),
-                              ),
-                              if (row['decision'] != null) ...[
-                                const SizedBox(height: 8),
+                          const SizedBox(width: 13),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  row['decision'] as String,
+                                  row['title'] as String,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  '${row['kind']} · ${_formatDate(date)}',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colors.onSurfaceVariant,
                                   ),
                                 ),
+                                if (canResume) ...[
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    'Tap to continue this task',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colors.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                                if (row['decision'] != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    row['decision'] as String,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: .12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            _statusLabel(status),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: color,
-                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _statusLabel(status),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: color,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (canResume) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: colors.primary,
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 );

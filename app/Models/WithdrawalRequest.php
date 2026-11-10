@@ -13,7 +13,7 @@ class WithdrawalRequest extends Model
 
     protected $table = 'withdrawal_requests';
     protected $fillable = [
-        'user_id', 'wallet_id', 'withdrawal_option_id', 'amount_minor', 'fee_minor', 'currency',
+        'user_id', 'wallet_id', 'user_subscription_id', 'package_withdrawal_terms_snapshot', 'withdrawal_option_id', 'amount_minor', 'fee_minor', 'currency',
         'payout_details', 'status', 'idempotency_key', 'provider_reference', 'processed_by',
         'failure_reason', 'requested_at', 'processed_at', 'processed_by_admin_id',
     ];
@@ -21,6 +21,7 @@ class WithdrawalRequest extends Model
         'amount_minor' => 'integer',
         'fee_minor' => 'integer',
         'payout_details' => 'array',
+        'package_withdrawal_terms_snapshot' => 'array',
         'status' => WithdrawalRequestStatus::class,
         'requested_at' => 'datetime',
         'processed_at' => 'datetime',
@@ -39,6 +40,11 @@ class WithdrawalRequest extends Model
     public function option(): BelongsTo
     {
         return $this->belongsTo(WithdrawalOption::class, 'withdrawal_option_id');
+    }
+
+    public function userSubscription(): BelongsTo
+    {
+        return $this->belongsTo(UserSubscription::class, 'user_subscription_id');
     }
 
     public function processor(): BelongsTo

@@ -16,13 +16,12 @@ final class ListingController
         $validated = $request->validate([
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
-            'location' => ['sometimes', 'nullable', 'string', 'max:32'],
             'featured' => ['sometimes', 'boolean'],
             'sort' => ['sometimes', 'in:latest,reward_desc'],
         ]);
-        $result = $listings->apps($request->user(), $validated['per_page'] ?? 20, $validated['search'] ?? null, $validated['location'] ?? null, (bool) ($validated['featured'] ?? false), $validated['sort'] ?? 'latest');
+        $result = $listings->apps($request->user(), $validated['per_page'] ?? 20, $validated['search'] ?? null, (bool) ($validated['featured'] ?? false), $validated['sort'] ?? 'latest');
         $result->getCollection()->each(fn (AppReviewCampaign $campaign) => $campaign->setAttribute(
-            'task_access_status', $eligibility->taskAccessStatus($request->user(), $campaign->location),
+            'task_access_status', $eligibility->taskAccessStatus($request->user(), $campaign->location, $campaign->app?->store, $campaign->app?->category, 'review'),
         ));
 
         return response()->json(['data' => $result->items(), 'meta' => [
@@ -30,7 +29,6 @@ final class ListingController
             'per_page' => $result->perPage(),
             'total' => $result->total(),
             'last_page' => $result->lastPage(),
-            'locations' => AppReviewCampaign::query()->where('status', 'active')->whereNotNull('location')->distinct()->orderBy('location')->pluck('location'),
         ]]);
     }
 
@@ -39,13 +37,12 @@ final class ListingController
         $validated = $request->validate([
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
-            'location' => ['sometimes', 'nullable', 'string', 'max:32'],
             'featured' => ['sometimes', 'boolean'],
             'sort' => ['sometimes', 'in:latest,reward_desc'],
         ]);
-        $result = $listings->ads($request->user(), $validated['per_page'] ?? 20, $validated['search'] ?? null, $validated['location'] ?? null, (bool) ($validated['featured'] ?? false), $validated['sort'] ?? 'latest');
+        $result = $listings->ads($request->user(), $validated['per_page'] ?? 20, $validated['search'] ?? null, (bool) ($validated['featured'] ?? false), $validated['sort'] ?? 'latest');
         $result->getCollection()->each(fn (Ad $ad) => $ad->setAttribute(
-            'task_access_status', $eligibility->taskAccessStatus($request->user(), $ad->location),
+            'task_access_status', $eligibility->taskAccessStatus($request->user(), $ad->location, taskType: 'ad'),
         ));
 
         return response()->json(['data' => $result->items(), 'meta' => [
@@ -53,14 +50,13 @@ final class ListingController
             'per_page' => $result->perPage(),
             'total' => $result->total(),
             'last_page' => $result->lastPage(),
-            'locations' => Ad::query()->where('status', 'active')->whereNotNull('location')->distinct()->orderBy('location')->pluck('location'),
         ]]);
     }
 
     public function app(Request $request, AppReviewCampaign $campaign, ListEligibleListings $listings, ListingEligibility $eligibility): JsonResponse
     {
         $item = $listings->appDetail($request->user(), $campaign);
-        $item->setAttribute('task_access_status', $eligibility->taskAccessStatus($request->user(), $item->location));
+        $item->setAttribute('task_access_status', $eligibility->taskAccessStatus($request->user(), $item->location, $item->app?->store, $item->app?->category, 'review'));
 
         return response()->json(['data' => $item]);
     }
@@ -68,7 +64,7 @@ final class ListingController
     public function ad(Request $request, Ad $ad, ListEligibleListings $listings, ListingEligibility $eligibility): JsonResponse
     {
         $item = $listings->adDetail($request->user(), $ad);
-        $item->setAttribute('task_access_status', $eligibility->taskAccessStatus($request->user(), $item->location));
+        $item->setAttribute('task_access_status', $eligibility->taskAccessStatus($request->user(), $item->location, taskType: 'ad'));
 
         return response()->json(['data' => $item]);
     }

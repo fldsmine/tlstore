@@ -6,6 +6,7 @@ use App\Enums\BillingInterval;
 use App\Enums\SubscriptionProductType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SubscriptionPlan extends Model
 {
@@ -15,7 +16,9 @@ class SubscriptionPlan extends Model
     protected $fillable = [
         'plan_key', 'product_type', 'name', 'tier_key', 'billing_interval', 'duration_count',
         'price_minor', 'currency', 'discount', 'bonus', 'is_special', 'subscription_referral_percent', 'task_referral_percent', 'max_review_tasks',
-        'max_ad_shares', 'global_listing_access', 'features', 'is_active',
+        'max_ad_shares', 'subscription_group_id', 'eligible_app_store',
+        'eligible_app_category', 'minimum_withdrawal_minor', 'withdrawal_days', 'daily_revenue_minor',
+        'task_reward_minor', 'daily_task_limit', 'features', 'is_active',
     ];
     protected $casts = [
         'product_type' => SubscriptionProductType::class,
@@ -29,7 +32,12 @@ class SubscriptionPlan extends Model
         'is_special' => 'integer',
         'max_review_tasks' => 'integer',
         'max_ad_shares' => 'integer',
-        'global_listing_access' => 'boolean',
+        'subscription_group_id' => 'integer',
+        'minimum_withdrawal_minor' => 'integer',
+        'withdrawal_days' => 'array',
+        'daily_revenue_minor' => 'integer',
+        'task_reward_minor' => 'integer',
+        'daily_task_limit' => 'integer',
         'features' => 'array',
         'is_active' => 'boolean',
     ];
@@ -37,6 +45,11 @@ class SubscriptionPlan extends Model
     public function features(): HasMany
     {
         return $this->hasMany(SubscriptionPlanFeature::class);
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(SubscriptionGroup::class, 'subscription_group_id');
     }
 
     public function locationCoverage(): HasMany

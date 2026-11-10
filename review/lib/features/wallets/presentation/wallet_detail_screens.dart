@@ -1,7 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
+import '../../../core/currency/money.dart';
 import '../../../screens/payout_screen.dart';
 import '../../../screens/topup_screen.dart';
 import '../../../screens/wallet_transfer_screen.dart';
@@ -112,7 +111,7 @@ class TopupFundWalletScreen extends StatelessWidget {
     token: token,
     wallet: wallet,
     title: 'Top-up fund wallet',
-    subtitle: 'Use these funds to pay for subscriptions and location add-ons, or transfer them to an earnings wallet.',
+    subtitle: 'Use these funds to pay for subscriptions, or transfer them to an earnings wallet.',
     icon: Icons.account_balance_wallet_rounded,
   );
 }
@@ -151,6 +150,7 @@ class _WalletAccountScreenState extends State<_WalletAccountScreen> {
   bool get _isTopup => _wallet['type'] == 'topup_fund';
   String get _currency =>
       _wallet['currency']?.toString().toUpperCase() ?? 'USD';
+  String get _preferredCurrency => widget.api.preferredCurrency;
   int get _walletId => (_wallet['id'] as num).toInt();
 
   @override
@@ -165,6 +165,7 @@ class _WalletAccountScreenState extends State<_WalletAccountScreen> {
       _error = null;
     });
     try {
+      await widget.api.loadExchangeRates(widget.token);
       final values = await Future.wait([
         widget.api.wallets(widget.token),
         widget.api.walletLedgerPage(widget.token, _walletId),
@@ -299,7 +300,7 @@ class _WalletAccountScreenState extends State<_WalletAccountScreen> {
                             ),
                             const Spacer(),
                             Text(
-                              _currency,
+                              _preferredCurrency,
                               style: theme.textTheme.labelLarge?.copyWith(
                                 color: colors.onPrimary.withValues(alpha: .82),
                                 fontWeight: FontWeight.w700,
@@ -316,7 +317,14 @@ class _WalletAccountScreenState extends State<_WalletAccountScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _money(balance, _currency),
+                          moneyConverted(
+                            widget.api,
+                            balance,
+                            _currency,
+                            currencyPrecision(_currency),
+                            _preferredCurrency,
+                            isMinor: true,
+                          ),
                           style: theme.textTheme.headlineMedium?.copyWith(
                             color: colors.onPrimary,
                             fontWeight: FontWeight.w800,
@@ -325,7 +333,7 @@ class _WalletAccountScreenState extends State<_WalletAccountScreen> {
                         if (pending > 0) ...[
                           const SizedBox(height: 8),
                           Text(
-                            'Pending ${_money(pending, _currency)}',
+                            'Pending ${moneyConverted(widget.api, pending, _currency, currencyPrecision(_currency), _preferredCurrency, isMinor: true)}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colors.onPrimary.withValues(alpha: .82),
                             ),
@@ -399,7 +407,15 @@ class _WalletAccountScreenState extends State<_WalletAccountScreen> {
                         padding: const EdgeInsets.only(bottom: 9),
                         child: _WalletLedgerRow(
                           entry: entry,
-                          currency: _currency,
+                          displayAmount: moneyConverted(
+                            widget.api,
+                            entry['amount_minor'],
+                            entry['currency']?.toString() ?? _currency,
+                            entry['currency_minor_units'] ??
+                                currencyPrecision(_currency),
+                            _preferredCurrency,
+                            isMinor: true,
+                          ),
                         ),
                       ),
                     ),
@@ -426,16 +442,15 @@ class _WalletAccountScreenState extends State<_WalletAccountScreen> {
 }
 
 class _WalletLedgerRow extends StatelessWidget {
-  const _WalletLedgerRow({required this.entry, required this.currency});
+  const _WalletLedgerRow({required this.entry, required this.displayAmount});
   final Map<String, dynamic> entry;
-  final String currency;
+  final String displayAmount;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final isCredit = entry['direction']?.toString() == 'credit';
-    final amount = (entry['amount_minor'] as num?)?.toInt() ?? 0;
     final title = entry['description']?.toString().trim().isNotEmpty == true
         ? entry['description'].toString()
         : _pretty(entry['entry_type']?.toString() ?? 'Wallet transaction');
@@ -485,7 +500,7 @@ class _WalletLedgerRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '${isCredit ? '+' : '−'}${_money(amount, currency)}',
+            '${isCredit ? '+' : '−'}$displayAmount',
             style: theme.textTheme.labelLarge?.copyWith(
               color: isCredit ? colors.primary : colors.error,
               fontWeight: FontWeight.w800,
@@ -554,51 +569,6 @@ class _LoadError extends StatelessWidget {
   );
 }
 
-String _money(int minor, String currency) {
-  final digits = _precision(currency);
-  final value = minor / math.pow(10, digits);
-  final symbol = const {
-    'USD': r'$',
-    'NGN': '₦',
-    'GBP': '£',
-    'EUR': '€',
-    'GHS': '₵',
-  }[currency];
-  return '${symbol ?? '$currency '}${value.toStringAsFixed(digits)}';
-}
-
-int _precision(String currency) {
-  if (const {
-    'BIF',
-    'CLP',
-    'DJF',
-    'GNF',
-    'ISK',
-    'JPY',
-    'KMF',
-    'KRW',
-    'PYG',
-    'RWF',
-    'UGX',
-    'VND',
-    'VUV',
-    'XAF',
-    'XOF',
-    'XPF',
-  }.contains(currency))
-    return 0;
-  if (const {
-    'BHD',
-    'IQD',
-    'JOD',
-    'KWD',
-    'LYD',
-    'OMR',
-    'TND',
-  }.contains(currency))
-    return 3;
-  return 2;
-}
 
 String _pretty(String value) => value
     .replaceAll('_', ' ')

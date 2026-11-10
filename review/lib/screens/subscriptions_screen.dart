@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
+import 'subscription_questionnaire_screen.dart';
 import 'topup_screen.dart';
 
 class SubscriptionsScreen extends StatefulWidget {
@@ -25,8 +27,10 @@ class SubscriptionsScreen extends StatefulWidget {
 class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   Map<String, dynamic> _user = const {};
   List<Map<String, dynamic>> _plans = const [];
+  List<Map<String, dynamic>> _groups = const [];
+  String? _selectedGroupKey;
   Map<String, dynamic>? _activeMarketplace;
-  List<Map<String, dynamic>> _activeAddons = const [];
+  List<Map<String, dynamic>> _activeMarketplaces = const [];
   String? _error;
   bool _loading = true;
   int? _purchasing;
@@ -43,9 +47,39 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     _user = user;
     final context = _map(user['subscription_context']);
     final catalog = _map(context['catalog']);
-    _plans = _rows(catalog['marketplace_access']);
+    _groups = _rows(catalog['subscription_groups']);
+    _plans = _groups
+        .expand((group) {
+          final groupKey = group['group_key']?.toString();
+          return _rows(group['plans']).map((plan) {
+            final item = Map<String, dynamic>.from(plan);
+            item['group_key'] = groupKey;
+            return item;
+          });
+        })
+        .toList(growable: false);
     _activeMarketplace = _mapOrNull(context['active_marketplace']);
-    _activeAddons = _rows(context['active_location_addons']);
+    _activeMarketplaces = _rows(context['active_marketplaces']);
+    if (_activeMarketplaces.isEmpty && _activeMarketplace != null) {
+      _activeMarketplaces = [_activeMarketplace!];
+    }
+  }
+
+  Map<String, dynamic>? get _selectedGroup {
+    for (final group in _groups) {
+      if (group['group_key']?.toString() == _selectedGroupKey) return group;
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _planForSubscription(
+    Map<String, dynamic>? subscription,
+  ) {
+    final planId = _asInt(subscription?['subscription_plan_id']);
+    for (final plan in _plans) {
+      if (_asInt(plan['id']) == planId) return plan;
+    }
+    return const {};
   }
 
   Future<void> _load() async {
@@ -53,6 +87,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     if (!hasCachedData && mounted) setState(() => _loading = true);
     setState(() => _error = null);
     try {
+      await widget.api.loadExchangeRates(widget.token);
       final fresh = await widget.api.refreshUser(widget.token);
       if (!mounted) return;
       setState(() {
@@ -70,16 +105,68 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     }
   }
 
-  bool _isActivePlan(Map<String, dynamic> plan) =>
-      _asInt(_activeMarketplace?['subscription_plan_id']) == _asInt(plan['id']);
+  bool _isActivePlan(Map<String, dynamic> plan) => _activeMarketplaces.any(
+    (subscription) =>
+        _asInt(subscription['subscription_plan_id']) == _asInt(plan['id']),
+  );
+
+  Map<String, dynamic>? _subscriptionForPlan(Map<String, dynamic> plan) {
+    for (final subscription in _activeMarketplaces) {
+      if (_asInt(subscription['subscription_plan_id']) == _asInt(plan['id'])) {
+        return subscription;
+      }
+    }
+    return null;
+  }
+
+  bool _questionnaireComplete(String? groupKey) {
+    if (groupKey != 'group_b' && groupKey != 'group_c') return true;
+    final questionnaire = _map(_user['subscription_questionnaire']);
+    final completed = questionnaire['completed_groups'];
+    return completed is List &&
+        completed.any((value) => value.toString() == groupKey);
+  }
+
+  Future<bool> _showQuestionnaire(String groupKey) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => SubscriptionQuestionnaireScreen(
+          api: widget.api,
+          token: widget.token,
+          groupKey: groupKey,
+          user: _user,
+        ),
+      ),
+    );
+    if (!mounted || result != true) return false;
+    final refreshed = await widget.api.refreshUser(widget.token);
+    if (!mounted) return false;
+    setState(() => _applySnapshot(refreshed));
+    return _questionnaireComplete(groupKey);
+  }
+
+  Future<void> _ensureQuestionnaire(String? groupKey) async {
+    if (groupKey != null &&
+        (groupKey == 'group_b' || groupKey == 'group_c') &&
+        !_questionnaireComplete(groupKey)) {
+      await _showQuestionnaire(groupKey);
+    }
+  }
 
   Future<void> _openPurchase(Map<String, dynamic> plan) async {
     if (_isActivePlan(plan)) {
-      _showActiveDetails(_activeMarketplace!);
+      final activeSubscription = _subscriptionForPlan(plan)!;
+      final groupKey = plan['group_key']?.toString();
+      if (!_questionnaireComplete(groupKey)) {
+        await _ensureQuestionnaire(groupKey);
+      } else {
+        _showActiveDetails(activeSubscription);
+      }
       return;
     }
     setState(() => _purchasing = _asInt(plan['id']));
     try {
+      final groupKey = plan['group_key']?.toString();
       final result = await showPlanPurchaseSheet(
         context: context,
         api: widget.api,
@@ -98,6 +185,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       }
       if (result == 'paid') {
         await _load();
+        if (_isActivePlan(plan)) await _ensureQuestionnaire(groupKey);
       }
     } finally {
       if (mounted) setState(() => _purchasing = null);
@@ -105,9 +193,14 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 
   void _showActiveDetails(Map<String, dynamic> subscription) {
-    final plan = _map(subscription['plan']);
+    final plan = _planForSubscription(subscription);
     final ends = _formatDate(subscription['ends_at']);
-    final features = _planFeatures(plan);
+    final dailyAdEarnings = _dailyAdEarningsLabel(
+      plan,
+      widget.api,
+      widget.api.preferredCurrency,
+    );
+    final features = [..._planFeatures(plan, widget.api), ?dailyAdEarnings];
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -143,28 +236,6 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                     ),
                   ),
                 ],
-                if (_activeAddons.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Active location add-ons',
-                    style: Theme.of(context).textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  ..._activeAddons.map((addon) {
-                    final addonPlan = _map(addon['plan']);
-                    final coverage = _coverageSummary(addonPlan);
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.public_rounded),
-                      title: Text(
-                        addonPlan['name']?.toString() ?? 'Location add-on',
-                      ),
-                      subtitle: Text(
-                        '${coverage.isEmpty ? 'Coverage not configured' : coverage} · Ends ${_formatDate(addon['ends_at'])}',
-                      ),
-                    );
-                  }),
-                ],
               ],
             ),
           ),
@@ -178,12 +249,19 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final active = _activeMarketplace;
-    final activePlan = _map(active?['plan']);
+    final activePlan = _planForSubscription(active);
 
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: AppBar(
-        title: const Text('Subscriptions'),
+        leading: _selectedGroupKey == null
+            ? null
+            : IconButton(
+                tooltip: 'All package groups',
+                onPressed: () => setState(() => _selectedGroupKey = null),
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+        title: Text(_selectedGroup?['name']?.toString() ?? 'Subscriptions'),
         centerTitle: false,
         elevation: 0,
         actions: [
@@ -198,215 +276,231 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       body: _loading && _plans.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_rounded,
+                      size: 46,
+                      color: colors.error,
+                    ),
+                    const SizedBox(height: 14),
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+                children: [
+                  _SubscriptionHero(
+                    active: active != null,
+                    planName:
+                        activePlan['name']?.toString() ?? 'No active plan',
+                    endsAt: active?['ends_at'],
+                    onTap: active == null
+                        ? null
+                        : () => _showActiveDetails(active),
+                  ),
+                  const SizedBox(height: 22),
+                  if (_activeMarketplaces.isNotEmpty) ...[
+                    Text(
+                      'Your active packages',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._activeMarketplaces.map((subscription) {
+                      final plan = _planForSubscription(subscription);
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.verified_rounded,
+                            color: colors.primary,
+                          ),
+                          title: Text(
+                            plan['name']?.toString() ?? 'Active package',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            '${plan['group_key']?.toString().replaceAll('_', ' ').toUpperCase() ?? 'PACKAGE'} · until ${_formatDate(subscription['ends_at'])}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => _showActiveDetails(subscription),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 14),
+                  ],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedGroupKey == null
+                                  ? 'CHOOSE A PACKAGE GROUP'
+                                  : 'CHOOSE YOUR PLAN',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.3,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              _selectedGroupKey == null
+                                  ? 'Subscription groups'
+                                  : 'Available packages',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_plans.isNotEmpty)
+                        Text(
+                          '${_plans.length} available',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    _selectedGroupKey == null
+                        ? 'Choose a group to see its subscription packages.'
+                        : 'Choose a package. Joining another package switches your current package.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_plans.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.inventory_2_outlined, size: 34),
+                          SizedBox(height: 10),
+                          Text(
+                            'No marketplace packages are available right now.',
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_selectedGroupKey == null)
+                    ..._groups.map(
+                      (group) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _GroupCard(
+                          group: group,
+                          planCount: _rows(group['plans']).length,
+                          onTap: () => setState(
+                            () => _selectedGroupKey = group['group_key']
+                                ?.toString(),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ..._plans
+                        .where(
+                          (plan) =>
+                              plan['group_key']?.toString() ==
+                              _selectedGroupKey,
+                        )
+                        .map(
+                          (plan) => Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: _PlanCard(
+                              api: widget.api,
+                              preferredCurrency: widget.api.preferredCurrency,
+                              plan: plan,
+                              active: _isActivePlan(plan),
+                              purchasing: _purchasing == _asInt(plan['id']),
+                              onTap: () => _openPurchase(plan),
+                            ),
+                          ),
+                        ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: colors.outlineVariant),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.cloud_off_rounded,
-                            size: 46, color: colors.error),
-                        const SizedBox(height: 14),
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 18),
-                        FilledButton.icon(
-                          onPressed: _load,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Try again'),
+                        Icon(Icons.lock_outline_rounded, color: colors.primary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Secure subscription payments',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Choose a supported payment currency and gateway at checkout. You can also pay with your funded wallet.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
-                    children: [
-                      _SubscriptionHero(
-                        active: active != null,
-                        planName: activePlan['name']?.toString() ?? 'No active plan',
-                        endsAt: active?['ends_at'],
-                        onTap: active == null ? null : () => _showActiveDetails(active),
-                      ),
-                      const SizedBox(height: 22),
-                      if (active != null) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _MetricTile(
-                                icon: Icons.rate_review_outlined,
-                                label: 'Review tasks',
-                                value: activePlan['max_review_tasks']?.toString() ?? '—',
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _MetricTile(
-                                icon: Icons.campaign_outlined,
-                                label: 'Ad shares',
-                                value: activePlan['max_ad_shares']?.toString() ?? '—',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 22),
-                      ],
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('CHOOSE YOUR PLAN',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: colors.primary,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.3,
-                                    )),
-                                const SizedBox(height: 5),
-                                Text('Marketplace packages',
-                                    style: theme.textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -.5,
-                                    )),
-                              ],
-                            ),
-                          ),
-                          if (_plans.isNotEmpty)
-                            Text('${_plans.length} available',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colors.onSurfaceVariant,
-                                )),
-                        ],
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        'Pick the access level that matches how you want to explore, review and share listings.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colors.onSurfaceVariant,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      if (_plans.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: colors.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Column(
-                            children: [
-                              Icon(Icons.inventory_2_outlined, size: 34),
-                              SizedBox(height: 10),
-                              Text('No marketplace packages are available right now.'),
-                            ],
-                          ),
-                        )
-                      else
-                        ..._plans.map((plan) => Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: _PlanCard(
-                                plan: plan,
-                                active: _isActivePlan(plan),
-                                purchasing: _purchasing == _asInt(plan['id']),
-                                onTap: () => _openPurchase(plan),
-                              ),
-                            )),
-                      if (_activeAddons.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: colors.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colors.outlineVariant),
-                          ),
-                          child: Theme(
-                            data: theme.copyWith(dividerColor: Colors.transparent),
-                            child: ExpansionTile(
-                              leading: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: colors.primaryContainer,
-                                  borderRadius: BorderRadius.circular(13),
-                                ),
-                                child: Icon(Icons.public_rounded,
-                                    color: colors.onPrimaryContainer),
-                              ),
-                              title: Text('Location add-ons (${_activeAddons.length})',
-                                  style: const TextStyle(fontWeight: FontWeight.w800)),
-                              subtitle: const Text('Your extra market coverage'),
-                              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                              children: _activeAddons.map((addon) {
-                                final plan = _map(addon['plan']);
-                                final coverage = _coverageSummary(plan);
-                                return ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: const Icon(Icons.check_circle_rounded),
-                                  title: Text(plan['name']?.toString() ?? 'Location add-on'),
-                                  subtitle: Text(
-                                    '${coverage.isEmpty ? 'Coverage not configured' : coverage}\nActive until ${_formatDate(addon['ends_at'])}',
-                                  ),
-                                  isThreeLine: true,
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: colors.outlineVariant),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.lock_outline_rounded, color: colors.primary),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Secure subscription payments',
-                                      style: TextStyle(fontWeight: FontWeight.w800)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Choose a supported payment currency and gateway at checkout. You can also pay with your funded wallet.',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colors.onSurfaceVariant,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
+              ),
+            ),
     );
   }
-
 }
 
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
+    required this.api,
+    required this.preferredCurrency,
     required this.plan,
     required this.active,
     required this.purchasing,
     required this.onTap,
   });
 
+  final AuthApi api;
+  final String preferredCurrency;
   final Map<String, dynamic> plan;
   final bool active;
   final bool purchasing;
@@ -417,13 +511,17 @@ class _PlanCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final currency = plan['currency']?.toString() ?? 'USD';
-    final digits = _asInt(plan['currency_minor_units'], fallback: 2).clamp(0, 4);
+    final digits = _asInt(
+      plan['currency_minor_units'],
+      fallback: 2,
+    ).clamp(0, 4);
     final original = _asInt(plan['price_minor']);
     final discount = _asDouble(plan['discount']).clamp(0, 100);
     final payable = (original * (100 - discount) / 100).round();
     final bonus = _asDouble(plan['bonus']);
     final special = _asInt(plan['is_special']) == 1;
-    final features = _planFeatures(plan);
+    final features = _planFeatures(plan, api);
+    final dailyAdEarnings = _dailyAdEarningsLabel(plan, api, preferredCurrency);
     final name = plan['name']?.toString() ?? 'Plan';
 
     return Container(
@@ -431,12 +529,16 @@ class _PlanCard extends StatelessWidget {
         color: colors.surface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: active ? colors.primary : special ? colors.tertiary : colors.outlineVariant,
+          color: active
+              ? colors.primary
+              : special
+              ? colors.tertiary
+              : colors.outlineVariant,
           width: active || special ? 1.6 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: colors.shadow.withOpacity(.045),
+            color: colors.shadow.withValues(alpha: .045),
             blurRadius: 18,
             offset: const Offset(0, 7),
           ),
@@ -450,20 +552,29 @@ class _PlanCard extends StatelessWidget {
             if (active || special)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 8,
+                ),
                 color: active ? colors.primary : colors.tertiaryContainer,
                 child: Row(
                   children: [
                     Icon(
-                      active ? Icons.verified_rounded : Icons.auto_awesome_rounded,
+                      active
+                          ? Icons.verified_rounded
+                          : Icons.auto_awesome_rounded,
                       size: 15,
-                      color: active ? colors.onPrimary : colors.onTertiaryContainer,
+                      color: active
+                          ? colors.onPrimary
+                          : colors.onTertiaryContainer,
                     ),
                     const SizedBox(width: 7),
                     Text(
                       active ? 'CURRENT PACKAGE' : 'RECOMMENDED',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: active ? colors.onPrimary : colors.onTertiaryContainer,
+                        color: active
+                            ? colors.onPrimary
+                            : colors.onTertiaryContainer,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.1,
                       ),
@@ -483,11 +594,13 @@ class _PlanCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(name,
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -.3,
-                                )),
+                            Text(
+                              name,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -.3,
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Text(
                               '${plan['duration_count'] ?? 1} ${plan['billing_interval'] ?? 'monthly'} access',
@@ -500,16 +613,21 @@ class _PlanCard extends StatelessWidget {
                       ),
                       if (discount > 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: colors.secondaryContainer,
                             borderRadius: BorderRadius.circular(30),
                           ),
-                          child: Text('${discount.toStringAsFixed(0)}% OFF',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colors.onSecondaryContainer,
-                                fontWeight: FontWeight.w900,
-                              )),
+                          child: Text(
+                            '${discount.toStringAsFixed(0)}% OFF',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.onSecondaryContainer,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -517,40 +635,57 @@ class _PlanCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(_money(payable, currency, digits),
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            color: colors.primary,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1,
-                          )),
+                      Text(
+                        moneyConverted(
+                          api,
+                          payable,
+                          currency,
+                          digits,
+                          preferredCurrency,
+                          isMinor: true,
+                        ),
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1,
+                        ),
+                      ),
                       const SizedBox(width: 7),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 5),
-                        child: Text('/ ${plan['billing_interval'] ?? 'month'}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            )),
+                        child: Text(
+                          '/ ${plan['billing_interval'] ?? 'month'}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   if (discount > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: Text('Regular price ${_money(original, currency, digits)}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            decoration: TextDecoration.lineThrough,
-                          )),
+                      child: Text(
+                        'Regular price ${moneyConverted(api, original, currency, digits, preferredCurrency, isMinor: true)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
                     ),
                   if (bonus > 0 && plan['bonus_active'] != false) ...[
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        Icon(Icons.card_giftcard_rounded, size: 17, color: colors.tertiary),
+                        Icon(
+                          Icons.card_giftcard_rounded,
+                          size: 17,
+                          color: colors.tertiary,
+                        ),
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
-                            'Includes ${_money(_asInt((bonus * math.pow(10, digits)).round()), currency, digits)} welcome bonus',
+                            'Includes ${moneyConverted(api, bonus, currency, digits, preferredCurrency, isMinor: false)} welcome bonus',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colors.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
@@ -563,23 +698,61 @@ class _PlanCard extends StatelessWidget {
                   const SizedBox(height: 16),
                   Divider(color: colors.outlineVariant),
                   const SizedBox(height: 8),
-                  Text('WHAT’S INCLUDED',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
-                      )),
+                  Text(
+                    'WHAT’S INCLUDED',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   if (features.isNotEmpty)
-                    ...features.take(6).map((feature) => _PlanFeature(text: feature))
+                    ...features
+                        .take(6)
+                        .map((feature) => _PlanFeature(text: feature))
                   else ...[
                     if (plan['max_review_tasks'] != null)
-                      _PlanFeature(text: 'Up to ${plan['max_review_tasks']} app reviews'),
+                      _PlanFeature(
+                        text: 'Up to ${plan['max_review_tasks']} app reviews',
+                      ),
                     if (plan['max_ad_shares'] != null)
-                      _PlanFeature(text: 'Up to ${plan['max_ad_shares']} ad shares'),
-                    if (plan['global_listing_access'] == true)
-                      const _PlanFeature(text: 'Access to global listings'),
+                      if (_asInt(plan['max_ad_shares']) > 0)
+                        _PlanFeature(
+                          text:
+                              'Up to ${plan['max_ad_shares']} ad shares per package period',
+                        ),
+                    if (_asInt(plan['max_review_tasks']) > 0)
+                      _PlanFeature(
+                        text:
+                            'Up to ${plan['max_review_tasks']} app reviews per package period',
+                      ),
+                    if (plan['eligible_app_store'] != null)
+                      _PlanFeature(
+                        text: 'Review ${plan['eligible_app_store']} apps only',
+                      ),
+                    if (plan['eligible_app_category'] != null)
+                      _PlanFeature(
+                        text:
+                            'Review ${plan['eligible_app_category']} category apps only',
+                      ),
+                    if (plan['minimum_withdrawal_minor'] != null)
+                      _PlanFeature(
+                        text:
+                            'Minimum withdrawal ${moneyConverted(api, plan['minimum_withdrawal_minor'], currency, digits, preferredCurrency, isMinor: true)}',
+                      ),
+                    if (plan['withdrawal_days'] is List)
+                      _PlanFeature(
+                        text:
+                            'Withdraw ${(plan['withdrawal_days'] as List).join(' & ')}',
+                      ),
+                    if (plan['daily_task_limit'] != null)
+                      _PlanFeature(
+                        text: '${plan['daily_task_limit']} tasks each day',
+                      ),
                   ],
+                  if (dailyAdEarnings != null)
+                    _PlanFeature(text: dailyAdEarnings),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -600,9 +773,16 @@ class _PlanCard extends StatelessWidget {
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(active ? 'View current package' : 'Continue with $name'),
+                                Text(
+                                  active
+                                      ? 'View current package'
+                                      : 'Join Package',
+                                ),
                                 const SizedBox(width: 8),
-                                const Icon(Icons.arrow_forward_rounded, size: 18),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 18,
+                                ),
                               ],
                             ),
                     ),
@@ -611,6 +791,71 @@ class _PlanCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupCard extends StatelessWidget {
+  const _GroupCard({
+    required this.group,
+    required this.planCount,
+    required this.onTap,
+  });
+  final Map<String, dynamic> group;
+  final int planCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                backgroundColor: colors.primaryContainer,
+                child: Icon(
+                  Icons.card_membership_rounded,
+                  color: colors.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                group['name']?.toString() ?? 'Package group',
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${group['description'] ?? ''} · $planCount packages',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: FilledButton(
+                  onPressed: onTap,
+                  child: const Text('JOIN PACKAGE'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -631,7 +876,9 @@ class _PlanFeature extends StatelessWidget {
         children: [
           Icon(Icons.check_circle_rounded, size: 18, color: colors.primary),
           const SizedBox(width: 9),
-          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
         ],
       ),
     );
@@ -666,7 +913,10 @@ class _SubscriptionHero extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [colors.primary, Color.lerp(colors.primary, colors.tertiary, .55)!],
+              colors: [
+                colors.primary,
+                Color.lerp(colors.primary, colors.tertiary, .55)!,
+              ],
             ),
             borderRadius: BorderRadius.circular(24),
           ),
@@ -675,60 +925,90 @@ class _SubscriptionHero extends StatelessWidget {
               Positioned(
                 right: -12,
                 top: -18,
-                child: Icon(Icons.workspace_premium_rounded,
-                    size: 125, color: foreground.withOpacity(.10)),
+                child: Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 125,
+                  color: foreground.withValues(alpha: .10),
+                ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.auto_awesome_rounded, color: foreground, size: 17),
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        color: foreground,
+                        size: 17,
+                      ),
                       const SizedBox(width: 7),
-                      Text('YOUR MARKETPLACE ACCESS',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: foreground.withOpacity(.9),
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
-                          )),
+                      Text(
+                        'YOUR MARKETPLACE ACCESS',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: foreground.withValues(alpha: .9),
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 17),
-                  Text(active ? planName : 'Unlock more opportunities',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: foreground,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -.5,
-                      )),
+                  Text(
+                    active ? planName : 'Unlock more opportunities',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -.5,
+                    ),
+                  ),
                   const SizedBox(height: 7),
                   Text(
                     active
                         ? 'Your package is active until ${_formatDate(endsAt)}.'
                         : 'Choose a package to review apps and share ads across the marketplace.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: foreground.withOpacity(.9),
+                      color: foreground.withValues(alpha: .9),
                       height: 1.4,
                     ),
                   ),
                   const SizedBox(height: 17),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: foreground.withOpacity(.15),
+                      color: foreground.withValues(alpha: .15),
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: foreground.withOpacity(.22)),
+                      border: Border.all(
+                        color: foreground.withValues(alpha: .22),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(active ? Icons.verified_rounded : Icons.explore_rounded,
-                            size: 16, color: foreground),
+                        Icon(
+                          active
+                              ? Icons.verified_rounded
+                              : Icons.explore_rounded,
+                          size: 16,
+                          color: foreground,
+                        ),
                         const SizedBox(width: 7),
-                        Text(active ? 'Subscription active' : 'Explore packages',
-                            style: TextStyle(color: foreground, fontWeight: FontWeight.w700)),
+                        Text(
+                          active ? 'Subscription active' : 'Explore packages',
+                          style: TextStyle(
+                            color: foreground,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         if (active) ...[
                           const SizedBox(width: 7),
-                          Icon(Icons.arrow_forward_rounded, size: 15, color: foreground),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 15,
+                            color: foreground,
+                          ),
                         ],
                       ],
                     ),
@@ -738,54 +1018,6 @@ class _SubscriptionHero extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.icon, required this.label, required this.value});
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: colors.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 19, color: colors.onPrimaryContainer),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                )),
-                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    )),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -833,8 +1065,6 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
         .round();
   }
 
-  int get _digits =>
-      _asInt(widget.plan['currency_minor_units'], fallback: 2).clamp(0, 4);
   String get _currency => widget.plan['currency']?.toString() ?? 'USD';
   List<Map<String, dynamic>> get _checkoutOptions =>
       _rows(widget.plan['checkout_options']);
@@ -862,7 +1092,7 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
     if (_cachedFunds() < _priceMinor) {
       setState(
         () => _message =
-            'Your top-up wallet does not have enough ${_currency} funds. Use Secure payment or fund your wallet first.',
+            'Your top-up wallet does not have enough $_currency funds. Use Secure payment or fund your wallet first.',
       );
       return;
     }
@@ -880,11 +1110,12 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
       await widget.api.refreshUser(widget.token);
       if (mounted) Navigator.of(context).pop('paid');
     } on AuthException catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _message = error.message;
         });
+      }
     }
   }
 
@@ -910,21 +1141,24 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
       final data = _map(response['data']);
       final url = Uri.tryParse(data['checkout_url']?.toString() ?? '');
       final intent = data['intent_id'];
-      if (url == null || url.scheme != 'https' || intent == null)
+      if (url == null || url.scheme != 'https' || intent == null) {
         throw const AuthException(
           'The payment provider returned an invalid checkout link.',
         );
+      }
       _pendingIntent = intent;
       final opened = await launchUrl(url, mode: LaunchMode.inAppBrowserView);
-      if (!opened)
+      if (!opened) {
         throw const AuthException('Could not open secure checkout. Try again.');
+      }
       await _checkPayment();
     } on AuthException catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _message = error.message;
         });
+      }
     }
   }
 
@@ -951,11 +1185,12 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
         });
       }
     } on AuthException catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _message = error.message;
         });
+      }
     }
   }
 
@@ -982,350 +1217,172 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
             20 + MediaQuery.viewInsetsOf(context).bottom,
           ),
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Join $name',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              selected == null ? 'Package cost' : 'Secure payment cost',
-              style: theme.textTheme.bodyMedium,
-            ),
-            Text(
-              _money(displayPrice, displayCurrency, displayDigits),
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            if (widget.plan['product_type']?.toString() ==
-                    'marketplace_access' &&
-                _map(
-                  _map(
-                    widget.user['subscription_context'],
-                  )['active_marketplace'],
-                ).isNotEmpty) ...[
-              const SizedBox(height: 8),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                'Joining replaces your current marketplace package. Your active location add-ons stay in effect.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                'Join $name',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            ],
-            const SizedBox(height: 16),
-            Text(
-              'Select a currency and payment route for secure payment',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+              const SizedBox(height: 6),
+              Text(
+                selected == null ? 'Package cost' : 'Secure payment cost',
+                style: theme.textTheme.bodyMedium,
               ),
-            ),
-            const SizedBox(height: 8),
-            if (_checkoutOptions.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text(
-                  'No secure payment currencies are available for this package right now.',
+              Text(
+                _money(displayPrice, displayCurrency, displayDigits),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (widget.plan['product_type']?.toString() ==
+                      'marketplace_access' &&
+                  _rows(
+                    _map(
+                      widget.user['subscription_context'],
+                    )['active_marketplaces'],
+                  ).any(
+                    (subscription) =>
+                        subscription['group_key'] == widget.plan['group_key'],
+                  )) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Joining replaces only the active package in this group.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-              )
-            else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 230),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _checkoutOptions.length,
-                  itemBuilder: (context, index) {
-                    final option = _checkoutOptions[index];
-                    final optionKey = option['option_key']?.toString() ?? '';
-                    final currency =
-                        option['currency']?.toString() ?? _currency;
-                    final label = option['label']?.toString() ?? currency;
-                    final gateway = option['gateway']?.toString() ?? '';
-                    final amount = _money(
-                      _asInt(option['amount_minor']),
-                      currency,
-                      _asInt(
-                        option['currency_minor_units'],
-                        fallback: 2,
-                      ).clamp(0, 4),
-                    );
-                    return CheckboxListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      value: _selectedOptionKey == optionKey,
-                      title: Text('$label · $currency'),
-                      subtitle: Text('${_humanize(gateway)} · $amount'),
-                      onChanged: _busy
-                          ? null
-                          : (checked) => setState(() {
-                              _selectedOptionKey = checked == true
-                                  ? optionKey
-                                  : null;
-                              _message = null;
-                            }),
-                    );
-                  },
+              ],
+              const SizedBox(height: 16),
+              Text(
+                'Select a currency and payment route for secure payment',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _busy || selected == null ? null : _securePayment,
-                icon: const Icon(Icons.lock_rounded),
-                label: const Text('Secure payment'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _busy ? null : _payWithFunds,
-                icon: const Icon(Icons.account_balance_wallet_rounded),
-                label: Text('Funds wallet · $_currency'),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'Funds wallet uses your top-up balance in $_currency.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: 8),
+              if (_checkoutOptions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    'No secure payment currencies are available for this package right now.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 230),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _checkoutOptions.length,
+                    itemBuilder: (context, index) {
+                      final option = _checkoutOptions[index];
+                      final optionKey = option['option_key']?.toString() ?? '';
+                      final currency =
+                          option['currency']?.toString() ?? _currency;
+                      final label = option['label']?.toString() ?? currency;
+                      final gateway = option['gateway']?.toString() ?? '';
+                      final amount = _money(
+                        _asInt(option['amount_minor']),
+                        currency,
+                        _asInt(
+                          option['currency_minor_units'],
+                          fallback: 2,
+                        ).clamp(0, 4),
+                      );
+                      return CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: _selectedOptionKey == optionKey,
+                        title: Text('$label · $currency'),
+                        subtitle: Text('${_humanize(gateway)} · $amount'),
+                        onChanged: _busy
+                            ? null
+                            : (checked) => setState(() {
+                                _selectedOptionKey = checked == true
+                                    ? optionKey
+                                    : null;
+                                _message = null;
+                              }),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ),
-            if (_pendingIntent != null) ...[
-              const SizedBox(height: 7),
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: _busy ? null : _checkPayment,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Check payment status'),
+                child: FilledButton.icon(
+                  onPressed: _busy || selected == null ? null : _securePayment,
+                  icon: const Icon(Icons.lock_rounded),
+                  label: const Text('Secure payment'),
                 ),
               ),
-            ],
-            if (_message != null) ...[
               const SizedBox(height: 8),
-              Text(
-                _message!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : _payWithFunds,
+                  icon: const Icon(Icons.account_balance_wallet_rounded),
+                  label: Text('Funds wallet · $_currency'),
                 ),
               ),
-              if (_message!.toLowerCase().contains('fund') ||
-                  _message!.toLowerCase().contains('insufficient'))
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: _busy
-                        ? null
-                        : () => Navigator.of(context).pop('topup'),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Fund wallet'),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Funds wallet uses your top-up balance in $_currency.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
+                ),
+              ),
+              if (_pendingIntent != null) ...[
+                const SizedBox(height: 7),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : _checkPayment,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Check payment status'),
+                  ),
+                ),
+              ],
+              if (_message != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _message!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                if (_message!.toLowerCase().contains('fund') ||
+                    _message!.toLowerCase().contains('insufficient'))
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => Navigator.of(context).pop('topup'),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Fund wallet'),
+                    ),
+                  ),
+              ],
+              if (_busy)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Center(child: CircularProgressIndicator()),
                 ),
             ],
-            if (_busy)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-          ],
+          ),
         ),
       ),
-      ),
     );
   }
-}
-
-Future<bool?> showLocationCoveragePackages({
-  required BuildContext context,
-  required AuthApi api,
-  required String token,
-  required Map<String, dynamic> user,
-  required String location,
-}) => showModalBottomSheet<bool>(
-  context: context,
-  isScrollControlled: true,
-  showDragHandle: true,
-  builder: (_) => _LocationCoverageSheet(
-    api: api,
-    token: token,
-    user: user,
-    location: location,
-  ),
-);
-
-class _LocationCoverageSheet extends StatefulWidget {
-  const _LocationCoverageSheet({
-    required this.api,
-    required this.token,
-    required this.user,
-    required this.location,
-  });
-  final AuthApi api;
-  final String token;
-  final Map<String, dynamic> user;
-  final String location;
-
-  @override
-  State<_LocationCoverageSheet> createState() => _LocationCoverageSheetState();
-}
-
-class _LocationCoverageSheetState extends State<_LocationCoverageSheet> {
-  late Map<String, dynamic> _user = widget.user;
-  List<Map<String, dynamic>> _plans = const [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _plans = _rows(
-      _map(_map(_user['subscription_context'])['catalog'])['location_coverage'],
-    );
-    if (_plans.isNotEmpty) _loading = false;
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final fresh = await widget.api.refreshUser(widget.token);
-      if (!mounted) return;
-      final catalog = _map(_map(fresh['subscription_context'])['catalog']);
-      setState(() {
-        _user = fresh;
-        _plans = _rows(catalog['location_coverage']);
-        _loading = false;
-      });
-    } on AuthException catch (error) {
-      if (_plans.isEmpty && mounted)
-        setState(() {
-          _error = error.message;
-          _loading = false;
-        });
-    }
-  }
-
-  Future<void> _select(Map<String, dynamic> plan) async {
-    final result = await showPlanPurchaseSheet(
-      context: context,
-      api: widget.api,
-      token: widget.token,
-      user: _user,
-      plan: plan,
-    );
-    if (!mounted) return;
-    if (result == 'paid') {
-      _user = await widget.api.refreshUser(widget.token);
-      Navigator.of(context).pop(true);
-    } else if (result == 'topup') {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => TopUpScreen(api: widget.api, token: widget.token),
-        ),
-      );
-      _user = await widget.api.refreshUser(widget.token);
-      if (mounted) setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: Padding(
-      padding: EdgeInsets.fromLTRB(
-        18,
-        0,
-        18,
-        22 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: _loading
-          ? const SizedBox(
-              height: 260,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          : _error != null
-          ? SizedBox(
-              height: 220,
-              child: Center(child: Text(_error!, textAlign: TextAlign.center)),
-            )
-          : SizedBox(
-              height: MediaQuery.sizeOf(context).height * .72,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Add location coverage',
-                    style: Theme.of(context).textTheme.headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your current marketplace plan does not cover ${widget.location}. Buy a location add-on to review apps and share ads there.',
-                  ),
-                  const SizedBox(height: 14),
-                  Expanded(
-                    child: _plans.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No location packages are available right now.',
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: _plans.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 9),
-                            itemBuilder: (context, index) {
-                              final plan = _plans[index];
-                              final currency =
-                                  plan['currency']?.toString() ?? 'USD';
-                              final digits = _asInt(
-                                plan['currency_minor_units'],
-                                fallback: 2,
-                              ).clamp(0, 4);
-                              final discount = _asDouble(plan['discount'])
-                                  .clamp(0, 100);
-                              final cost =
-                                  (_asInt(plan['price_minor']) *
-                                          (100 - discount) /
-                                          100)
-                                      .round();
-                              final coverage = _coverageSummary(plan);
-                              return Card(
-                                child: ListTile(
-                                  title: Text(
-                                    plan['name']?.toString() ??
-                                        'Location package',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    '${_money(cost, currency, digits)} · ${coverage.isEmpty ? 'Coverage not configured' : coverage}',
-                                  ),
-                                  trailing: const Icon(
-                                    Icons.chevron_right_rounded,
-                                  ),
-                                  onTap: () => _select(plan),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-    ),
-  );
 }
 
 Map<String, dynamic> _map(Object? value) => value is Map
@@ -1339,45 +1396,64 @@ List<Map<String, dynamic>> _rows(Object? value) => value is List
     ? value.whereType<Map>().map((item) => _map(item)).toList(growable: false)
     : const [];
 
-List<String> _planFeatures(Map<String, dynamic> plan) {
+List<String> _planFeatures(Map<String, dynamic> plan, AuthApi api) {
   final value = plan['features'];
   if (value is List) {
+    final currency = plan['currency']?.toString() ?? 'USD';
+    final digits = _asInt(
+      plan['currency_minor_units'],
+      fallback: 2,
+    ).clamp(0, 4);
     return value
         .whereType<Map>()
-        .map(
-          (item) =>
+        .map((item) {
+          final label =
               item['label']?.toString() ??
               item['feature_key']?.toString() ??
-              '',
-        )
+              '';
+          final value = item['value'];
+          if (label.isEmpty || value == null) return label;
+          final key = item['feature_key']?.toString();
+          if (const {
+                'amount',
+                'minimum_withdrawal',
+                'daily_revenue',
+                'per_survey',
+                'task_reward',
+              }.contains(key) &&
+              value is num) {
+            return '$label: ${moneyConverted(api, value, currency, digits, api.preferredCurrency, isMinor: false)}';
+          }
+          return '$label: ${value is List ? value.join(', ') : value}';
+        })
         .where((label) => label.isNotEmpty)
         .toList();
   }
   return const [];
 }
 
-String _coverageSummary(Map<String, dynamic> plan) {
-  final value = plan['location_coverage'];
-  if (value is! List) return '';
-  final countries = <String>[];
-  final regions = <String>[];
-  for (final item in value.whereType<Map>()) {
-    final type = item['target_type']?.toString() ?? 'country';
-    final name =
-        item['target_name']?.toString() ??
-        item['target_code']?.toString() ??
-        '';
-    if (name.isEmpty) continue;
-    if (type == 'region') {
-      regions.add(name);
-    } else {
-      countries.add(name);
-    }
+String? _dailyAdEarningsLabel(
+  Map<String, dynamic> plan,
+  AuthApi api,
+  String preferredCurrency,
+) {
+  if (plan['group_key']?.toString() != 'group_a' ||
+      plan['daily_revenue_minor'] is! num) {
+    return null;
   }
-  return [
-    if (countries.isNotEmpty) 'Countries: ${countries.join(', ')}',
-    if (regions.isNotEmpty) 'Regions: ${regions.join(', ')}',
-  ].join(' · ');
+
+  final currency = plan['currency']?.toString() ?? 'USD';
+  final digits = _asInt(plan['currency_minor_units'], fallback: 2).clamp(0, 4);
+  final amount = moneyConverted(
+    api,
+    plan['daily_revenue_minor'],
+    currency,
+    digits,
+    preferredCurrency,
+    isMinor: true,
+  );
+
+  return 'Daily ad earnings up to $amount';
 }
 
 String _humanize(String key) => key

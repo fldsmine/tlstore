@@ -16,7 +16,7 @@
   {
     "id": 2,
     "option_id": "mobile_money",
-    "name": "Zambia",
+    "name": "Mobile Money",
     "icon": "📱",
     "description": "M-Pesa, MTN MoMo, Airtel Money",
     "fields": ["phone_number", "provider"],

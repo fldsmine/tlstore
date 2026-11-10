@@ -9,6 +9,7 @@ use App\Application\Support\SubscriptionPriceQuote;
 use App\Models\PaymentIntent;
 use App\Application\Actions\Subscriptions\PurchaseSubscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,10 +21,53 @@ final class SubscriptionController
             'subscription_plan_id' => ['required', 'integer', 'exists:subscription_plans,id'],
             'idempotency_key' => ['required', 'string', 'max:80'],
         ]);
-        $plan = SubscriptionPlan::query()->where('is_active', true)->findOrFail($data['subscription_plan_id']);
+        $plan = SubscriptionPlan::query()->with('group')->where('is_active', true)->findOrFail($data['subscription_plan_id']);
         $subscription = $purchase->handle($request->user(), $plan, $data['idempotency_key']);
 
         return response()->json(['data' => $subscription, 'message' => 'Package activated using top-up funds.'], 201);
+    }
+
+    public function submitQuestionnaire(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'group_key' => ['required', 'string', 'in:group_b,group_c'],
+            'answers' => ['required', 'array:device,weekly_income,daily_time,tested_before,ready_today,motivation'],
+            'answers.device' => ['required', 'in:iphone,android,other'],
+            'answers.weekly_income' => ['required', 'in:100_200,200_500,500_plus'],
+            'answers.daily_time' => ['required', 'in:5_10,10_30,30_plus'],
+            'answers.tested_before' => ['required', 'in:yes,no'],
+            'answers.ready_today' => ['required', 'in:yes,maybe_later'],
+            'answers.motivation' => ['required', 'in:extra_income,pay_bills,side_hustle'],
+        ]);
+        abort_unless(SubscriptionGroup::query()->where('group_key', $data['group_key'])->where('is_active', true)->exists(), 404);
+
+        $user = $request->user();
+        $activeSubscription = $user->subscriptions()
+            ->where('product_type', 'marketplace_access')
+            ->where('status', 'active')
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>', now())
+            ->whereHas('plan.group', fn ($query) => $query->where('group_key', $data['group_key']))
+            ->with('plan.group')
+            ->latest('starts_at')
+            ->first();
+        if ($activeSubscription?->plan?->group?->group_key !== $data['group_key']) {
+            return response()->json(['message' => 'Join an active package in this group before answering its qualification questions.'], 422);
+        }
+        $completedGroups = $user->subscription_questionnaire_completed_groups ?? [];
+        $answersByGroup = $user->subscription_questionnaire_answers ?? [];
+        $answersByGroup[$data['group_key']] = $data['answers'];
+        $completedGroups = array_values(array_unique([...$completedGroups, $data['group_key']]));
+        $user->forceFill([
+            'subscription_questionnaire_answers' => $answersByGroup,
+            'subscription_questionnaire_completed_groups' => $completedGroups,
+            'subscription_questionnaire_completed_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'message' => 'Your app tester qualification answers were saved.',
+            'data' => ['completed_groups' => $completedGroups, 'completed_at' => $user->subscription_questionnaire_completed_at],
+        ]);
     }
 
     public function checkout(Request $request, InitializeGatewayTopup $initialize, SubscriptionPriceQuote $priceQuote): JsonResponse
@@ -36,15 +80,8 @@ final class SubscriptionController
             'customer_email' => ['nullable', 'string', 'max:191', 'email:rfc,dns'],
         ]);
         $plan = SubscriptionPlan::query()->where('is_active', true)->findOrFail($data['subscription_plan_id']);
-        if ($plan->product_type->value === 'location_coverage' && ! $request->user()->subscriptions()
-            ->where('product_type', 'marketplace_access')
-            ->where('status', 'active')
-            ->where('ends_at', '>', now())
-            ->exists()) {
-            return response()->json(['message' => 'An active package is required before adding location proxy.'], 422);
-        }
-        if ($plan->product_type->value === 'location_coverage' && ! $plan->locationCoverage()->exists()) {
-            return response()->json(['message' => 'This location proxy has no admin-configured coverage.'], 422);
+        if ($plan->product_type->value !== 'marketplace_access') {
+            return response()->json(['message' => 'Location coverage packages are no longer available.'], 422);
         }
         $currency = strtoupper($data['currency']);
         if (! PaymentGatewaySettings::supports($data['gateway'], $currency)) {
@@ -107,14 +144,14 @@ final class SubscriptionController
                 'currency' => $paymentIntent->currency,
                 'provider' => $paymentIntent->provider,
                 'paid_at' => $paymentIntent->paid_at,
-                'subscription' => $paymentIntent->userSubscriptions()->with(['plan.features', 'locationEntitlements'])->first(),
+                'subscription' => $paymentIntent->userSubscriptions()->with(['plan.group', 'plan.features'])->first(),
             ],
         ]);
     }
 
     public function mine(Request $request): JsonResponse
     {
-        return response()->json(['data' => $request->user()->subscriptions()->with(['plan.features', 'plan.locationCoverage', 'locationEntitlements'])
+        return response()->json(['data' => $request->user()->subscriptions()->with(['plan.group', 'plan.features'])
             ->latest('starts_at')->paginate(30)]);
     }
 }

@@ -29,7 +29,8 @@ class User extends Authenticatable
     protected $fillable = [
         'full_name', 'username', 'email', 'phone', 'email_verified_at', 'password',
         'country_code', 'preferred_currency', 'role', 'status', 'avatar', 'cover_image',
-        'is_banned', 'ban_reason',
+        'is_banned', 'ban_reason', 'subscription_questionnaire_answers',
+        'subscription_questionnaire_completed_groups', 'subscription_questionnaire_completed_at',
     ];
 
     protected $hidden = [
@@ -40,6 +41,9 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'subscription_questionnaire_answers' => 'array',
+        'subscription_questionnaire_completed_groups' => 'array',
+        'subscription_questionnaire_completed_at' => 'datetime',
         'two_factor' => 'boolean',
         'two_factor_secret' => 'encrypted',
         'two_factor_setup_started_at' => 'datetime',
@@ -65,6 +69,16 @@ class User extends Authenticatable
     public function socialFollows(): HasMany
     {
         return $this->hasMany(UserSocialFollow::class);
+    }
+
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(UserSocialAccount::class);
+    }
+
+    public function payoutProfile(): HasOne
+    {
+        return $this->hasOne(UserPayoutProfile::class);
     }
 
     public function devices(): HasMany
@@ -110,11 +124,6 @@ class User extends Authenticatable
     public function subscriptions(): HasMany
     {
         return $this->hasMany(UserSubscription::class);
-    }
-
-    public function locationEntitlements(): HasMany
-    {
-        return $this->hasMany(UserLocationEntitlement::class);
     }
 
     public function wallets(): HasMany

@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../marketplace/presentation/widgets/listing_components.dart';
 import '../../../../services/auth_api.dart';
 import '../../../../widgets/auth_components.dart';
-import '../../../../screens/history_screen.dart';
+import '../../../../widgets/task_completion_page.dart';
 
 class AdEvidenceScreen extends StatefulWidget {
   const AdEvidenceScreen({
@@ -15,10 +15,12 @@ class AdEvidenceScreen extends StatefulWidget {
     required this.api,
     required this.token,
     required this.task,
+    required this.user,
   });
   final AuthApi api;
   final String token;
   final Map<String, dynamic> task;
+  final Map<String, dynamic> user;
   @override
   State<AdEvidenceScreen> createState() => _AdEvidenceScreenState();
 }
@@ -31,6 +33,22 @@ class _AdEvidenceScreenState extends State<AdEvidenceScreen> {
   Map<String, dynamic> get _ad => widget.task['ad'] is Map<String, dynamic>
       ? widget.task['ad'] as Map<String, dynamic>
       : const {};
+  List<String> get _channelOptions => [_channel];
+
+  @override
+  void initState() {
+    super.initState();
+    final type = (_ad['type']?.toString() ?? '').toLowerCase();
+    _channel = type.contains('twitter') || type == 'x'
+        ? 'X (Twitter)'
+        : type.isEmpty
+        ? 'Instagram'
+        : type == 'others'
+        ? 'Others'
+        : type == 'whatsapp'
+        ? 'WhatsApp'
+        : '${type[0].toUpperCase()}${type.substring(1)}';
+  }
 
   @override
   void dispose() {
@@ -150,22 +168,13 @@ class _AdEvidenceScreenState extends State<AdEvidenceScreen> {
         });
       }
       if (!mounted) return;
-      final navigator = Navigator.of(context);
-      final messenger = ScaffoldMessenger.of(context);
-      navigator.popUntil((route) => route.isFirst);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Public share submitted. It is awaiting admin verification.',
-          ),
-        ),
-      );
-      await navigator.push(
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => HistoryScreen(
+          builder: (_) => TaskCompletionPage(
             api: widget.api,
             token: widget.token,
-            initialTab: 2,
+            user: widget.user,
+            taskLabel: 'Ad share',
           ),
         ),
       );
@@ -258,20 +267,12 @@ class _AdEvidenceScreenState extends State<AdEvidenceScreen> {
               DropdownButtonFormField<String>(
                 initialValue: _channel,
                 decoration: const InputDecoration(labelText: 'Social channel'),
-                items:
-                    const [
-                          'Instagram',
-                          'Facebook',
-                          'TikTok',
-                          'X',
-                          'YouTube',
-                          'Other',
-                        ]
-                        .map(
-                          (name) =>
-                              DropdownMenuItem(value: name, child: Text(name)),
-                        )
-                        .toList(),
+                items: _channelOptions
+                    .map(
+                      (name) =>
+                          DropdownMenuItem(value: name, child: Text(name)),
+                    )
+                    .toList(),
                 onChanged: (value) =>
                     setState(() => _channel = value ?? 'Instagram'),
               ),

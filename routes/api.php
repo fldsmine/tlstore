@@ -10,10 +10,15 @@ use App\Features\Identity\Http\Controllers\Api\V1\TwoFactorChallengeController;
 use App\Features\Identity\Http\Controllers\Api\V1\AdminAuthController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\PublicCatalogController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\ListingController;
+use App\Features\Marketplace\Http\Controllers\Api\V1\DailyTaskController;
+use App\Features\Identity\Http\Controllers\Api\V1\UserSocialAccountController;
 use App\Features\AppReview\Http\Controllers\Api\V1\ReviewTaskController;
 use App\Features\Ads\Http\Controllers\Api\V1\AdShareController;
 use App\Features\Admin\Http\Controllers\Api\V1\ModerationController;
 use App\Features\Wallets\Http\Controllers\Api\V1\WalletController;
+use App\Features\Wallets\Http\Controllers\Api\V1\PayoutProfileController;
+use App\Features\Wallets\Http\Controllers\Api\V1\BankController;
+use App\Features\Wallets\Http\Controllers\Api\V1\PayoutAccountValidationController;
 use App\Features\Wallets\Http\Controllers\Api\V1\AccountHistoryController;
 use App\Features\Admin\Http\Controllers\Api\V1\SystemSettingController;
 use App\Features\Subscriptions\Http\Controllers\Api\V1\SubscriptionController;
@@ -59,6 +64,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/exchange-rates', [PublicCatalogController::class, 'exchangeRates'])->name('api.v1.exchange-rates.index');
     Route::get('/currencies', [PublicCatalogController::class, 'currencies'])->name('api.v1.currencies.index');
     Route::post('/webhooks/{provider}', [TopupController::class, 'webhook'])->name('api.v1.payments.webhook');
+	Route::get('/banks', [BankController::class, 'index'])->name('api.v1.banks.index');
 
     Route::prefix('admin/auth')->name('api.v1.admin.auth.')->group(function (): void {
         Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:6,1')->name('login');
@@ -71,8 +77,14 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/me/referral-code', [ReferralController::class, 'code'])->name('api.v1.referral.code');
         Route::get('/me/referrals', [ReferralController::class, 'attributions'])->name('api.v1.referrals.index');
         Route::get('/me', [AuthController::class, 'me'])->name('api.v1.me');
+        Route::get('/me/payout-profile', [PayoutProfileController::class, 'show'])->name('api.v1.me.payout-profile.show');
+        Route::put('/me/payout-profile', [PayoutProfileController::class, 'update'])->name('api.v1.me.payout-profile.update');
+        Route::post('/me/payout-profile/resolve-account', [PayoutAccountValidationController::class, 'resolve'])->middleware('throttle:12,1')->name('api.v1.me.payout-profile.resolve-account');
         Route::get('/me/ranking', [UserRankingController::class, 'show'])->name('api.v1.me.ranking');
         Route::get('/me/social-handles', [SocialFollowController::class, 'index'])->name('api.v1.me.social-handles');
+        Route::get('/me/social-accounts', [UserSocialAccountController::class, 'index'])->name('api.v1.me.social-accounts');
+        Route::put('/me/social-accounts/{platform}', [UserSocialAccountController::class, 'store'])->name('api.v1.me.social-accounts.store');
+        Route::get('/me/daily-tasks/{type}', [DailyTaskController::class, 'index'])->whereIn('type', ['apps', 'ads'])->name('api.v1.me.daily-tasks');
         Route::post('/me/social-handles/{socialHandle}/follow', [SocialFollowController::class, 'follow'])->name('api.v1.me.social-handles.follow');
         Route::patch('/me', [AuthController::class, 'updateProfile'])->name('api.v1.me.update');
         Route::delete('/me', [AuthController::class, 'deleteAccount'])->name('api.v1.me.delete');
@@ -107,6 +119,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout'])->name('api.v1.subscriptions.checkout');
         Route::post('/subscriptions/{paymentIntent}/check', [SubscriptionController::class, 'check'])->name('api.v1.subscriptions.check');
         Route::get('/me/subscriptions', [SubscriptionController::class, 'mine'])->name('api.v1.subscriptions.mine');
+        Route::post('/me/subscription-questionnaire', [SubscriptionController::class, 'submitQuestionnaire'])->name('api.v1.me.subscription-questionnaire');
         Route::get('/notifications', [NotificationController::class, 'index'])->name('api.v1.notifications.index');
         Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('api.v1.notifications.read');
         Route::post('/devices', [NotificationController::class, 'registerDevice'])->name('api.v1.devices.store');
@@ -162,8 +175,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/ads', [CampaignController::class, 'createAd'])->name('ads.store');
         Route::patch('/ads/{ad}', [CampaignController::class, 'updateAd'])->name('ads.update');
         Route::get('/subscription-plans', [SubscriptionPlanController::class, 'index'])->name('subscription-plans.index');
+        Route::get('/subscription-groups', [SubscriptionPlanController::class, 'groups'])->name('subscription-groups.index');
+        Route::patch('/subscription-groups/{group}', [SubscriptionPlanController::class, 'updateGroup'])->name('subscription-groups.update');
         Route::patch('/subscription-plans/{plan}', [SubscriptionPlanController::class, 'update'])->name('subscription-plans.update');
-        Route::put('/subscription-plans/{plan}/coverage', [SubscriptionPlanController::class, 'syncCoverage'])->name('subscription-plans.coverage');
         Route::get('/regions', [RegionController::class, 'index'])->name('regions.index');
         Route::post('/regions', [RegionController::class, 'store'])->name('regions.store');
         Route::patch('/regions/{region}', [RegionController::class, 'update'])->name('regions.update');

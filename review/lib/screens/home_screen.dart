@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/currency/money.dart';
 import '../features/marketplace/presentation/listing_kind.dart';
 import '../features/social_follow/presentation/social_handles_dialog.dart';
 import '../features/wallets/presentation/wallet_detail_screens.dart';
@@ -13,7 +14,7 @@ import '../widgets/auth_components.dart';
 import '../widgets/advanced_app_drawer.dart';
 import 'frontend/landing_sreen.dart';
 import 'history_screen.dart';
-import 'my_tasks_screen.dart';
+import 'daily_tasks_screen.dart';
 import 'faq_screen.dart';
 import 'auth/login_screen.dart';
 import 'listings_screen.dart';
@@ -29,6 +30,7 @@ import 'about_screen.dart';
 import 'topup_screen.dart';
 import 'wallet_transfer_screen.dart';
 import 'user_ranking_screen.dart';
+import 'payment_details_setup_screen.dart';
 import '../services/push_notification_service.dart';
 
 const _dashboardInk = Color(0xFF202A38);
@@ -75,7 +77,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   String get _currency {
-    final preferred = _sessionUser['preferred_currency']?.toString();
+    final preferred = widget.api.preferredCurrency.isNotEmpty
+        ? widget.api.preferredCurrency
+        : _sessionUser['preferred_currency']?.toString();
     if (preferred != null && preferred.isNotEmpty) {
       return preferred.toUpperCase();
     }
@@ -650,6 +654,7 @@ class _HomeScreenState extends State<HomeScreen>
                 padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
                 children: [
                   _buildEarningsCard(),
+                  _buildAccountSetupCard(),
                   _buildInlineAnnouncements(),
                   const SizedBox(height: 19),
                   _buildCategoryTabs(),
@@ -787,7 +792,11 @@ class _HomeScreenState extends State<HomeScreen>
         );
       case AppDrawerDestination.tasks:
         _pushPage(
-          MyTasksScreen(api: widget.api, token: widget.result.token),
+          DailyTasksScreen(
+            api: widget.api,
+            token: widget.result.token,
+            user: _sessionUser,
+          ),
           0,
         );
       case AppDrawerDestination.help:
@@ -1043,6 +1052,254 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+
+Widget _buildAccountSetupCard() {
+  final contextData = _sessionUser['subscription_context'] is Map
+      ? Map<String, dynamic>.from(
+          _sessionUser['subscription_context'] as Map,
+        )
+      : <String, dynamic>{};
+
+  final hasPlan = contextData['active_marketplace'] is Map;
+  final hasPin = _sessionUser['security_pin_set'] == true;
+  final hasPayment = _sessionUser['payout_profile'] is Map;
+
+  final completed = 1 +
+      (hasPlan ? 1 : 0) +
+      (hasPin ? 1 : 0) +
+      (hasPayment ? 1 : 0);
+
+  if (completed >= 4) return const SizedBox.shrink();
+
+  final nextTitle = !hasPlan
+      ? 'Activate Plan'
+      : !hasPin
+          ? 'Set Withdrawal PIN'
+          : 'Set Payment Details';
+
+  final progress = completed / 4;
+  final percentage = (progress * 100).round();
+
+	final theme = Theme.of(context);
+	final colors = theme.colorScheme;
+
+	final primary = colors.primary;
+	final secondary = colors.secondary;
+	final surface = colors.surface;
+	final onSurface = colors.onSurface;
+	final muted = colors.onSurfaceVariant;
+
+	final success = colors.tertiary;
+	final outline = colors.outlineVariant;
+
+  const accent = Color(0xFFF28A18);
+
+  void continueSetup() {
+    if (!hasPlan) {
+      _pushPage(
+        SubscriptionsScreen(
+          api: widget.api,
+          token: widget.result.token,
+          user: _sessionUser,
+        ),
+        0,
+      );
+    } else if (!hasPin) {
+      _pushPage(
+        ProfileScreen(
+          api: widget.api,
+          token: widget.result.token,
+          user: _sessionUser,
+        ),
+        2,
+      );
+    } else {
+      _pushPage(
+        PaymentDetailsSetupScreen(
+          api: widget.api,
+          token: widget.result.token,
+          user: _sessionUser,
+        ),
+        0,
+      );
+    }
+  }
+
+  return Container(
+    margin: const EdgeInsets.only(top: 12),
+    padding: const EdgeInsets.all(15),
+	decoration: BoxDecoration(
+	  color: colors.surface,
+	  borderRadius: BorderRadius.circular(20),
+	  border: Border.all(
+		color: colors.outlineVariant,
+		width: 0.8,
+	  ),
+	  boxShadow: [
+		BoxShadow(
+		  color: colors.shadow.withOpacity(0.06),
+		  blurRadius: 14,
+		  offset: const Offset(0, 4),
+		),
+	  ],
+	),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: primary.withOpacity(0.09),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.rocket_launch_rounded,
+                color: primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 11),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Complete Your Setup',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: colors.onSurface,
+                        ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'A few more steps to get started',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Progress percentage
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
+				decoration: BoxDecoration(
+				  color: colors.primaryContainer,
+				  borderRadius: BorderRadius.circular(20),
+				),
+				child: Text(
+				  '$percentage%',
+				  style: TextStyle(
+					color: colors.onPrimaryContainer,
+					fontWeight: FontWeight.w800,
+					fontSize: 12,
+				  ),
+				),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Progress information
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Setup progress',
+              style: TextStyle(
+                color: colors.onSurface,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              '$completed of 4 completed',
+              style: TextStyle(
+                color: muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 8),
+
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: LinearProgressIndicator(
+			  value: progress,
+			  minHeight: 7,
+			  backgroundColor: colors.surfaceContainerHighest,
+			  valueColor: AlwaysStoppedAnimation(colors.primary),
+			),
+        ),
+
+        const SizedBox(height: 15),
+
+        // Next action
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: continueSetup,
+            borderRadius: BorderRadius.circular(13),
+            child: Ink(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 12,
+              ),
+				decoration: BoxDecoration(
+				  gradient: LinearGradient(
+					colors: [
+					  colors.primary,
+					  colors.secondary,
+					],
+				  ),
+				  borderRadius: BorderRadius.circular(13),
+				),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    nextTitle,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 17,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+      ],
+    ),
+  );
+}
+
+  Widget _setupCheck(String label, bool complete) => Row(mainAxisSize: MainAxisSize.min, children: [Icon(complete ? Icons.check_circle_rounded : Icons.circle_outlined, size: 14, color: complete ? brandGreen : mutedInk), const SizedBox(width: 4), Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: mutedInk))]);
+
   Widget _heroMeta(String label, String value) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -1080,7 +1337,7 @@ class _HomeScreenState extends State<HomeScreen>
         _categoryButton('Apps', 0),
         _categoryButton('Earnings', 1),
         _categoryButton('Ads', 2),
-        _categoryButton('Wallet', 3),
+        _categoryButton('Tasks', 3),
       ],
     ),
   );
@@ -1107,6 +1364,16 @@ class _HomeScreenState extends State<HomeScreen>
               user: _sessionUser,
               kind: ListingKind.adShare,
               preferredCurrency: _currency,
+            ),
+            0,
+          );
+        } else if (index == 3) {
+          setState(() => _selectedTab = index);
+          _pushPage(
+            DailyTasksScreen(
+              api: widget.api,
+              token: widget.result.token,
+              user: _sessionUser,
             ),
             0,
           );
@@ -1194,9 +1461,22 @@ class _HomeScreenState extends State<HomeScreen>
         child: _WalletCard(
           title: detailsForType.$1,
           icon: detailsForType.$2,
-          balance: _formatMinor(balance, currency),
-          pending: (wallet['pending_balance_minor'] as num?)?.toInt() ?? 0,
-          currency: currency,
+          balance: moneyConverted(
+            widget.api,
+            balance,
+            currency,
+            _currencyPrecision(currency),
+            _currency,
+            isMinor: true,
+          ),
+          pending: moneyConverted(
+            widget.api,
+            (wallet['pending_balance_minor'] as num?)?.toInt() ?? 0,
+            currency,
+            _currencyPrecision(currency),
+            _currency,
+            isMinor: true,
+          ),
           onTap: () => _openWallet(wallet),
         ),
       );
@@ -1415,9 +1695,14 @@ class _HomeScreenState extends State<HomeScreen>
               padding: const EdgeInsets.only(bottom: 10),
               child: _TransactionCard(
                 entry: entry,
-                currency: entry['currency']?.toString() ?? _currency,
-                precision:
-                    (entry['currency_minor_units'] as num?)?.toInt() ?? 2,
+                displayAmount: moneyConverted(
+                  widget.api,
+                  entry['amount_minor'],
+                  entry['currency']?.toString() ?? _currency,
+                  entry['currency_minor_units'],
+                  _currency,
+                  isMinor: true,
+                ),
               ),
             ),
           )
@@ -1430,15 +1715,14 @@ class _HomeScreenState extends State<HomeScreen>
       'App Reviews',
       'Earnings',
       'Ad Shares',
-      'Wallets',
+      'Tasks',
     ][_selectedTab];
     final desc = [
       'Discover apps available for review.',
       'Your wallet balances and recent transactions.',
       'Browse sponsored campaigns to share.',
-      'Manage your earnings and top-up funds.',
+      'View users active task for the day.',
     ][_selectedTab];
-    if (_selectedTab == 3) return Column(children: [_buildWalletGrid()]);
     if (_selectedTab == 1) return Column(children: [_buildWalletGrid()]);
     return Container(
       padding: const EdgeInsets.all(22),
@@ -1742,14 +2026,12 @@ class _WalletCard extends StatelessWidget {
     required this.icon,
     required this.balance,
     required this.pending,
-    required this.currency,
     required this.onTap,
   });
   final String title;
   final IconData icon;
   final String balance;
-  final int pending;
-  final String currency;
+  final String pending;
   final VoidCallback onTap;
 
   @override
@@ -1814,11 +2096,11 @@ class _WalletCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (pending > 0)
+              if (pending.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
-                    'Pending ${_formatMinor(pending, currency)}',
+                    'Pending $pending',
                     style: const TextStyle(
                       color: Color(0xFF9A866A),
                       fontSize: 9,
@@ -1834,20 +2116,14 @@ class _WalletCard extends StatelessWidget {
 }
 
 class _TransactionCard extends StatelessWidget {
-  const _TransactionCard({
-    required this.entry,
-    required this.currency,
-    required this.precision,
-  });
+  const _TransactionCard({required this.entry, required this.displayAmount});
   final Map<String, dynamic> entry;
-  final String currency;
-  final int precision;
+  final String displayAmount;
 
   @override
   Widget build(BuildContext context) {
     final direction = entry['direction']?.toString() ?? '';
     final credit = direction == 'credit';
-    final minor = (entry['amount_minor'] as num?)?.toInt() ?? 0;
     final title = entry['description']?.toString().trim().isNotEmpty == true
         ? entry['description'].toString()
         : _humanize(entry['entry_type']?.toString() ?? 'Wallet transaction');
@@ -1916,7 +2192,7 @@ class _TransactionCard extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            '${credit ? '+' : '−'}${_formatMinor(minor, currency)}',
+            '${credit ? '+' : '−'}$displayAmount',
             style: TextStyle(
               color: credit ? brandGreen : const Color(0xFF5B6672),
               fontWeight: FontWeight.w800,
@@ -1932,27 +2208,6 @@ class _TransactionCard extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatMinor(int amount, String currency) {
-  final digits = _currencyPrecision(currency);
-  final divisor = math.pow(10, digits);
-  final value = amount / divisor;
-  final symbols = {
-    'USD': r'$',
-    'NGN': '₦',
-    'GBP': '£',
-    'EUR': '€',
-    'GHS': '₵',
-    'ZAR': 'R',
-    'KES': 'KSh',
-    'CAD': r'$',
-    'AUD': r'$',
-    'INR': '₹',
-  };
-  final symbol =
-      symbols[currency.toUpperCase()] ?? '${currency.toUpperCase()} ';
-  return '$symbol${value.toStringAsFixed(digits)}';
 }
 
 int _currencyPrecision(String currency) {

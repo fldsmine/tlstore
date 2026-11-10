@@ -378,33 +378,6 @@ class DemoPlatformActivitySeeder extends Seeder
                 'created_at' => $startsAt,
                 'updated_at' => $now,
             ]], ['provider_subscription_reference'], ['subscription_plan_id', 'payment_intent_id', 'status', 'starts_at', 'ends_at', 'plan_snapshot', 'updated_at']);
-
-            $subscriptionId = (int) DB::table('user_subscriptions')
-                ->where('provider_subscription_reference', $providerSubscriptionReference)
-                ->value('id');
-
-            $entitlementRows = [];
-            foreach ($coverage as $target) {
-                $entitlementRows[] = [
-                    'user_id' => $users[$userNumber],
-                    'user_subscription_id' => $subscriptionId,
-                    'target_type' => $target->target_type,
-                    'target_code' => $target->target_code,
-                    'starts_at' => $startsAt,
-                    'ends_at' => $endsAt,
-                    'status' => 'active',
-                    'created_at' => $startsAt,
-                    'updated_at' => $now,
-                ];
-            }
-
-            if ($entitlementRows !== []) {
-                DB::table('user_location_entitlements')->upsert(
-                    $entitlementRows,
-                    ['user_subscription_id', 'target_type', 'target_code'],
-                    ['starts_at', 'ends_at', 'status', 'updated_at']
-                );
-            }
         }
     }
 
@@ -687,7 +660,7 @@ class DemoPlatformActivitySeeder extends Seeder
 
     private function seedTopupsAndManualDeposits(array $users, array $wallets, $now): void
     {
-        foreach ([3 => 2000, 4 => 5000] as $number => $amount) {
+        foreach ([3 => 2000, 2 => 4200, 4 => 5000] as $number => $amount) {
             $key = 'demo-topup-user-'.$number;
             DB::table('payment_intents')->upsert([[
                 'user_id' => $users[$number],

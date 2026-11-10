@@ -107,6 +107,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       setState(() => _loadingMore = true);
     }
     try {
+      await widget.api.loadExchangeRates(widget.token);
       final response = await widget.api.accountHistory(
         widget.token,
         page: _page,
@@ -336,6 +337,8 @@ class _HistoryScreenState extends State<HistoryScreen>
                         );
                       }
                       return AccountTransactionCard(
+                        api: widget.api,
+                        preferredCurrency: widget.api.preferredCurrency,
                         transaction: visible[index],
                       );
                     },

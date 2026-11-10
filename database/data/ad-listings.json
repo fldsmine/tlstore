@@ -1,6 +1,7 @@
 [
   {
     "campaign_key": "demo-clean-water-ng",
+    "type": "Facebook",
     "featured": true,
     "title": "Help bring clean water closer",
     "description": "Learn how community water projects are supporting households across Nigeria.",
@@ -20,6 +21,7 @@
   },
   {
     "campaign_key": "demo-financial-literacy-gh",
+    "type": "WhatsApp",
     "featured": true,
     "title": "Simple money habits for Ghana",
     "description": "Share a short guide to budgeting, saving, and planning everyday expenses.",
@@ -39,6 +41,7 @@
   },
   {
     "campaign_key": "demo-mobile-safety-ke",
+    "type": "Instagram",
     "title": "Stay safer on your phone",
     "description": "A practical checklist for protecting accounts and recognizing suspicious messages.",
     "share_message": "These practical mobile-safety tips are worth keeping handy:",
@@ -57,6 +60,7 @@
   },
   {
     "campaign_key": "demo-local-food-za",
+    "type": "TikTok",
     "title": "Discover local food markets",
     "description": "Explore a directory of independent food markets and small producers in South Africa.",
     "share_message": "Find independent food markets and local producers near you:",
@@ -75,6 +79,7 @@
   },
   {
     "campaign_key": "demo-learning-tools-uk",
+    "type": "YouTube",
     "title": "Free learning tools for families",
     "description": "Share a collection of free online learning resources for families in the UK.",
     "share_message": "Here is a collection of free learning resources for families:",
@@ -93,6 +98,7 @@
   },
   {
     "campaign_key": "demo-digital-skills-us",
+    "type": "YouTube",
     "title": "Build practical digital skills",
     "description": "An introductory program with self-paced lessons for people building workplace digital skills.",
     "share_message": "Explore self-paced lessons for practical digital skills:",
@@ -111,6 +117,7 @@
   },
   {
     "campaign_key": "demo-energy-saving-global",
+    "type": "X (Twitter)",
     "title": "Small steps to save energy",
     "description": "A general guide to reducing household energy use with simple everyday changes.",
     "share_message": "Try these simple ideas for reducing household energy use:",
@@ -129,6 +136,7 @@
   },
   {
     "campaign_key": "demo-community-library-gh",
+    "type": "Telegram",
     "title": "Support a community reading club",
     "description": "Help a community reading club connect with volunteers and book donors.",
     "share_message": "Learn how to support a community reading club:",
@@ -147,6 +155,7 @@
   },
   {
     "campaign_key": "demo-small-business-ca",
+    "type": "Instagram",
     "title": "Find independent businesses nearby",
     "description": "A directory helping people discover independent businesses in their community.",
     "share_message": "Discover independent businesses in your community:",
@@ -165,6 +174,7 @@
   },
   {
     "campaign_key": "demo-online-wellbeing-global",
+    "type": "Others",
     "title": "Everyday wellbeing resources",
     "description": "A collection of general educational resources about rest, routines, and wellbeing.",
     "share_message": "Browse these general educational wellbeing resources:",

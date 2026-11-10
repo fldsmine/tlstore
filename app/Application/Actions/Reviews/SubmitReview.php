@@ -21,8 +21,8 @@ final class SubmitReview
             if ($task->reviewer_id !== $user->id || $task->status->value !== 'reserved' || ($task->expires_at && $task->expires_at->isPast())) {
                 throw ValidationException::withMessages(['task' => 'This review task cannot be submitted.']);
             }
-            if (! $this->eligibility->canAccess($user, $task->campaign->location)) {
-                throw ValidationException::withMessages(['task' => 'Your subscription or location eligibility is no longer active.']);
+            if (! $this->eligibility->appAllowed($user, $task->campaign->location, $task->campaign->app?->store, $task->campaign->app?->category)) {
+                throw ValidationException::withMessages(['task' => 'Your package or app store eligibility is no longer active for this task.']);
             }
 
             $questions = $task->templateVersion->questions->keyBy('id');

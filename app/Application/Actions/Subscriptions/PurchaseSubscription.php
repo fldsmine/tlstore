@@ -19,6 +19,9 @@ final class PurchaseSubscription
     {
         return DB::transaction(function () use ($user, $plan, $idempotencyKey): UserSubscription {
             $plan = SubscriptionPlan::query()->lockForUpdate()->where('is_active', true)->findOrFail($plan->id);
+            if ($plan->product_type->value !== 'marketplace_access') {
+                throw ValidationException::withMessages(['subscription_plan_id' => 'Location coverage packages are no longer available.']);
+            }
             $existingKey = 'subscription:'.$user->id.':'.hash('sha256', $idempotencyKey);
             $existingIntent = PaymentIntent::query()->where('idempotency_key', $existingKey)->first();
             if ($existingIntent) {
@@ -38,19 +41,6 @@ final class PurchaseSubscription
                 throw ValidationException::withMessages(['subscription_plan_id' => 'This package is already active on your account.']);
             }
 
-            $targets = $plan->locationCoverage()->get();
-            if ($plan->product_type->value === 'location_coverage' && $targets->isEmpty()) {
-                throw ValidationException::withMessages(['subscription_plan_id' => 'This location plan has no admin-configured coverage.']);
-            }
-            if ($plan->product_type->value === 'location_coverage' && ! UserSubscription::query()
-                ->where('user_id', $user->id)
-                ->where('product_type', 'marketplace_access')
-                ->where('status', 'active')
-                ->where('ends_at', '>', now())
-                ->exists()) {
-                throw ValidationException::withMessages(['subscription_plan_id' => 'An active marketplace package is required before adding location coverage.']);
-            }
-
             $discountPercent = min(max((float) $plan->discount, 0), 100);
             $payable = (int) round($plan->price_minor * (100 - $discountPercent) / 100);
             $wallet = Wallet::query()
@@ -64,9 +54,7 @@ final class PurchaseSubscription
                 throw ValidationException::withMessages(['wallet' => 'Top-up funds are insufficient in '.$plan->currency.'. Use secure payment or fund your wallet first.']);
             }
 
-            $credits = (int) $wallet->ledgerEntries()->where('direction', 'credit')->where('status', 'posted')->sum('amount_minor');
-            $debits = (int) $wallet->ledgerEntries()->where('direction', 'debit')->whereIn('status', ['posted', 'reserved'])->sum('amount_minor');
-            if ($credits - $debits < $payable) {
+            if ((int) $wallet->balance_minor < $payable) {
                 throw ValidationException::withMessages(['wallet' => 'Top-up funds are insufficient for this package. Use secure payment or fund your wallet first.']);
             }
 

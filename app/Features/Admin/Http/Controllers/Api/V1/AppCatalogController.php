@@ -35,6 +35,7 @@ final class AppCatalogController
             'app_icon_file' => ['required_without:app_icon', 'image', 'max:5120'],
             'store_url' => ['required', 'url', 'max:2048'],
             'featured' => ['sometimes', 'boolean'],
+            'status' => ['sometimes', 'in:active,pending,rejected,draft'],
         ]);
         $icon = isset($data['app_icon_file']) ? $data['app_icon_file']->store('app-icons', 'public') : $data['app_icon'];
         $app = StoreApp::query()->create([
@@ -43,6 +44,7 @@ final class AppCatalogController
             'brand_color' => $data['brand_color'], 'developer' => $data['developer'], 'category' => $data['category'],
             'install_count_label' => $data['install_count_label'] ?? null, 'description' => $data['description'], 'app_icon' => $icon,
             'featured' => $data['featured'] ?? false,
+            'status' => $data['status'] ?? 'active',
         ]);
         AppStoreListingSnapshot::query()->create([
             'app_id' => $app->id, 'store' => $app->store, 'source_url' => $data['store_url'],
@@ -63,6 +65,7 @@ final class AppCatalogController
             'install_count_label' => ['sometimes', 'nullable', 'string', 'max:32'], 'description' => ['sometimes', 'string'],
             'app_icon' => ['sometimes', 'url', 'max:255'],
             'featured' => ['sometimes', 'boolean'],
+            'status' => ['sometimes', 'in:active,pending,rejected,draft'],
         ]);
         $before = $app->only(array_keys($data));
         $app->fill($data)->save();

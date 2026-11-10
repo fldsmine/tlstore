@@ -11,8 +11,8 @@ class App extends Model
     protected $table = 'apps';
     protected $fillable = [
         'prototype_id', 'name', 'short_code', 'store', 'brand_color', 'developer', 'category',
-        'install_count_label', 'description', 'illustration_kind', 'paid_amount', 'location',
-        'currency', 'rating', 'total_reviews', 'review_reward', 'app_icon', 'maximum_review', 'featured',
+        'install_count_label', 'description', 'store_link', 'paid_amount', 'location',
+        'currency', 'rating', 'total_reviews', 'review_reward', 'app_icon', 'maximum_review', 'featured', 'status',
     ];
     protected $casts = [
         'prototype_id' => 'integer',

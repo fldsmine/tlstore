@@ -18,14 +18,13 @@ class FaqSeeder extends Seeder
             ['Why was my submission rejected?', 'A submission can be rejected if it does not follow the campaign instructions or the evidence cannot be verified. Check the status details and any moderator feedback, then contact support if you need help.', 'moderation'],
             ['Do I need a subscription to browse listings?', 'You can browse app and ad listings. An active marketplace subscription is required before claiming and completing tasks.', 'subscriptions'],
             ['What does a marketplace subscription include?', 'Marketplace plans define access limits and other features. Available plan details are set by administrators and shown on the subscription screen.', 'subscriptions'],
-            ['What is a location add-on?', 'A location add-on expands the countries or regions in which your account can qualify for location-targeted campaigns. It grants listing eligibility; it does not use device location tracking.', 'locations'],
             ['Can I change my registration country?', 'No. Your profile country is selected during registration and cannot be changed from the account profile. It determines your initial country-based campaign eligibility.', 'locations'],
-            ['How do I know if a campaign is available in my location?', 'Listings show their location targeting. Global listings are open to all eligible users; country or region listings require the matching profile country or an active location entitlement.', 'locations'],
+            ['How do I know if a campaign is available in my location?', 'Listings show their location targeting. Country or region listings require a match with your profile country. A listing with no location restriction is open to all users who meet its package requirements.', 'locations'],
             ['What wallets are available?', 'The account can have Review, Share, Referral, and Top-up Fund wallets. Earned rewards are held in the applicable earned wallet, while deposits are held separately in the Top-up Fund wallet.', 'wallets'],
             ['Can I withdraw money from my Top-up Fund wallet?', 'No. Top-up funds cannot be withdrawn directly. They can be used for eligible purchases or transferred without a transfer fee to an earned wallet that supports withdrawals.', 'wallets'],
             ['How do I add funds?', 'Choose an active payment option in the app. If manual bank deposit is available, submit the payment details and proof; administrators review it before funds are credited. Online checkout is available only when a gateway is configured.', 'payments'],
-            ['How are subscription and location add-ons paid for?', 'Subscriptions and location add-ons are purchased from the Top-up Fund wallet. Add funds first if your available balance is not enough.', 'subscriptions'],
-            ['How do I request a withdrawal?', 'Choose an available withdrawal method and an eligible earned wallet, then enter the requested amount and required payout details. The request is subject to the configured minimum, percentage tax, and administrator processing.', 'withdrawals'],
+            ['How are subscriptions paid for?', 'Subscriptions are paid using your Top-up Fund wallet or a supported secure payment option. Add funds first if your available balance is not enough.', 'subscriptions'],
+            ['How do I request a withdrawal?', 'Choose an available withdrawal method and an eligible earned wallet, then enter the requested amount and required payout details. Your active package sets the withdrawal currency, minimum amount, and available withdrawal days; the payout method may also set a minimum and percentage tax.', 'withdrawals'],
             ['Which currency will I receive for a campaign reward?', 'Campaign currency determines the reward currency. The app may show converted display values using available exchange-rate snapshots; displayed conversions do not change the campaign currency.', 'payments'],
             ['How do referrals work?', 'Your referral screen shows your referral code and attributed sign-ups. Any referral reward is subject to the active referral rules and appears in the Referral wallet when credited.', 'referrals'],
             ['Where can I check a task or payment status?', 'Use History for task submissions, ad-share verification, wallet activity, and withdrawal requests. Top-up records show payment status and any available manual-deposit review status.', 'account'],
@@ -46,5 +45,10 @@ class FaqSeeder extends Seeder
                 ],
             );
         }
+
+        DB::table('faqs')->whereIn('question', [
+            'What is a location add-on?',
+            'How are subscription and location add-ons paid for?',
+        ])->update(['is_active' => false, 'updated_at' => $now]);
     }
 }

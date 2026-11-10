@@ -23,6 +23,7 @@ class AdListingSeeder extends Seeder
             return [
                 'campaign_key' => $ad['campaign_key'],
                 'title' => $ad['title'],
+                'type' => $ad['type'] ?? 'others',
                 'description' => $ad['description'],
                 'share_message' => $ad['share_message'],
                 'owner_id' => $ad['owner_id'],
@@ -48,6 +49,7 @@ class AdListingSeeder extends Seeder
             ['campaign_key'],
             [
                 'title',
+                'type',
                 'description',
                 'share_message',
                 'owner_id',

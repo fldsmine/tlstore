@@ -30,11 +30,11 @@ routes/
 
 ## Confirmed product rules
 
-- Marketplace plans are configured by admins. A current marketplace subscription is required to browse, claim, or submit work.
-- A user's profile country determines country matching. Admin-managed region membership and purchased location entitlements expand listing eligibility; no device or IP location verification is used.
+- Marketplace plans are configured by admins in Groups A, B, and C. Listings are public; an active package is required to claim tasks. Group A enables ad shares, Group B enables Google Play or Samsung reviews, and Group C enables Apple app reviews. A user has one active package and joining another switches packages.
+- A user's profile country determines country matching; region targets match through the region's country membership. There are no location add-on packages or global listing access flag.
 - Campaign `paid_amount` is its reward pool. Admins configure campaign maximums. Claiming reserves capacity; human approval records completion and updates `apps.total_reviews` or `ads.total_share`. Store-reported review totals live in `app_store_listing_snapshots`.
 - App reviews and public ad-share links/screenshots wait for human admin approval. Rewards are credited only after approval.
-- Only top-up funds purchase marketplace/location plans. Top-up funds cannot be withdrawn; users may transfer them fee-free to review, share, or referral wallets. Those earned wallets may be withdrawn.
+- Only top-up funds purchase subscription packages. Top-up funds cannot be withdrawn; users may transfer them fee-free to review, share, referral, or bonus wallets. Earned wallets may be withdrawn under the active package's currency, minimum, and allowed days.
 - Manual bank deposits require private proof upload and admin approval. Withdrawal `tax` is a percentage fee. All configured withdrawal methods are available to all users.
 - Campaign currency is authoritative for reward payouts. Exchange rates are returned as dated display values only.
 - Admins use a separate `admins` table and Sanctum tokens. Administrative changes and decisions are written to `audit_logs`.

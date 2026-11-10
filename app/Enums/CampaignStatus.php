@@ -5,6 +5,7 @@ namespace App\Enums;
 enum CampaignStatus: string
 {
     case Draft = 'draft';
+    case Pending = 'pending';
     case PendingReview = 'pending_review';
     case UnderReview = 'under_review';
     case Active = 'active';

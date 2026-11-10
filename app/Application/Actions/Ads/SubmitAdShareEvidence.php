@@ -21,8 +21,18 @@ final class SubmitAdShareEvidence
             if ($task->user_id !== $user->id || $task->status->value !== 'reserved' || ($task->expires_at && $task->expires_at->isPast())) {
                 throw ValidationException::withMessages(['task' => 'This share task cannot accept evidence.']);
             }
-            if (! $this->eligibility->canAccess($user, $task->ad->location)) {
-                throw ValidationException::withMessages(['task' => 'Your subscription or location eligibility is no longer active.']);
+            $subscription = $this->eligibility->subscriptionForTask($user, 'ad');
+            if (! $subscription || ($subscription->plan?->max_ad_shares ?? 0) < 1) {
+                throw ValidationException::withMessages(['task' => 'Your package is no longer eligible for this ad share.']);
+            }
+            $expected = strtolower(trim((string) $task->ad->type));
+            if (str_contains($expected, 'twitter') || $expected === 'x') $expected = 'x';
+            if (! in_array($expected, ['telegram', 'facebook', 'youtube', 'instagram', 'tiktok', 'x', 'whatsapp', 'others'], true)) $expected = 'others';
+            $submitted = strtolower(trim($channel));
+            if (str_contains($submitted, 'twitter') || $submitted === 'x') $submitted = 'x';
+            if ($submitted === 'other') $submitted = 'others';
+            if ($submitted !== $expected) {
+                throw ValidationException::withMessages(['channel' => 'Submit this task using its assigned '.$task->ad->type.' channel.']);
             }
 
             $event = AdShareEvent::query()->create([

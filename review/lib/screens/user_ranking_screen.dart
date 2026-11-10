@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 import '../services/media_url.dart';
 
 class UserRankingScreen extends StatefulWidget {
-  const UserRankingScreen({
-    super.key,
-    required this.api,
-    required this.token,
-  });
+  const UserRankingScreen({super.key, required this.api, required this.token});
 
   final AuthApi api;
   final String token;
@@ -43,6 +40,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
     }
 
     try {
+      await widget.api.loadExchangeRates(widget.token);
       final response = await widget.api.get('me/ranking', widget.token);
       final data = response['data'];
 
@@ -95,12 +93,10 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         ],
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: _primary),
-            )
+          ? const Center(child: CircularProgressIndicator(color: _primary))
           : _error != null
-              ? _errorView()
-              : _content(),
+          ? _errorView()
+          : _content(),
     );
   }
 
@@ -149,8 +145,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
               'Rewards you have successfully unlocked',
             ),
             const SizedBox(height: 12),
-            for (final item in qualifications)
-              _qualificationCard(item),
+            for (final item in qualifications) _qualificationCard(item),
             const SizedBox(height: 22),
           ],
 
@@ -166,11 +161,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             // The first level that is not yet qualified is the only
             // level currently in progress. Every level after it stays locked.
             for (int i = 0; i < levels.length; i++)
-              _levelCard(
-                levels[i],
-                i,
-                locked: i > _currentLevelIndex(levels),
-              ),
+              _levelCard(levels[i], i, locked: i > _currentLevelIndex(levels)),
           ],
 
           const SizedBox(height: 20),
@@ -188,11 +179,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF28235D),
-            Color(0xFF5146C9),
-            Color(0xFF7568FF),
-          ],
+          colors: [Color(0xFF28235D), Color(0xFF5146C9), Color(0xFF7568FF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -356,10 +343,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 12,
-          ),
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
         ),
       ],
     );
@@ -385,7 +369,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             Expanded(
               child: _statCard(
                 title: 'Referral cash inflow',
-                value: '\$${_number(progress['referral_cash_inflow_usd'])}',
+                value: _usd(progress['referral_cash_inflow_usd']),
                 icon: Icons.groups_rounded,
                 color: const Color(0xFF159B72),
                 background: const Color(0xFFE3F7EF),
@@ -396,7 +380,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         const SizedBox(height: 12),
         _statCard(
           title: 'Your personal cash inflow',
-          value: '\$${_number(progress['user_cash_inflow_usd'])}',
+          value: _usd(progress['user_cash_inflow_usd']),
           icon: Icons.account_balance_wallet_rounded,
           color: const Color(0xFFDB9231),
           background: const Color(0xFFFFF3E1),
@@ -459,10 +443,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 const SizedBox(height: 14),
                 Text(
                   title,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                 ),
                 const SizedBox(height: 6),
                 FittedBox(
@@ -521,21 +502,23 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
     final referralGoal = _asDouble(requirements['subscribed_referrals']);
     final referralCurrent = _asDouble(progress['subscribed_referrals']);
 
-    final referralCashGoal =
-        _asDouble(requirements['referral_cash_inflow_usd']);
-    final referralCashCurrent =
-        _asDouble(progress['referral_cash_inflow_usd']);
+    final referralCashGoal = _asDouble(
+      requirements['referral_cash_inflow_usd'],
+    );
+    final referralCashCurrent = _asDouble(progress['referral_cash_inflow_usd']);
 
     final ownGoal = _asDouble(requirements['user_cash_inflow_usd']);
     final ownCurrent = _asDouble(progress['user_cash_inflow_usd']);
 
     final color = _rankColor(index);
 
-    final totalProgress = [
-      _fraction(referralCurrent, referralGoal),
-      _fraction(referralCashCurrent, referralCashGoal),
-      _fraction(ownCurrent, ownGoal),
-    ].reduce((a, b) => a + b) / 3;
+    final totalProgress =
+        [
+          _fraction(referralCurrent, referralGoal),
+          _fraction(referralCashCurrent, referralCashGoal),
+          _fraction(ownCurrent, ownGoal),
+        ].reduce((a, b) => a + b) /
+        3;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -543,9 +526,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: eligible
-              ? _green.withOpacity(0.4)
-              : const Color(0xFFEEEEF5),
+          color: eligible ? _green.withOpacity(0.4) : const Color(0xFFEEEEF5),
           width: eligible ? 1.5 : 1,
         ),
         boxShadow: [
@@ -605,21 +586,14 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             const SizedBox(height: 17),
 
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 13,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.07),
                 borderRadius: BorderRadius.circular(13),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.card_giftcard_rounded,
-                    color: color,
-                    size: 20,
-                  ),
+                  Icon(Icons.card_giftcard_rounded, color: color, size: 20),
                   const SizedBox(width: 9),
                   Expanded(
                     child: Column(
@@ -636,7 +610,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '\$${_number(level['monthly_reward_usd'])}',
+                          _usd(level['monthly_reward_usd']),
                           style: TextStyle(
                             color: color,
                             fontSize: 19,
@@ -686,7 +660,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   const Expanded(
                     child: Text(
                       'REQUIREMENTS PROGRESS',
-                        style: TextStyle(
+                      style: TextStyle(
                         color: _dark,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
@@ -726,12 +700,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
 
               const SizedBox(height: 13),
 
-              _goal(
-                'Your cash inflow',
-                ownCurrent,
-                ownGoal,
-                color: color,
-              ),
+              _goal('Your cash inflow', ownCurrent, ownGoal, color: color),
 
               if (eligible && !locked) ...[
                 const SizedBox(height: 14),
@@ -744,11 +713,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   ),
                   child: const Row(
                     children: [
-                      Icon(
-                        Icons.check_circle_rounded,
-                        color: _green,
-                        size: 17,
-                      ),
+                      Icon(Icons.check_circle_rounded, color: _green, size: 17),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -801,13 +766,10 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'This ranking level is currently inactive.',
-                  style: TextStyle(
-                    color: Colors.red.shade400,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: Colors.red.shade400, fontSize: 11),
                 ),
               ],
-           ],
+            ],
           ],
         ),
       ),
@@ -823,13 +785,9 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
   }) {
     final fraction = _fraction(current, target);
 
-    final currentText = integer
-        ? _asInt(current).toString()
-        : '\$${_number(current)}';
+    final currentText = integer ? _asInt(current).toString() : _usd(current);
 
-    final targetText = integer
-        ? _asInt(target).toString()
-        : '\$${_number(target)}';
+    final targetText = integer ? _asInt(target).toString() : _usd(target);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -870,32 +828,25 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
     );
   }
 
-  Widget _statusBadge(
-    bool active,
-    bool eligible, {
-    bool locked = false,
-  }) {
+  Widget _statusBadge(bool active, bool eligible, {bool locked = false}) {
     final color = locked
         ? Colors.grey
         : !active
-            ? Colors.red
-            : eligible
-                ? _green
-                : const Color(0xFFD18A28);
+        ? Colors.red
+        : eligible
+        ? _green
+        : const Color(0xFFD18A28);
 
     final label = locked
         ? 'Locked'
         : !active
-            ? 'Inactive'
-            : eligible
-                ? 'Qualified'
-                : 'In progress';
+        ? 'Inactive'
+        : eligible
+        ? 'Qualified'
+        : 'In progress';
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(30),
@@ -912,11 +863,8 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
   }
 
   Widget _rankIcon(String? path, Color color) {
-    Widget fallback() => Icon(
-          Icons.military_tech_rounded,
-          color: color,
-          size: 29,
-        );
+    Widget fallback() =>
+        Icon(Icons.military_tech_rounded, color: color, size: 29);
 
     if (path != null && path.startsWith('assets/ranks/')) {
       return Container(
@@ -984,8 +932,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
     final paid = _asInt(item['rewards_paid']);
     final completed = item['status'] == 'completed';
 
-    final reward =
-        item['monthly_reward_usd'] ?? level['monthly_reward_usd'];
+    final reward = item['monthly_reward_usd'] ?? level['monthly_reward_usd'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -997,10 +944,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
       ),
       child: Row(
         children: [
-          _rankIcon(
-            level['icon']?.toString(),
-            _primary,
-          ),
+          _rankIcon(level['icon']?.toString(), _primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1016,7 +960,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '\$${_number(reward)} / month',
+                  '${_usd(reward)} / month',
                   style: const TextStyle(
                     color: _primary,
                     fontSize: 12,
@@ -1028,18 +972,13 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   completed
                       ? 'Reward period complete'
                       : 'Next payment: ${_date(item['next_reward_at'])}',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 10),
                 ),
                 const SizedBox(height: 9),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: LinearProgressIndicator(
-                    value: total <= 0
-                        ? 0
-                        : (paid / total).clamp(0.0, 1.0),
+                    value: total <= 0 ? 0 : (paid / total).clamp(0.0, 1.0),
                     minHeight: 5,
                     backgroundColor: const Color(0xFFF0F0F5),
                     valueColor: const AlwaysStoppedAnimation(_green),
@@ -1048,19 +987,14 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 const SizedBox(height: 5),
                 Text(
                   '$paid of $total payments',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
           Icon(
-            completed
-                ? Icons.check_circle_rounded
-                : Icons.schedule_rounded,
+            completed ? Icons.check_circle_rounded : Icons.schedule_rounded,
             color: completed ? _green : Colors.orange,
             size: 22,
           ),
@@ -1088,18 +1022,12 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
           const SizedBox(height: 12),
           const Text(
             'No ranking levels available',
-            style: TextStyle(
-              color: _dark,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(color: _dark, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 5),
           Text(
             'Please check back later.',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
         ],
       ),
@@ -1116,11 +1044,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
-          Icon(
-            Icons.info_outline_rounded,
-            color: _primary,
-            size: 20,
-          ),
+          Icon(Icons.info_outline_rounded, color: _primary, size: 20),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1164,10 +1088,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             Text(
               _error ?? 'Please try again.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
             ),
             const SizedBox(height: 18),
             ElevatedButton.icon(
@@ -1204,14 +1125,21 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
   }
 
   double _asDouble(dynamic value) {
-    return value is num
-        ? value.toDouble()
-        : double.tryParse('$value') ?? 0;
+    return value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
   }
 
   String _number(dynamic value) {
     return _asDouble(value).toStringAsFixed(2);
   }
+
+  String _usd(dynamic value) => moneyConverted(
+    widget.api,
+    value,
+    'USD',
+    2,
+    widget.api.preferredCurrency,
+    isMinor: false,
+  );
 
   String _date(dynamic value) {
     if (value == null) return 'Pending';

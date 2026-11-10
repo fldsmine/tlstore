@@ -105,13 +105,13 @@ final class CampaignController
     public function createAd(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'title' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string'],
+            'title' => ['required', 'string', 'max:180'], 'type' => ['required', 'string', 'max:48'], 'description' => ['nullable', 'string'],
             'share_message' => ['nullable', 'string'], 'owner_id' => ['nullable', 'integer', 'exists:users,id'],
             'creative_path' => ['nullable', 'string', 'max:255'], 'destination_url' => ['nullable', 'url', 'max:2048'],
             'paid_amount' => ['required', 'numeric', 'gt:0'], 'location' => ['nullable', 'string', 'max:32'],
             'currency' => ['required', 'string', 'size:3'], 'share_reward' => ['required', 'numeric', 'gt:0'],
             'maximum_share' => ['required', 'integer', 'min:1'], 'starts_at' => ['nullable', 'date'],
-            'ends_at' => ['nullable', 'date', 'after:starts_at'], 'status' => ['sometimes', 'in:draft,active,paused'],
+            'ends_at' => ['nullable', 'date', 'after:starts_at'], 'status' => ['sometimes', 'in:draft,pending,active,paused,rejected'],
             'featured' => ['sometimes', 'boolean'],
         ]);
         $data['location'] = $this->normalizeLocation($data['location'] ?? null);
@@ -134,12 +134,13 @@ final class CampaignController
     {
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:180'], 'description' => ['sometimes', 'nullable', 'string'],
+            'type' => ['sometimes', 'string', 'max:48'],
             'share_message' => ['sometimes', 'nullable', 'string'], 'owner_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'creative_path' => ['sometimes', 'nullable', 'string', 'max:255'], 'destination_url' => ['sometimes', 'nullable', 'url', 'max:2048'],
             'paid_amount' => ['sometimes', 'numeric', 'gt:0'], 'location' => ['sometimes', 'nullable', 'string', 'max:32'],
             'currency' => ['sometimes', 'string', 'size:3'], 'share_reward' => ['sometimes', 'numeric', 'gt:0'],
             'maximum_share' => ['sometimes', 'integer', 'min:1'], 'starts_at' => ['sometimes', 'nullable', 'date'],
-            'ends_at' => ['sometimes', 'nullable', 'date'], 'status' => ['sometimes', 'in:draft,active,paused,ended,archived'],
+            'ends_at' => ['sometimes', 'nullable', 'date'], 'status' => ['sometimes', 'in:draft,pending,active,paused,rejected,ended,archived'],
             'featured' => ['sometimes', 'boolean'],
         ]);
         if (array_key_exists('location', $data)) $data['location'] = $this->normalizeLocation($data['location']);

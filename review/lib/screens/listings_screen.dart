@@ -36,10 +36,8 @@ class _ListingsScreenState extends State<ListingsScreen> {
   bool _loading = true;
   bool _featuredOnly = false;
   String _sort = 'latest';
-  String _location = 'all';
   String? _error;
   List<Map<String, dynamic>> _items = const [];
-  List<String> _locationOptions = const [];
   int _loadGeneration = 0;
   int _totalCount = 0;
 
@@ -51,10 +49,10 @@ class _ListingsScreenState extends State<ListingsScreen> {
     final search = _searchController.text.trim();
     if (search.isNotEmpty) query['search'] = search;
     if (_featuredOnly) query['featured'] = '1';
-    if (_location != 'all') query['location'] = _location;
     if (_sort != 'latest') query['sort'] = _sort;
     return '$path?${Uri(queryParameters: query).query}';
   }
+
   String get _title =>
       widget.kind == ListingKind.appReview ? 'Review apps' : 'Share ads';
 
@@ -87,16 +85,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
         _items = list is List
             ? list.whereType<Map<String, dynamic>>().toList()
             : const [];
-        final locations = _items
-            .map((item) => item['location']?.toString().trim() ?? '')
-            .where((location) => location.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
-        final locationsFromServer = meta is Map<String, dynamic> && meta['locations'] is List
-            ? (meta['locations'] as List).map((value) => value.toString()).toSet()
-            : <String>{};
-        _locationOptions = {..._locationOptions, ...locations, ...locationsFromServer}.toList()..sort();
         _totalCount = meta is Map<String, dynamic> && meta['total'] is num
             ? (meta['total'] as num).toInt()
             : _items.length;
@@ -126,36 +114,30 @@ class _ListingsScreenState extends State<ListingsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-	appBar: AppBar(
-	  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-	  elevation: 0,
-	  scrolledUnderElevation: 0,
-	  toolbarHeight: 60,
-	  titleSpacing: 0,
-	  title: SizedBox(
-		height: 48,
-		child: _buildToolbarSearch(),
-	  ),
-	  actions: [
-		  Padding(
-			padding: const EdgeInsets.only(right: 12, left: 8),
-			child: Container(
-			  width: 48,
-			  height: 48,
-			  clipBehavior: Clip.antiAlias,
-			  decoration: BoxDecoration(
-				color: Colors.grey[200],
-				borderRadius: BorderRadius.circular(12),
-			  ),
-			  child: Image.asset(
-				'assets/logo.jpg',
-				fit: BoxFit.cover,
-			  ),
-			),
-		  ),
-		],
-	),
-	
+    appBar: AppBar(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      toolbarHeight: 60,
+      titleSpacing: 0,
+      title: SizedBox(height: 48, child: _buildToolbarSearch()),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12, left: 8),
+          child: Container(
+            width: 48,
+            height: 48,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Image.asset('assets/logo.jpg', fit: BoxFit.cover),
+          ),
+        ),
+      ],
+    ),
+
     body: _loading && _items.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : _error != null
@@ -170,7 +152,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
                 _buildSearchAndFilters(),
                 const SizedBox(height: 12),
                 const Text(
-                  'Browse campaigns across locations. Each listing shows whether your current plan covers it.',
+                  'Browse available tasks. Your subscription determines which task types you can perform.',
                   style: TextStyle(color: mutedInk, fontSize: 12, height: 1.4),
                 ),
                 const SizedBox(height: 14),
@@ -178,7 +160,10 @@ class _ListingsScreenState extends State<ListingsScreen> {
                   children: [
                     const Text(
                       'Available listings',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const Spacer(),
                     Text(
@@ -192,8 +177,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                if (_loading)
-                  const LinearProgressIndicator(minHeight: 2),
+                if (_loading) const LinearProgressIndicator(minHeight: 2),
                 if (_items.isEmpty)
                   ListingEmptyState(
                     title: _searchController.text.trim().isEmpty
@@ -259,7 +243,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
           ),
   );
 
-
   Widget _buildToolbarSearch() => TextField(
     controller: _searchController,
     textInputAction: TextInputAction.search,
@@ -307,7 +290,7 @@ class _ListingsScreenState extends State<ListingsScreen> {
   );
 
   bool get _hasActiveFilters =>
-      _featuredOnly || _sort != 'latest' || _location != 'all';
+      _featuredOnly || _sort != 'latest';
 
   void _clearFilters() {
     _searchDebounce?.cancel();
@@ -315,7 +298,6 @@ class _ListingsScreenState extends State<ListingsScreen> {
     setState(() {
       _featuredOnly = false;
       _sort = 'latest';
-      _location = 'all';
     });
     _load();
   }
@@ -391,65 +373,16 @@ class _ListingsScreenState extends State<ListingsScreen> {
                 onPressed: () => _updateFilter(() {
                   _sort = _sort == 'latest' ? 'reward_desc' : 'latest';
                 }),
-                side: BorderSide(
-                  color: theme.dividerColor.withOpacity(0.55),
-                ),
+                side: BorderSide(color: theme.dividerColor.withOpacity(0.55)),
                 backgroundColor: theme.colorScheme.surface,
                 labelStyle: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ],
           ),
-          if (_locationOptions.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _location,
-              isExpanded: true,
-              isDense: true,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.public_rounded, size: 19),
-                labelText: 'Target location',
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(13),
-                  borderSide: BorderSide(
-                    color: theme.dividerColor.withOpacity(0.55),
-                  ),
-                ),
-              ),
-              items: [
-                const DropdownMenuItem(
-                  value: 'all',
-                  child: Text('All locations'),
-                ),
-                const DropdownMenuItem(
-                  value: 'global',
-                  child: Text('Global'),
-                ),
-                ..._locationOptions.map(
-                  (location) => DropdownMenuItem(
-                    value: location,
-                    child: Text(location, overflow: TextOverflow.ellipsis),
-                  ),
-                ),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  _updateFilter(() => _location = value);
-                }
-              },
-            ),
-          ],
         ],
       ),
     );
   }
-
 }
 
 class ListingDetailScreen extends StatefulWidget {
@@ -502,33 +435,25 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     }
   }
 
-  Future<void> _showAccessPrompt({required bool needsLocation}) async {
-    if (needsLocation) {
-      await showLocationCoveragePackages(
-        context: context,
-        api: widget.api,
-        token: widget.token,
-        user: widget.user,
-        location:
-            _item['location']?.toString() ??
-            _app['location']?.toString() ??
-            'this location',
-      );
-
-      if (mounted) await _loadListingGuidance();
-      return;
-    }
+  Future<void> _showAccessPrompt(String access) async {
+    final packageMessage = access == 'store_package_required'
+        ? 'This app is available to a package for its store or category. Choose the matching review package to continue.'
+        : access == 'review_package_required'
+        ? 'Your current package is for ad sharing. Join a review package to review apps.'
+        : access == 'share_package_required'
+        ? 'Your current package is for app reviews. Join an ad sharing package to share ads.'
+        : access == 'subscription_questionnaire_required'
+        ? 'Complete the app tester qualification questions for your active package before starting tasks.'
+        : 'Choose a subscription package that includes this task.';
     final openPlans = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
-          needsLocation ? 'Add location coverage' : 'Choose a marketplace plan',
+          access == 'subscription_questionnaire_required'
+              ? 'Complete your package setup'
+              : 'Choose a subscription package',
         ),
-        content: Text(
-          needsLocation
-              ? 'Your marketplace plan is active, but this listing targets a location outside your current coverage. Add a location plan to continue.'
-              : 'Subscribe to a marketplace plan to review apps and share ads. You can browse all available listings before subscribing.',
-        ),
+        content: Text(packageMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -537,7 +462,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
-              needsLocation ? 'View location plans' : 'View marketplace plans',
+              'View subscription groups',
             ),
           ),
         ],
@@ -559,12 +484,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
   Future<void> _claim() async {
     final access = _item['task_access_status']?.toString();
-    if (access == 'marketplace_plan_required') {
-      await _showAccessPrompt(needsLocation: false);
-      return;
-    }
-    if (access == 'location_coverage_required') {
-      await _showAccessPrompt(needsLocation: true);
+    if (access != null && access != 'eligible') {
+      await _showAccessPrompt(access);
       return;
     }
     setState(() => _claiming = true);
@@ -590,11 +511,13 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                   api: widget.api,
                   token: widget.token,
                   task: task,
+                  user: widget.user,
                 )
               : AdEvidenceScreen(
                   api: widget.api,
                   token: widget.token,
                   task: task,
+                  user: widget.user,
                 ),
         ),
       );
@@ -602,12 +525,15 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       if (!mounted) return;
       final message = error.message.toLowerCase();
       if (message.contains('marketplace plan') ||
-          message.contains('marketplace subscription')) {
-        await _showAccessPrompt(needsLocation: false);
-      } else if (message.contains('location coverage') ||
-          message.contains('location add-on') ||
-          message.contains('location addon')) {
-        await _showAccessPrompt(needsLocation: true);
+          message.contains('marketplace subscription') ||
+          message.contains('review package') ||
+          message.contains('ad sharing package') ||
+          message.contains('store only covers') ||
+          message.contains('category apps')) {
+        await _showAccessPrompt(
+          _item['task_access_status']?.toString() ??
+              'marketplace_plan_required',
+        );
       } else if (message.contains('plan') && message.contains('limit')) {
         await _showPlanLimitPrompt();
       } else {
@@ -710,10 +636,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               ),
               const SizedBox(height: 14),
               DetailLine(label: 'Reward', value: reward),
-              DetailLine(
-                label: 'Target location',
-                value: _item['location']?.toString() ?? 'Open to all locations',
-              ),
+              if ((_item['location']?.toString().trim().isNotEmpty ?? false))
+                DetailLine(
+                  label: 'Campaign location · info only',
+                  value: _item['location'].toString(),
+                ),
               if (_isReview) ...[
                 DetailLine(
                   label: 'Store',
@@ -744,18 +671,12 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
               _claiming
                   ? 'Starting task…'
                   : _isReview
-                  ? (_item['task_access_status'] == 'marketplace_plan_required'
-                        ? 'View marketplace plans'
-                        : _item['task_access_status'] ==
-                              'location_coverage_required'
-                        ? 'Add location coverage'
-                        : 'Start app review')
-                  : (_item['task_access_status'] == 'marketplace_plan_required'
-                        ? 'View marketplace plans'
-                        : _item['task_access_status'] ==
-                              'location_coverage_required'
-                        ? 'Add location coverage'
-                        : 'Start ad share'),
+                  ? (_item['task_access_status'] == 'eligible'
+                        ? 'Start app review'
+                        : 'View package options')
+                  : (_item['task_access_status'] == 'eligible'
+                        ? 'Start ad share'
+                        : 'View package options'),
             ),
             style: FilledButton.styleFrom(
               backgroundColor: brandGreen,

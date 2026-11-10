@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/currency/money.dart';
+import '../../../../services/auth_api.dart';
 import '../../../../widgets/auth_components.dart';
 
 class AccountTransactionCard extends StatelessWidget {
-  const AccountTransactionCard({super.key, required this.transaction});
+  const AccountTransactionCard({
+    super.key,
+    required this.transaction,
+    required this.api,
+    required this.preferredCurrency,
+  });
   final Map<String, dynamic> transaction;
+  final AuthApi api;
+  final String preferredCurrency;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +83,7 @@ class AccountTransactionCard extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '${credit ? '+' : '−'}${_formatMinor(amount, currency, digits)}',
+            '${credit ? '+' : '−'}${moneyConverted(api, amount, currency, digits, preferredCurrency, isMinor: true)}',
             style: TextStyle(
               color: credit ? brandGreen : const Color(0xFF5B6672),
               fontWeight: FontWeight.w800,

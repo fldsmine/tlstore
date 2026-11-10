@@ -1,0 +1,35 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * faqs
+ *
+ * Frequently asked questions grouped by category and ordered for display.
+ *
+ * Relationships:
+ *   - none - standalone content table
+ *
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('faqs', function (Blueprint $table) {
+            $table->id();
+            $table->string('question');
+            $table->text('answer');
+            $table->string('category')->default('general');
+            $table->integer('order')->default(0);
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('faqs');
+    }
+};

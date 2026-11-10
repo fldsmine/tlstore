@@ -39,9 +39,7 @@ final class TransferTopupFunds
                 ]);
             }
 
-            $credits = (int) $source->ledgerEntries()->where('direction', 'credit')->where('status', 'posted')->sum('amount_minor');
-            $debits = (int) $source->ledgerEntries()->where('direction', 'debit')->whereIn('status', ['posted', 'reserved'])->sum('amount_minor');
-            if ($credits - $debits < $amountMinor) {
+            if ((int) $source->balance_minor < $amountMinor) {
                 throw ValidationException::withMessages(['amount_minor' => 'The top-up wallet has insufficient available funds.']);
             }
 

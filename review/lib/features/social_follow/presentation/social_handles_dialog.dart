@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/currency/money.dart';
 import '../../../services/auth_api.dart';
 
 class SocialHandlesDialog extends StatefulWidget {
@@ -102,7 +103,7 @@ class _SocialHandlesDialogState extends State<SocialHandlesDialog> {
       _showMessage(
         alreadyCompleted
             ? 'This social follow reward was already claimed.'
-            : '${handle['currency']} ${_reward(handle)} added to your share wallet.',
+            : '${moneyConverted(widget.api, handle['reward_amount'], handle['currency']?.toString() ?? 'USD', handle['currency_minor_units'], widget.api.preferredCurrency, isMinor: false)} added to your bonus wallet.',
       );
     } on AuthException catch (error) {
       if (!mounted) return;
@@ -118,7 +119,14 @@ class _SocialHandlesDialogState extends State<SocialHandlesDialog> {
   String _reward(Map<String, dynamic> handle) {
     final amount = (handle['reward_amount'] as num?)?.toDouble() ?? 0;
     final precision = (handle['currency_minor_units'] as num?)?.toInt() ?? 2;
-    return amount.toStringAsFixed(precision);
+    return moneyConverted(
+      widget.api,
+      amount,
+      handle['currency']?.toString() ?? 'USD',
+      precision,
+      widget.api.preferredCurrency,
+      isMinor: false,
+    );
   }
 
   void _showMessage(String message) {

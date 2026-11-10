@@ -17,15 +17,14 @@ final class WalletController
     {
         $wallets = Wallet::query()->where('user_id', $request->user()->id)->where('status', 'active')->get();
         $data = $wallets->map(function (Wallet $wallet): array {
-            $credits = (int) $wallet->ledgerEntries()->where('direction', 'credit')->where('status', 'posted')->sum('amount_minor');
-            $debits = (int) $wallet->ledgerEntries()->where('direction', 'debit')->whereIn('status', ['posted', 'reserved'])->sum('amount_minor');
             $pending = (int) $wallet->ledgerEntries()->where('status', 'pending')->where('direction', 'credit')->sum('amount_minor');
 
             return [
                 'id' => $wallet->id,
                 'type' => $wallet->wallet_type->value,
                 'currency' => $wallet->currency,
-                'available_balance_minor' => max(0, $credits - $debits),
+                'balance_minor' => (int) $wallet->balance_minor,
+                'available_balance_minor' => (int) $wallet->balance_minor,
                 'pending_balance_minor' => $pending,
             ];
         });
@@ -82,6 +81,6 @@ final class WalletController
 
     public function withdrawals(Request $request): JsonResponse
     {
-        return response()->json(['data' => $request->user()->withdrawalRequests()->with('option')->latest()->paginate(30)]);
+        return response()->json(['data' => $request->user()->withdrawalRequests()->with(['option', 'userSubscription.plan.group'])->latest()->paginate(30)]);
     }
 }

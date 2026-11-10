@@ -48,6 +48,11 @@ class DemoAdminSeeder extends Seeder
             ], 'is_public' => true, 'updated_by_admin_id' => $admin->id],
         );
 
+        SystemSetting::firstOrCreate(
+            ['setting_key' => 'account_validation.provider'],
+            ['value' => ['provider' => 'paystack'], 'is_public' => false, 'updated_by_admin_id' => $admin->id],
+        );
+
         foreach ([
             'rewards.referral_subscription_active',
             'rewards.referral_task_active',
