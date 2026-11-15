@@ -555,13 +555,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .round();
     final memberSince = _formatDate(user['created_at']?.toString());
 
-    final hasAddonSubscription = activeSubscriptions.any((subscription) {
-      final plan = plansById[
-        subscription['subscription_plan_id']?.toString()
-      ];
-      return plan?['addons'] == true || plan?['addons'] == 1;
-    });
-
     return Theme(
       data: theme.copyWith(
         scaffoldBackgroundColor: theme.scaffoldBackgroundColor,

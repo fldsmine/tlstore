@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/currency/money.dart';
 import '../services/auth_api.dart';
@@ -42,7 +45,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
     _detail = {'user': widget.user};
     _load();
   }
@@ -100,75 +103,211 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
       : int.tryParse(value?.toString() ?? '') ?? 0;
 
   bool get _deleted => _user['deleted_at'] != null;
-  bool get _banned => _user['is_banned'] == true || _user['is_banned'] == 1;
+  bool get _banned =>
+      _user['is_banned'] == true || _user['is_banned'] == 1 || _user['is_banned'] == '1';
 
   Future<void> _runAction(Future<void> Function() action) async {
     await action();
     if (mounted) await _load();
   }
 
+  Future<void> _exportReport() async {
+    final user = _user;
+    final rows = <List<String>>[
+      ['section', 'id', 'date', 'status', 'amount', 'currency', 'summary'],
+      [
+        'account',
+        '${user['id'] ?? ''}',
+        '${user['created_at'] ?? ''}',
+        '${user['status'] ?? ''}',
+        '',
+        '${user['preferred_currency'] ?? ''}',
+        '${user['full_name'] ?? user['username'] ?? 'User'} · ${user['email'] ?? ''}',
+      ],
+    ];
+
+    void addRows(
+      String section,
+      List<Map<String, dynamic>> values,
+      String Function(Map<String, dynamic>) summary,
+    ) {
+      for (final row in values) {
+        rows.add([
+          section,
+          '${row['id'] ?? ''}',
+          '${row['created_at'] ?? row['requested_at'] ?? row['submitted_at'] ?? ''}',
+          '${row['status'] ?? ''}',
+          '${row['amount_minor'] ?? row['amount'] ?? row['reserved_reward_minor'] ?? ''}',
+          '${row['currency'] ?? ''}',
+          summary(row),
+        ]);
+      }
+    }
+
+    addRows('wallet', _list(_detail['wallets']), (row) =>
+        '${row['wallet_type'] ?? ''} · ${row['balance_minor'] ?? 0} minor units');
+    addRows('transaction', _list(_detail['transactions']), (row) =>
+        '${row['direction'] ?? ''} · ${row['description'] ?? row['type'] ?? ''}');
+    addRows('withdrawal', _list(_detail['withdrawals']), (row) =>
+        '${_map(row['option'])['name'] ?? 'Withdrawal'} · fee ${row['fee_minor'] ?? 0}');
+    addRows('manual_deposit', _list(_detail['manual_deposits']), (row) =>
+        'Bank reference ${row['bank_reference'] ?? ''}');
+    addRows('payment_attempt', _list(_detail['payment_intents']), (row) =>
+        '${row['purpose'] ?? 'Payment'} · ${row['provider_reference'] ?? ''}');
+    addRows('review_task', _list(_detail['review_tasks']), (row) =>
+        'App review task · ${row['app_name'] ?? row['campaign_id'] ?? ''}');
+    addRows('ad_share_task', _list(_detail['ad_share_tasks']), (row) =>
+        'Ad share task · ${row['ad_title'] ?? row['ad_id'] ?? ''}');
+    addRows('subscription', _list(_detail['subscriptions']), (row) =>
+        '${_map(row['plan'])['name'] ?? 'Subscription'} · ends ${row['ends_at'] ?? ''}');
+    addRows('package_addon', _list(_detail['package_addons']), (row) =>
+        '${_map(row['addon'])['name'] ?? row['name'] ?? 'Package add-on'} · ${row['status'] ?? ''}');
+    addRows('referral', _list(_detail['referrals']), (row) =>
+        '${_map(row['referred_user'])['email'] ?? ''} · ${row['rewards_count'] ?? 0} rewards');
+    addRows('social_follow_reward', _list(_detail['social_follows']), (row) =>
+        '${row['platform'] ?? ''} · ${row['status'] ?? ''}');
+    addRows('social_account', _list(_detail['social_accounts']), (row) =>
+        '${row['platform'] ?? ''} · ${row['handle'] ?? row['username'] ?? ''}');
+
+    final csv = '\uFEFF${rows.map((row) => row.map(_csvCell).join(',')).join('\r\n')}';
+    final date = DateTime.now().toIso8601String().substring(0, 10);
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              utf8.encode(csv),
+              mimeType: 'text/csv',
+              name: 'user-${user['id']}-report-$date.csv',
+            ),
+          ],
+          title: 'User account report',
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not export this user report.')),
+        );
+      }
+    }
+  }
+
+  String _csvCell(String value) => '"${value.replaceAll('"', '""')}"';
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = _adminTheme(context);
     final user = _user;
     final name = _text(user['full_name'], _text(user['username'], 'User account'));
     final stats = _map(_detail['stats']);
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text('Account #${user['id']}', style: theme.textTheme.labelSmall),
-          ],
-        ),
-        actions: [
-          IconButton(tooltip: 'Refresh account', onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded)),
-          PopupMenuButton<String>(
-            onSelected: (value) => _handleAction(value),
-            itemBuilder: (_) => [
-              if (!_deleted) const PopupMenuItem(value: 'wallet', child: Text('Adjust wallet')),
-              if (!_deleted) const PopupMenuItem(value: 'profile', child: Text('Edit profile details')),
-              if (!_deleted) const PopupMenuItem(value: 'access', child: Text('Change role or status')),
-              if (!_deleted) const PopupMenuItem(value: 'password', child: Text('Reset password')),
-              if (!_deleted) PopupMenuItem(value: 'ban', child: Text(_banned ? 'Unban account' : 'Ban account')),
-              if (!_deleted) const PopupMenuItem(value: 'delete', child: Text('Soft-delete account')),
-              if (_deleted) const PopupMenuItem(value: 'restore', child: Text('Restore account')),
+    return Theme(
+      data: theme,
+      child: Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: _Palette.indigo,
+          foregroundColor: Colors.white,
+          flexibleSpace: const DecoratedBox(
+            decoration: BoxDecoration(gradient: _Palette.hero),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                'Account #${user['id']}',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: .82),
+                  fontSize: 11,
+                ),
+              ),
             ],
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: [
-            Tab(text: 'Overview', icon: const Icon(Icons.person_outline_rounded),),
-            Tab(text: 'Tasks (${_int(stats['review_tasks']) + _int(stats['ad_share_tasks'])})', icon: const Icon(Icons.task_alt_rounded)),
-            Tab(text: 'Finance (${_int(stats['transactions'])})', icon: const Icon(Icons.account_balance_wallet_outlined)),
-            const Tab(text: 'Access', icon: Icon(Icons.admin_panel_settings_outlined)),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          if (_loading) const LinearProgressIndicator(minHeight: 2),
-          if (_error != null)
-            MaterialBanner(
-              content: Text(_error!),
-              leading: const Icon(Icons.cloud_off_outlined),
-              actions: [TextButton(onPressed: _load, child: const Text('Retry'))],
+          actions: [
+            IconButton(
+              tooltip: 'Export user report',
+              onPressed: _loading ? null : _exportReport,
+              icon: const Icon(Icons.download_rounded, color: Colors.white),
             ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabs,
-              children: [
-                _overview(theme, stats),
-                _tasks(theme),
-                _finance(theme),
-                _access(theme),
+            IconButton(
+              tooltip: 'Refresh account',
+              onPressed: _loading ? null : _load,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: .18),
+                shape: const CircleBorder(),
+              ),
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            ),
+            PopupMenuButton<String>(
+              iconColor: Colors.white,
+              onSelected: _handleAction,
+              itemBuilder: (_) => [
+                if (!_deleted)
+                  const PopupMenuItem(value: 'wallet', child: Text('Adjust wallet')),
+                if (!_deleted)
+                  const PopupMenuItem(value: 'profile', child: Text('Edit profile details')),
+                if (!_deleted)
+                  const PopupMenuItem(value: 'access', child: Text('Change role or status')),
+                if (!_deleted)
+                  const PopupMenuItem(value: 'password', child: Text('Reset password')),
+                if (!_deleted)
+                  PopupMenuItem(value: 'ban', child: Text(_banned ? 'Unban account' : 'Ban account')),
+                if (!_deleted)
+                  const PopupMenuItem(value: 'delete', child: Text('Soft-delete account')),
+                if (_deleted)
+                  const PopupMenuItem(value: 'restore', child: Text('Restore account')),
               ],
             ),
+            const SizedBox(width: 4),
+          ],
+          bottom: TabBar(
+            controller: _tabs,
+            isScrollable: true,
+            indicatorColor: Colors.white,
+            indicatorWeight: 3,
+            dividerColor: Colors.transparent,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white.withValues(alpha: .74),
+            tabs: [
+              const Tab(text: 'Overview', icon: Icon(Icons.person_outline_rounded)),
+              Tab(
+                text: 'Tasks (${_int(stats['review_tasks']) + _int(stats['ad_share_tasks'])})',
+                icon: const Icon(Icons.task_alt_rounded),
+              ),
+              Tab(
+                text: 'Finance (${_int(stats['transactions'])})',
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+              ),
+              const Tab(text: 'Access', icon: Icon(Icons.admin_panel_settings_outlined)),
+              const Tab(text: 'Reports', icon: Icon(Icons.analytics_outlined)),
+            ],
           ),
-        ],
+        ),
+        body: Column(
+          children: [
+            if (_loading) const LinearProgressIndicator(minHeight: 2),
+            if (_error != null)
+              MaterialBanner(
+                content: Text(_error!),
+                leading: const Icon(Icons.cloud_off_outlined),
+                actions: [TextButton(onPressed: _load, child: const Text('Retry'))],
+              ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabs,
+                children: [
+                  _overview(theme, stats),
+                  _tasks(theme),
+                  _finance(theme),
+                  _access(theme),
+                  _reports(theme, stats),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -355,6 +494,135 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
         ]),
         const SizedBox(height: 12),
         _actionButtons(),
+      ],
+    );
+  }
+
+  Widget _reports(ThemeData theme, Map<String, dynamic> stats) {
+    final reviewTasks = _list(_detail['review_tasks']).length;
+    final shareTasks = _list(_detail['ad_share_tasks']).length;
+    final transactions = _list(_detail['transactions']).length;
+    final referrals = _list(_detail['referrals']).length;
+    final withdrawals = _list(_detail['withdrawals']).length;
+    final deposits = _list(_detail['manual_deposits']).length;
+    final wallets = _list(_detail['wallets']);
+    final user = _user;
+    final status = _text(user['status'], 'active');
+    final safeToAccess = !_deleted && !_banned && status == 'active';
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(17),
+          decoration: const BoxDecoration(
+            gradient: _Palette.hero,
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+          child: Row(children: [
+            const _ReportBrandMark(),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Account activity report',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'A snapshot of this user’s activity, access and finances.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .86),
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(builder: (context, constraints) {
+          final columns = (constraints.maxWidth / 145).floor().clamp(1, 4).toInt();
+          final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
+          final values = [
+            ('Review tasks', '$reviewTasks', Icons.rate_review_outlined, _Palette.sky),
+            ('Ad share tasks', '$shareTasks', Icons.campaign_outlined, _Palette.teal),
+            ('Transactions', '$transactions', Icons.receipt_long_outlined, _Palette.violet),
+            ('Referrals', '$referrals', Icons.people_outline_rounded, _Palette.orange),
+          ];
+          return Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final item in values)
+                SizedBox(
+                  width: width,
+                  child: _DetailReportMetric(
+                    label: item.$1,
+                    value: item.$2,
+                    icon: item.$3,
+                    color: item.$4,
+                  ),
+                ),
+            ],
+          );
+        }),
+        const SizedBox(height: 12),
+        _section('Account health', [
+          _line(Icons.badge_outlined, 'Account status', status),
+          _line(Icons.block_outlined, 'Ban status', _banned ? 'Banned' : 'Not banned'),
+          _line(Icons.delete_outline_rounded, 'Deletion status', _deleted ? 'Soft-deleted' : 'Active record'),
+          _line(Icons.mark_email_read_outlined, 'Email verification', userVerified ? 'Verified' : 'Not verified'),
+          _line(Icons.phonelink_lock_outlined, 'Two-factor authentication', user['two_factor'] == true ? 'Enabled' : 'Disabled'),
+          _line(Icons.calendar_month_outlined, 'Joined', _date(user['created_at'])),
+        ]),
+        const SizedBox(height: 12),
+        _section('Financial activity', [
+          _line(Icons.account_balance_wallet_outlined, 'Wallet records', '${wallets.length}'),
+          _line(Icons.payments_outlined, 'Transactions', '$transactions'),
+          _line(Icons.south_west_rounded, 'Withdrawals', '$withdrawals'),
+          _line(Icons.north_east_rounded, 'Manual deposits', '$deposits'),
+          if (wallets.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('No wallet balances were returned for this account.', style: theme.textTheme.bodySmall),
+            )
+          else
+            for (final wallet in wallets)
+              _walletLine(theme, wallet),
+        ]),
+        const SizedBox(height: 12),
+        _section('Work & community', [
+          _line(Icons.rate_review_outlined, 'Review tasks submitted', '${_int(stats['reviews_submitted'])} / $reviewTasks'),
+          _line(Icons.campaign_outlined, 'Ad share submissions', '${_int(stats['ad_shares_submitted'])} / $shareTasks'),
+          _line(Icons.people_outline_rounded, 'Referred users', '$referrals'),
+          _line(Icons.gpp_good_outlined, 'Account access', safeToAccess ? 'Active and not banned' : 'Restricted or inactive'),
+        ]),
+        const SizedBox(height: 12),
+        _section('Export this report', [
+          const Text(
+            'Downloadable CSV includes account details and the activity, finance and access records currently available for this user.',
+          ),
+          const SizedBox(height: 10),
+          const _DetailPrivacyNote(),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _loading ? null : _exportReport,
+              icon: const Icon(Icons.download_rounded),
+              label: const Text('Export account report (CSV)'),
+            ),
+          ),
+        ]),
       ],
     );
   }
@@ -553,4 +821,145 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
     decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
     child: Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700)),
   );
+}
+
+class _Palette {
+  static const Color indigo = Color(0xFF4338CA);
+  static const Color violet = Color(0xFF7C3AED);
+  static const Color pink = Color(0xFFEC4899);
+  static const Color green = Color(0xFF16A34A);
+  static const Color teal = Color(0xFF0D9488);
+  static const Color amber = Color(0xFFF59E0B);
+  static const Color orange = Color(0xFFF97316);
+  static const Color sky = Color(0xFF0284C7);
+  static const Color rose = Color(0xFFE11D48);
+  static const Color muted = Color(0xFF667085);
+
+  static const LinearGradient hero = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF3730A3), violet, pink],
+  );
+  static const LinearGradient ocean = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [sky, indigo],
+  );
+}
+
+ThemeData _adminTheme(BuildContext context) {
+  final base = Theme.of(context);
+  final colors = ColorScheme.fromSeed(
+    seedColor: _Palette.indigo,
+    brightness: base.brightness,
+  );
+  return base.copyWith(
+    colorScheme: colors,
+    cardTheme: CardThemeData(
+      color: colors.surfaceContainerLow,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(19),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: colors.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: BorderSide(color: colors.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: BorderSide(color: colors.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: BorderSide(color: colors.primary, width: 1.5),
+      ),
+    ),
+  );
+}
+
+class _ReportBrandMark extends StatelessWidget {
+  const _ReportBrandMark();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .18),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: .28)),
+        ),
+        child: const Icon(Icons.analytics_outlined, color: Colors.white),
+      );
+}
+
+class _DetailReportMetric extends StatelessWidget {
+  const _DetailReportMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .07),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: .18)),
+        ),
+        child: Row(children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                value,
+                style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ]),
+          ),
+        ]),
+      );
+}
+
+class _DetailPrivacyNote extends StatelessWidget {
+  const _DetailPrivacyNote();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: _Palette.amber.withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.lock_outline_rounded, size: 16, color: _Palette.orange),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Contains personal and financial details. Share only with authorized staff.',
+              style: TextStyle(color: _Palette.muted, fontSize: 11, height: 1.35),
+            ),
+          ),
+        ]),
+      );
 }

@@ -15,6 +15,7 @@
 /.zed
 /auth.json
 /node_modules
+/laravel-livewire
 /public/build
 /public/hot
 /public/storage

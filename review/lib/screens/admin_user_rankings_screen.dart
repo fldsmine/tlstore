@@ -530,7 +530,8 @@ class _AdminUserRankingsScreenState extends State<AdminUserRankingsScreen> {
               pinned: true,
               elevation: 0,
               centerTitle: false,
-              backgroundColor: Colors.transparent,
+              backgroundColor: _Palette.indigo,
+              foregroundColor: Colors.white,
               flexibleSpace: const DecoratedBox(
                 decoration: BoxDecoration(gradient: _Palette.hero),
               ),
