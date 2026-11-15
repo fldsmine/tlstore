@@ -43,6 +43,19 @@ class _PayoutScreenState extends State<PayoutScreen> {
       .map((field) => field.toString())
       .toList();
   String get _currency => _wallet?['currency']?.toString() ?? 'USD';
+  double get _packageMinimumMajorInWallet {
+    final minor = (_packagePlan['minimum_withdrawal_minor'] as num?)?.toDouble() ?? 0;
+    if (minor <= 0) return 0;
+    final sourceCurrency = _packagePlan['currency']?.toString().toUpperCase() ?? _currency;
+    final sourceMajor = minor / math.pow(10, currencyPrecision(sourceCurrency));
+    return widget.api.convertMajor(sourceMajor, sourceCurrency, _currency) ?? sourceMajor;
+  }
+
+  double get _minimumMajor {
+    final methodMinimum = double.tryParse(_option?['min_withdrawal']?.toString() ?? '') ?? 0;
+    return math.max(methodMinimum, _packageMinimumMajorInWallet).toDouble();
+  }
+
   int get _digits {
     const zero = {'JPY', 'KRW', 'XOF', 'XAF', 'CLP', 'BIF'};
     const three = {'KWD', 'BHD', 'TND'};
@@ -118,13 +131,52 @@ class _PayoutScreenState extends State<PayoutScreen> {
             );
       final requests = list(results[2]['data']);
       final user = results[3]['data'];
-      final payoutProfile = user is Map<String, dynamic> && user['payout_profile'] is Map
+      final payoutProfile =
+          user is Map<String, dynamic> && user['payout_profile'] is Map
           ? Map<String, dynamic>.from(user['payout_profile'] as Map)
           : <String, dynamic>{};
       final savedDetails = payoutProfile['details'] is Map
           ? Map<String, dynamic>.from(payoutProfile['details'] as Map)
           : <String, dynamic>{};
-      final savedOptionId = int.tryParse(payoutProfile['withdrawal_option_id']?.toString() ?? '');
+      final savedOptionId = int.tryParse(
+        payoutProfile['withdrawal_option_id']?.toString() ?? '',
+      );
+      Map<String, dynamic> asMap(dynamic value) => value is Map
+          ? Map<String, dynamic>.from(value)
+          : <String, dynamic>{};
+      final subscriptionContext = user is Map<String, dynamic>
+          ? asMap(user['subscription_context'])
+          : <String, dynamic>{};
+      final activeSubscriptions =
+          (subscriptionContext['active_marketplaces'] as List? ?? const [])
+              .whereType<Map>()
+              .map((value) => Map<String, dynamic>.from(value))
+              .toList();
+      final selectedWallet = wallets
+              .where((w) => (w['id'] as num?)?.toInt() == widget.walletId)
+              .firstOrNull ??
+          wallets.firstOrNull;
+      final targetGroup = switch (selectedWallet?['type']?.toString()) {
+        'share' => 'group_a',
+        'review_group_c' => 'group_c',
+        'review_group_b' || 'review' => 'group_b',
+        _ => null,
+      };
+      final activeSubscription = activeSubscriptions
+              .where((item) => targetGroup == null || item['group_key'] == targetGroup)
+              .firstOrNull ??
+          activeSubscriptions.firstOrNull;
+      final planId = activeSubscription?['subscription_plan_id']?.toString();
+      final catalog = asMap(subscriptionContext['catalog']);
+      Map<String, dynamic> packagePlan = const {};
+      for (final group in (catalog['subscription_groups'] as List? ?? const []).whereType<Map>()) {
+        for (final plan in (group['plans'] as List? ?? const []).whereType<Map>()) {
+          if (plan['id']?.toString() == planId) {
+            packagePlan = Map<String, dynamic>.from(plan);
+            break;
+          }
+        }
+      }
       if (!mounted) return;
       setState(() {
         _preferredCurrency = user is Map<String, dynamic>
@@ -137,30 +189,25 @@ class _PayoutScreenState extends State<PayoutScreen> {
         _requests = requests;
         _securityPinSet =
             user is Map<String, dynamic> && user['security_pin_set'] == true;
-        _savedPayoutProfile = user is Map<String, dynamic> && user['payout_profile'] is Map
+        _savedPayoutProfile =
+            user is Map<String, dynamic> && user['payout_profile'] is Map
             ? Map<String, dynamic>.from(user['payout_profile'] as Map)
             : const {};
-        final subscriptionContext = user is Map<String, dynamic>
-            ? user['subscription_context'] as Map? ?? const {}
-            : const {};
-        final activeSubscription =
-            subscriptionContext['active_marketplace'] as Map? ?? const {};
-        _packagePlan = activeSubscription['plan'] is Map
-            ? Map<String, dynamic>.from(activeSubscription['plan'] as Map)
-            : const {};
-        _wallet =
-            wallets
-                .where((w) => (w['id'] as num?)?.toInt() == widget.walletId)
-                .firstOrNull ??
-            wallets.firstOrNull;
+        _packagePlan = packagePlan;
+        _wallet = selectedWallet;
         final oldOptionId = (_option?['id'] as num?)?.toInt();
         _option =
             options
-                .where((o) => (o['id'] as num?)?.toInt() == (savedOptionId ?? oldOptionId))
+                .where(
+                  (o) =>
+                      (o['id'] as num?)?.toInt() ==
+                      (savedOptionId ?? oldOptionId),
+                )
                 .firstOrNull ??
             options.firstOrNull;
         for (final entry in savedDetails.entries) {
-          _details.putIfAbsent(entry.key, () => TextEditingController()).text = entry.value.toString();
+          _details.putIfAbsent(entry.key, () => TextEditingController()).text =
+              entry.value.toString();
         }
         _loading = false;
       });
@@ -198,12 +245,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
       showAuthMessage(context, 'Enter a valid withdrawal amount.');
       return;
     }
-    final methodMinimum =
-        double.tryParse(option['min_withdrawal']?.toString() ?? '') ?? 0;
-    final packageMinimumMinor =
-        (_packagePlan['minimum_withdrawal_minor'] as num?)?.toInt() ?? 0;
-    final packageMinimum = packageMinimumMinor / math.pow(10, _digits);
-    final minimum = math.max(methodMinimum, packageMinimum).toDouble();
+    final minimum = _minimumMajor;
     if (minimum > 0 && major < minimum) {
       showAuthMessage(
         context,
@@ -224,12 +266,15 @@ class _PayoutScreenState extends State<PayoutScreen> {
     final payout = {
       for (final field in _fields) field: _details[field]?.text.trim() ?? '',
     };
-    final profileOptionId = int.tryParse(_savedPayoutProfile['withdrawal_option_id']?.toString() ?? '');
+    final profileOptionId = int.tryParse(
+      _savedPayoutProfile['withdrawal_option_id']?.toString() ?? '',
+    );
     final selectedOptionId = int.tryParse(option['id']?.toString() ?? '');
     final savedDetails = _savedPayoutProfile['details'];
     if (profileOptionId == selectedOptionId && savedDetails is Map) {
       for (final key in const ['bank_id', 'bank_code']) {
-        if (savedDetails[key] != null) payout[key] = savedDetails[key].toString();
+        if (savedDetails[key] != null)
+          payout[key] = savedDetails[key].toString();
       }
     }
     if (payout.values.any((value) => value.isEmpty)) {
@@ -279,14 +324,14 @@ class _PayoutScreenState extends State<PayoutScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        title: Text(
           'Confirm withdrawal',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Enter your 4-digit security PIN to submit this withdrawal request.',
             ),
             const SizedBox(height: 12),
@@ -307,14 +352,14 @@ class _PayoutScreenState extends State<PayoutScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(
               dialogContext,
               pin.text.length == 4 ? pin.text : null,
             ),
-            child: const Text('Continue'),
+            child: Text('Continue'),
           ),
         ],
       ),
@@ -322,76 +367,82 @@ class _PayoutScreenState extends State<PayoutScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF5F7F5),
-    appBar: AppBar(
-      title: const Text(
-        'Payout',
-        style: TextStyle(fontWeight: FontWeight.w800),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Scaffold(
+      backgroundColor: colors.surface,
+      appBar: AppBar(
+        title: Text('Payout', style: TextStyle(fontWeight: FontWeight.w800)),
+        backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _loading ? null : _load,
+            tooltip: 'Refresh',
+            icon: Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 5),
+        ],
       ),
-      backgroundColor: const Color(0xFFF5F7F5),
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      actions: [
-        IconButton(
-          onPressed: _loading ? null : _load,
-          tooltip: 'Refresh',
-          icon: const Icon(Icons.refresh_rounded),
-        ),
-        const SizedBox(width: 5),
-      ],
-    ),
-    body: _loading
-        ? const Center(child: CircularProgressIndicator(color: brandGreen))
-        : _error != null
-        ? _errorView()
-        : RefreshIndicator(
-            color: brandGreen,
-            onRefresh: _load,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(17, 4, 17, 30),
-              children: [
-                _hero(),
-                const SizedBox(height: 16),
-                _balanceCard(),
-                const SizedBox(height: 22),
-                _heading(
-                  'Request a payout',
-                  'Choose where your earnings should go.',
-                ),
-                const SizedBox(height: 12),
-                _requestCard(),
-                const SizedBox(height: 23),
-                _heading(
-                  'Recent payout requests',
-                  'Track the progress of your withdrawals.',
-                  trailing: _requests.isEmpty
-                      ? null
-                      : '${_requests.length} total',
-                ),
-                const SizedBox(height: 12),
-                if (_requests.isEmpty)
-                  _emptyRequests()
-                else
-                  ..._requests
-                      .take(10)
-                      .map(
-                        (r) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _PayoutRow(
-                            request: r,
-                            api: widget.api,
-                            preferredCurrency: _preferredCurrency,
+      body: _loading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            )
+          : _error != null
+          ? _errorView()
+          : RefreshIndicator(
+              color: Theme.of(context).colorScheme.primary,
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(17, 4, 17, 30),
+                children: [
+                  _hero(),
+                  const SizedBox(height: 16),
+                  _balanceCard(),
+                  const SizedBox(height: 22),
+                  _heading(
+                    'Request a payout',
+                    'Choose where your earnings should go.',
+                  ),
+                  const SizedBox(height: 12),
+                  _requestCard(),
+                  const SizedBox(height: 23),
+                  _heading(
+                    'Recent payout requests',
+                    'Track the progress of your withdrawals.',
+                    trailing: _requests.isEmpty
+                        ? null
+                        : '${_requests.length} total',
+                  ),
+                  const SizedBox(height: 12),
+                  if (_requests.isEmpty)
+                    _emptyRequests()
+                  else
+                    ..._requests
+                        .take(10)
+                        .map(
+                          (r) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _PayoutRow(
+                              request: r,
+                              api: widget.api,
+                              preferredCurrency: _preferredCurrency,
+                            ),
                           ),
                         ),
-                      ),
-                const SizedBox(height: 10),
-                _securityNote(),
-              ],
+                  const SizedBox(height: 10),
+                  _securityNote(),
+                ],
+              ),
             ),
-          ),
-  );
+    );
+  }
 
   Widget _errorView() => Center(
     child: Padding(
@@ -399,12 +450,16 @@ class _PayoutScreenState extends State<PayoutScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off_rounded, size: 42, color: mutedInk),
+          Icon(
+            Icons.cloud_off_rounded,
+            size: 42,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Could not load payouts',
             style: TextStyle(
-              color: ink,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w800,
               fontSize: 17,
             ),
@@ -413,9 +468,11 @@ class _PayoutScreenState extends State<PayoutScreen> {
           Text(
             _error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: mutedInk),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
-          TextButton(onPressed: _load, child: const Text('Try again')),
+          TextButton(onPressed: _load, child: Text('Try again')),
         ],
       ),
     ),
@@ -440,7 +497,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
     ),
     child: Row(
       children: [
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -492,7 +549,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
             color: Colors.white.withValues(alpha: .12),
             borderRadius: BorderRadius.circular(19),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.account_balance_wallet_rounded,
             color: Color(0xFFF4D991),
             size: 34,
@@ -509,9 +566,9 @@ class _PayoutScreenState extends State<PayoutScreen> {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: const Color(0xFFE7ECE8)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -521,9 +578,12 @@ class _PayoutScreenState extends State<PayoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Available to withdraw',
-                  style: TextStyle(color: mutedInk, fontSize: 11),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -537,8 +597,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
                           _preferredCurrency,
                           isMinor: true,
                         ),
-                  style: const TextStyle(
-                    color: ink,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
@@ -550,13 +610,13 @@ class _PayoutScreenState extends State<PayoutScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFEAF4ED),
+                color: Theme.of(context).colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 _pretty(wallet['type']?.toString() ?? 'Earnings'),
-                style: const TextStyle(
-                  color: brandGreen,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                 ),
@@ -570,12 +630,12 @@ class _PayoutScreenState extends State<PayoutScreen> {
   Widget _requestCard() => Container(
     padding: const EdgeInsets.all(17),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: const Color(0xFFE6EBE7)),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: .025),
+          color: Theme.of(context).colorScheme.shadow.withValues(alpha: .025),
           blurRadius: 14,
           offset: const Offset(0, 5),
         ),
@@ -626,8 +686,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
             padding: const EdgeInsets.only(top: 1),
             child: Text(
               _option!['description'].toString(),
-              style: const TextStyle(
-                color: mutedInk,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 11,
                 height: 1.4,
               ),
@@ -638,8 +698,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Package: ${_packagePlan['name'] ?? 'Active'} · Withdrawal days: ${(_packagePlan['withdrawal_days'] as List? ?? const []).join(', ')}',
-              style: const TextStyle(
-                color: mutedInk,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 11,
                 height: 1.4,
               ),
@@ -658,7 +718,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
             'Amount ($_currency)',
             Icons.payments_outlined,
             hint:
-                'Minimum ${moneyConverted(widget.api, math.max(double.tryParse(_option?['min_withdrawal']?.toString() ?? '') ?? 0, ((_packagePlan['minimum_withdrawal_minor'] as num?)?.toDouble() ?? 0) / math.pow(10, _digits)).toDouble(), _currency, _digits, _preferredCurrency, isMinor: false)}',
+                'Minimum ${moneyConverted(widget.api, _minimumMajor, _currency, _digits, _preferredCurrency, isMinor: false)}',
           ),
         ),
         if (_option != null) ...[const SizedBox(height: 9), _feeBreakdown()],
@@ -666,9 +726,12 @@ class _PayoutScreenState extends State<PayoutScreen> {
           const SizedBox(height: 19),
           _stepLabel('4', 'Payout details'),
           const SizedBox(height: 5),
-          const Text(
+          Text(
             'Enter the destination details for this method.',
-            style: TextStyle(color: mutedInk, fontSize: 11),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 11,
+            ),
           ),
           const SizedBox(height: 10),
           ..._fields.map(
@@ -696,20 +759,20 @@ class _PayoutScreenState extends State<PayoutScreen> {
                 ? null
                 : _submit,
             style: FilledButton.styleFrom(
-              backgroundColor: brandGreen,
-              disabledBackgroundColor: const Color(0xFFB9C8BE),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              disabledBackgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
               elevation: 0,
             ),
             child: _submitting
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   )
                 : const Row(
@@ -731,11 +794,14 @@ class _PayoutScreenState extends State<PayoutScreen> {
           ),
         ),
         const SizedBox(height: 9),
-        const Center(
+        Center(
           child: Text(
             'Your request will be reviewed before it is processed.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: mutedInk, fontSize: 10),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 10,
+            ),
           ),
         ),
       ],
@@ -757,10 +823,12 @@ class _PayoutScreenState extends State<PayoutScreen> {
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFEDF6EF) : Colors.white,
+        color: selected ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? brandGreen : const Color(0xFFE7ECE8),
+              color: selected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
               width: selected ? 1.4 : 1,
             ),
           ),
@@ -772,13 +840,13 @@ class _PayoutScreenState extends State<PayoutScreen> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: selected
-                      ? const Color(0xFFDCEEE1)
-                      : const Color(0xFFF3F5F3),
+                      ? Theme.of(context).colorScheme.secondaryContainer
+                      : Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   option['icon']?.toString() ?? '•',
-                  style: const TextStyle(fontSize: 20),
+                  style: TextStyle(fontSize: 20),
                 ),
               ),
               const SizedBox(width: 11),
@@ -788,8 +856,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
                   children: [
                     Text(
                       option['name']?.toString() ?? 'Payout method',
-                      style: const TextStyle(
-                        color: ink,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
                       ),
@@ -797,7 +865,10 @@ class _PayoutScreenState extends State<PayoutScreen> {
                     const SizedBox(height: 3),
                     Text(
                       '${option['tax'] ?? '0'}% method fee',
-                      style: const TextStyle(color: mutedInk, fontSize: 10),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
@@ -806,7 +877,9 @@ class _PayoutScreenState extends State<PayoutScreen> {
                 selected
                     ? Icons.radio_button_checked_rounded
                     : Icons.radio_button_off_rounded,
-                color: selected ? brandGreen : const Color(0xFFADB7B0),
+                color: selected
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 size: 21,
               ),
             ],
@@ -817,16 +890,11 @@ class _PayoutScreenState extends State<PayoutScreen> {
   }
 
   Widget _feeBreakdown() {
-    final methodMinimum =
-        double.tryParse(_option?['min_withdrawal']?.toString() ?? '') ?? 0;
-    final packageMinimum =
-        ((_packagePlan['minimum_withdrawal_minor'] as num?)?.toDouble() ?? 0) /
-        math.pow(10, _digits);
-    final minimum = math.max(methodMinimum, packageMinimum).toDouble();
+    final minimum = _minimumMajor;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F9F7),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(13),
       ),
       child: Column(
@@ -856,7 +924,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
                   )
                 : '—',
           ),
-          const Divider(height: 15, color: Color(0xFFE5EAE6)),
+          Divider(height: 15, color: Theme.of(context).colorScheme.outlineVariant),
           _feeLine(
             'Estimated payout',
             _enteredAmount > 0
@@ -884,7 +952,9 @@ class _PayoutScreenState extends State<PayoutScreen> {
           child: Text(
             label,
             style: TextStyle(
-              color: bold ? ink : mutedInk,
+              color: bold
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: bold ? 12 : 10,
               fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
             ),
@@ -893,7 +963,9 @@ class _PayoutScreenState extends State<PayoutScreen> {
         Text(
           value,
           style: TextStyle(
-            color: bold ? brandGreen : ink,
+            color: bold
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurface,
             fontSize: bold ? 13 : 11,
             fontWeight: FontWeight.w800,
           ),
@@ -905,27 +977,31 @@ class _PayoutScreenState extends State<PayoutScreen> {
   Widget _emptyRequests() => Container(
     padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(17),
-      border: Border.all(color: const Color(0xFFE7ECE8)),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       children: [
         _bubble(Icons.receipt_long_outlined),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           'Nothing here yet',
           style: TextStyle(
-            color: ink,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w800,
             fontSize: 14,
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Your payout requests will appear here once submitted.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: mutedInk, fontSize: 11, height: 1.4),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 11,
+            height: 1.4,
+          ),
         ),
       ],
     ),
@@ -934,19 +1010,23 @@ class _PayoutScreenState extends State<PayoutScreen> {
   Widget _securityNote() => Container(
     padding: const EdgeInsets.all(13),
     decoration: BoxDecoration(
-      color: const Color(0xFFEFF5F0),
+      color: Theme.of(context).colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(14),
     ),
-    child: const Row(
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.shield_outlined, color: brandGreen, size: 19),
+        Icon(
+          Icons.shield_outlined,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+          size: 19,
+        ),
         SizedBox(width: 9),
         Expanded(
           child: Text(
             'For your protection, only withdraw earnings from eligible wallets. Never share your security PIN with anyone.',
             style: TextStyle(
-              color: Color(0xFF52685A),
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
               fontSize: 10,
               height: 1.45,
             ),
@@ -965,8 +1045,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                color: ink,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 17,
                 fontWeight: FontWeight.w900,
               ),
@@ -974,7 +1054,10 @@ class _PayoutScreenState extends State<PayoutScreen> {
             const SizedBox(height: 3),
             Text(
               subtitle,
-              style: const TextStyle(color: mutedInk, fontSize: 11),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
@@ -982,8 +1065,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
       if (trailing != null)
         Text(
           trailing,
-          style: const TextStyle(
-            color: brandGreen,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
             fontSize: 10,
             fontWeight: FontWeight.w800,
           ),
@@ -997,14 +1080,14 @@ class _PayoutScreenState extends State<PayoutScreen> {
         width: 23,
         height: 23,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: Color(0xFFEAF3EC),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
           shape: BoxShape.circle,
         ),
         child: Text(
           number,
-          style: const TextStyle(
-            color: brandGreen,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
             fontSize: 11,
             fontWeight: FontWeight.w900,
           ),
@@ -1013,8 +1096,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
       const SizedBox(width: 8),
       Text(
         label,
-        style: const TextStyle(
-          color: ink,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
@@ -1027,22 +1110,18 @@ class _PayoutScreenState extends State<PayoutScreen> {
     margin: const EdgeInsets.only(top: 8),
     padding: const EdgeInsets.all(11),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFF7E8),
+      color: Theme.of(context).colorScheme.tertiaryContainer,
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(
       children: [
-        const Icon(
-          Icons.info_outline_rounded,
-          color: Color(0xFF9B7129),
-          size: 17,
-        ),
+        Icon(Icons.info_outline_rounded, color: Theme.of(context).colorScheme.onTertiaryContainer, size: 17),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             message,
-            style: const TextStyle(
-              color: Color(0xFF80632F),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onTertiaryContainer,
               fontSize: 10,
               height: 1.4,
             ),
@@ -1056,24 +1135,27 @@ class _PayoutScreenState extends State<PayoutScreen> {
       InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon, size: 18, color: const Color(0xFF839188)),
+        prefixIcon: Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
         filled: true,
-        fillColor: const Color(0xFFFAFBFA),
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 13,
           vertical: 14,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: Color(0xFFE4EAE5)),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: Color(0xFFE4EAE5)),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: brandGreen, width: 1.4),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
+            width: 1.4,
+          ),
         ),
       );
 
@@ -1081,10 +1163,10 @@ class _PayoutScreenState extends State<PayoutScreen> {
     width: 43,
     height: 43,
     decoration: BoxDecoration(
-      color: const Color(0xFFEAF4ED),
+      color: Theme.of(context).colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(13),
     ),
-    child: Icon(icon, color: brandGreen, size: 21),
+    child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 21),
   );
 
   TextInputType _keyboardFor(String field) {
@@ -1151,13 +1233,13 @@ class _PayoutRow extends StatelessWidget {
     final date =
         request['requested_at']?.toString() ??
         request['created_at']?.toString();
-    final color = _statusColor(status.toLowerCase());
+    final color = _statusColor(context, status.toLowerCase());
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: const Color(0xFFE7ECE8)),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -1168,12 +1250,12 @@ class _PayoutRow extends StatelessWidget {
                 height: 42,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF3EC),
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   option['icon']?.toString() ?? '💸',
-                  style: const TextStyle(fontSize: 19),
+                  style: TextStyle(fontSize: 19),
                 ),
               ),
               const SizedBox(width: 11),
@@ -1183,8 +1265,8 @@ class _PayoutRow extends StatelessWidget {
                   children: [
                     Text(
                       option['name']?.toString() ?? 'Withdrawal',
-                      style: const TextStyle(
-                        color: ink,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1192,12 +1274,18 @@ class _PayoutRow extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       date == null ? 'Date unavailable' : _formatDate(date),
-                      style: const TextStyle(color: mutedInk, fontSize: 10),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
                     ),
                     if (packageTerms['plan_name'] != null)
                       Text(
                         '${packageTerms['plan_name']}${packageDays.isEmpty ? '' : ' · $packageDays'}',
-                        style: const TextStyle(color: mutedInk, fontSize: 9),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 9,
+                        ),
                       ),
                   ],
                 ),
@@ -1214,8 +1302,8 @@ class _PayoutRow extends StatelessWidget {
                       preferredCurrency,
                       isMinor: true,
                     ),
-                    style: const TextStyle(
-                      color: ink,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
                     ),
@@ -1244,16 +1332,19 @@ class _PayoutRow extends StatelessWidget {
             ],
           ),
           if (fee != null) ...[
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 11),
-              child: Divider(height: 1, color: Color(0xFFEEF1EE)),
+              child: Divider(height: 1, color: Theme.of(context).colorScheme.outlineVariant),
             ),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Processing fee',
-                    style: TextStyle(color: mutedInk, fontSize: 10),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 10,
+                    ),
                   ),
                 ),
                 Text(
@@ -1265,8 +1356,8 @@ class _PayoutRow extends StatelessWidget {
                     preferredCurrency,
                     isMinor: true,
                   ),
-                  style: const TextStyle(
-                    color: ink,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1280,14 +1371,13 @@ class _PayoutRow extends StatelessWidget {
   }
 }
 
-Color _statusColor(String status) {
-  if (['paid', 'completed', 'approved'].contains(status))
-    return const Color(0xFF218653);
+Color _statusColor(BuildContext context, String status) {
+  final colors = Theme.of(context).colorScheme;
+  if (['paid', 'completed', 'approved'].contains(status)) return colors.primary;
   if (['processing', 'pending', 'review'].contains(status))
-    return const Color(0xFFB27A20);
-  if (['failed', 'rejected', 'cancelled'].contains(status))
-    return const Color(0xFFC34D45);
-  return const Color(0xFF64736A);
+    return colors.tertiary;
+  if (['failed', 'rejected', 'cancelled'].contains(status)) return colors.error;
+  return colors.onSurfaceVariant;
 }
 
 String _pretty(String value) => value

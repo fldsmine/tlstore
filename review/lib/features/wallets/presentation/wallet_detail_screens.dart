@@ -18,14 +18,26 @@ class ReviewWalletScreen extends StatelessWidget {
   final Map<String, dynamic> wallet;
 
   @override
-  Widget build(BuildContext context) => _WalletAccountScreen(
-    api: api,
-    token: token,
-    wallet: wallet,
-    title: 'Review wallet',
-    subtitle: 'Rewards from app review tasks are collected here.',
-    icon: Icons.rate_review_rounded,
-  );
+  Widget build(BuildContext context) {
+    final groupB = wallet['type'] == 'review_group_b';
+    final groupC = wallet['type'] == 'review_group_c';
+    return _WalletAccountScreen(
+      api: api,
+      token: token,
+      wallet: wallet,
+      title: groupC
+          ? 'Apple review wallet'
+          : groupB
+          ? 'Play Store & Galaxy review wallet'
+          : 'Legacy review wallet',
+      subtitle: groupC
+          ? 'Approved Apple Store app review rewards are collected here.'
+          : groupB
+          ? 'Approved Play Store and Samsung Galaxy Store review rewards are collected here.'
+          : 'Historical app review rewards are collected here.',
+      icon: Icons.rate_review_rounded,
+    );
+  }
 }
 
 class ShareWalletScreen extends StatelessWidget {

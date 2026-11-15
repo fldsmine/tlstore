@@ -16,13 +16,16 @@ final class AppCatalogController
 {
     public function index(): JsonResponse
     {
-        return response()->json(['data' => StoreApp::query()->with(['screenshots', 'storeListingSnapshots'])->latest()->paginate(30)]);
+        return response()->json(['data' => StoreApp::query()->with(['screenshots', 'storeListingSnapshots', 'reviewCampaigns.reviewTemplateVersion.template'])->latest()->paginate(30)]);
     }
 
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'prototype_id' => ['nullable', 'integer', 'min:1', 'unique:apps,prototype_id'],
+            'clone_from_app_id' => ['nullable', 'integer', 'exists:apps,id'],
+            'clone_screenshot_ids' => ['sometimes', 'array'],
+            'clone_screenshot_ids.*' => ['integer', 'exists:app_screenshots,id'],
             'name' => ['required', 'string', 'max:180'],
             'short_code' => ['required', 'string', 'max:12'],
             'store' => ['required', 'string', 'max:80'],
@@ -43,6 +46,7 @@ final class AppCatalogController
             'name' => $data['name'], 'short_code' => $data['short_code'], 'store' => $data['store'],
             'brand_color' => $data['brand_color'], 'developer' => $data['developer'], 'category' => $data['category'],
             'install_count_label' => $data['install_count_label'] ?? null, 'description' => $data['description'], 'app_icon' => $icon,
+            'store_link' => $data['store_url'],
             'featured' => $data['featured'] ?? false,
             'status' => $data['status'] ?? 'active',
         ]);
@@ -50,6 +54,13 @@ final class AppCatalogController
             'app_id' => $app->id, 'store' => $app->store, 'source_url' => $data['store_url'],
             'captured_at' => now(), 'metadata' => ['source' => 'admin_curated'],
         ]);
+        if (! empty($data['clone_from_app_id'])) {
+            $this->copyScreenshots(
+                StoreApp::query()->with('screenshots')->findOrFail($data['clone_from_app_id']),
+                $app,
+                $data['clone_screenshot_ids'] ?? [],
+            );
+        }
         $this->audit($request->user(), 'app_listing.created', 'app', (string) $app->id, null, ['name' => $app->name]);
         Cache::forget('api:login-spot:v3');
 
@@ -64,11 +75,31 @@ final class AppCatalogController
             'developer' => ['sometimes', 'string', 'max:180'], 'category' => ['sometimes', 'string', 'max:100'],
             'install_count_label' => ['sometimes', 'nullable', 'string', 'max:32'], 'description' => ['sometimes', 'string'],
             'app_icon' => ['sometimes', 'url', 'max:255'],
+            'app_icon_file' => ['sometimes', 'image', 'max:5120'],
+            'store_link' => ['sometimes', 'url', 'max:2048'],
             'featured' => ['sometimes', 'boolean'],
             'status' => ['sometimes', 'in:active,pending,rejected,draft'],
         ]);
+        if (isset($data['app_icon_file'])) {
+            $oldIcon = $app->getRawOriginal('app_icon');
+            $newIcon = $data['app_icon_file']->store('app-icons', 'public');
+            $data['app_icon'] = $newIcon;
+            unset($data['app_icon_file']);
+            if ($oldIcon && ! filter_var($oldIcon, FILTER_VALIDATE_URL)) {
+                Storage::disk('public')->delete($oldIcon);
+            }
+        }
         $before = $app->only(array_keys($data));
         $app->fill($data)->save();
+        if (array_key_exists('store_link', $data)) {
+            AppStoreListingSnapshot::query()->create([
+                'app_id' => $app->id,
+                'store' => $app->store,
+                'source_url' => $data['store_link'],
+                'captured_at' => now(),
+                'metadata' => ['source' => 'admin_curated_update'],
+            ]);
+        }
         $this->audit($request->user(), 'app_listing.updated', 'app', (string) $app->id, $before, $app->only(array_keys($data)));
         Cache::forget('api:login-spot:v3');
 
@@ -108,5 +139,33 @@ final class AppCatalogController
             'actor_admin_id' => $admin->id, 'action' => $action, 'entity_type' => $type, 'entity_id' => $id,
             'before_values' => $before, 'after_values' => $after, 'created_at' => now(),
         ]);
+    }
+
+    private function copyScreenshots(StoreApp $source, StoreApp $target, array $excludeIds = []): void
+    {
+        $excludeIds = array_map('intval', $excludeIds);
+        foreach ($source->screenshots as $screenshot) {
+            if (in_array($screenshot->id, $excludeIds, true)) {
+                continue;
+            }
+            $path = $screenshot->storage_path;
+            $disk = $screenshot->storage_disk;
+            if ($path && $disk && Storage::disk($disk)->exists($path)) {
+                $extension = pathinfo($path, PATHINFO_EXTENSION);
+                $copyPath = 'app-screenshots/'.$target->id.'/clone-'.$screenshot->id
+                    .($extension !== '' ? '.'.$extension : '');
+                Storage::disk($disk)->copy($path, $copyPath);
+                $path = $copyPath;
+            }
+
+            $target->screenshots()->create([
+                'position' => $screenshot->position,
+                'source_type' => $screenshot->source_type,
+                'storage_disk' => $disk,
+                'storage_path' => $path,
+                'illustration_index' => $screenshot->illustration_index,
+                'alt_text' => $screenshot->alt_text,
+            ]);
+        }
     }
 }

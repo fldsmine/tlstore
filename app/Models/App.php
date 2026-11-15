@@ -39,6 +39,11 @@ class App extends Model
         return $this->hasMany(AppReviewCampaign::class);
     }
 
+    public function reports(): HasMany
+    {
+        return $this->hasMany(AppReport::class);
+    }
+
     public function storeListingSnapshots(): HasMany
     {
         return $this->hasMany(AppStoreListingSnapshot::class);

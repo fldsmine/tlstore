@@ -347,18 +347,18 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel this checkout?'),
-        content: const Text(
+        title: Text('Cancel this checkout?'),
+        content: Text(
           'The top-up request will be marked expired. If you have already paid, use Check payment to confirm it.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep it'),
+            child: Text('Keep it'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel checkout'),
+            child: Text('Cancel checkout'),
           ),
         ],
       ),
@@ -379,7 +379,7 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Top up wallet',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
@@ -387,7 +387,7 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
         elevation: 0,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator())
           : _error != null
           ? Center(
               child: Padding(
@@ -395,21 +395,23 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.cloud_off_rounded,
                       size: 42,
-                      color: mutedInk,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(height: 12),
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: mutedInk),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: _load,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Try again'),
+                      icon: Icon(Icons.refresh),
+                      label: Text('Try again'),
                     ),
                   ],
                 ),
@@ -426,11 +428,11 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                   const SizedBox(height: 23),
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Recent top-ups',
                           style: TextStyle(
-                            color: ink,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                           ),
@@ -438,27 +440,33 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                       ),
                       Text(
                         '${_topups.length} record${_topups.length == 1 ? '' : 's'}',
-                        style: const TextStyle(color: mutedInk, fontSize: 11),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 11),
                   if (_topups.isEmpty)
                     _surface(
-                      child: const Padding(
+                      context: context,
+                      child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 14),
                         child: Column(
                           children: [
                             Icon(
                               Icons.receipt_long_outlined,
                               size: 34,
-                              color: mutedInk,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                             SizedBox(height: 8),
                             Text(
                               'No top-ups yet',
                               style: TextStyle(
-                                color: ink,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -466,7 +474,12 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                             Text(
                               'Your deposit and checkout history will appear here.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: mutedInk, fontSize: 12),
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -533,7 +546,7 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                 color: Colors.white.withValues(alpha: .13),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.account_balance_wallet_outlined,
                 color: Color(0xFFF4D58D),
                 size: 23,
@@ -564,7 +577,7 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
           ],
         ),
         const SizedBox(height: 17),
-        const Text(
+        Text(
           'Add funds to your wallet',
           style: TextStyle(
             color: Colors.white,
@@ -606,21 +619,25 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
   );
 
   Widget _buildPaymentPanel() => _surface(
+    context: context,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Choose payment method',
           style: TextStyle(
-            color: ink,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 17,
             fontWeight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Select a method, enter an amount and follow the steps.',
-          style: TextStyle(color: mutedInk, fontSize: 11),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
         ),
         const SizedBox(height: 16),
         if (_gateways.isEmpty)
@@ -657,25 +674,25 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
           Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E8),
+              color: Theme.of(context).colorScheme.tertiaryContainer,
               borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: const Color(0xFFF0DDAE)),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     Icon(
                       Icons.hourglass_top_rounded,
-                      color: Color(0xFF946A18),
+                      color: Theme.of(context).colorScheme.onTertiaryContainer,
                       size: 18,
                     ),
                     SizedBox(width: 7),
                     Text(
                       'Payment awaiting confirmation',
                       style: TextStyle(
-                        color: Color(0xFF765516),
+                        color: Theme.of(context).colorScheme.onTertiaryContainer,
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
                       ),
@@ -683,10 +700,10 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                   ],
                 ),
                 const SizedBox(height: 5),
-                const Text(
+                Text(
                   'If you have completed checkout, check the payment status. Your wallet is credited after provider confirmation.',
                   style: TextStyle(
-                    color: Color(0xFF806B43),
+                    color: Theme.of(context).colorScheme.onTertiaryContainer,
                     fontSize: 11,
                     height: 1.4,
                   ),
@@ -694,8 +711,8 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 9),
                 OutlinedButton.icon(
                   onPressed: _sending ? null : _checkCheckoutStatus,
-                  icon: const Icon(Icons.refresh_rounded, size: 17),
-                  label: const Text('Check payment status'),
+                  icon: Icon(Icons.refresh_rounded, size: 17),
+                  label: Text('Check payment status'),
                 ),
               ],
             ),
@@ -777,11 +794,14 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
           onPressed: _submit,
         ),
         const SizedBox(height: 9),
-        const Center(
+        Center(
           child: Text(
             'Your deposit will be reviewed before funds are added.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: mutedInk, fontSize: 10),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 10,
+            ),
           ),
         ),
       ],
@@ -796,31 +816,35 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F8F4),
+        color: Theme.of(context).colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFDCE9DE)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.account_balance, color: brandGreen, size: 18),
+              Icon(
+                Icons.account_balance,
+                color: Theme.of(context).colorScheme.primary,
+                size: 18,
+              ),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
                   '${method['name'] ?? 'Payment'} instructions',
-                  style: const TextStyle(
-                    color: Color(0xFF24583C),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
                 ),
               ),
               if (method['logo'] != null)
-                const Icon(
+                Icon(
                   Icons.verified_outlined,
-                  color: brandGreen,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 17,
                 ),
             ],
@@ -829,8 +853,8 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
             const SizedBox(height: 7),
             Text(
               method['description'].toString(),
-              style: const TextStyle(
-                color: Color(0xFF587060),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
                 fontSize: 11,
                 height: 1.45,
               ),
@@ -848,17 +872,17 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE1EBE2)),
+                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: SelectableText(
                         entry.value,
-                        style: const TextStyle(
-                          color: ink,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           height: 1.35,
@@ -875,10 +899,10 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                         if (mounted)
                           showAuthMessage(context, 'Payment details copied.');
                       },
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.copy_rounded,
                         size: 17,
-                        color: brandGreen,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ],
@@ -887,11 +911,14 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
             ),
           ],
           if (addresses.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
                 'No account details were provided for this method.',
-                style: TextStyle(color: mutedInk, fontSize: 11),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
               ),
             ),
         ],
@@ -941,11 +968,14 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
           onPressed: _startCheckout,
         ),
         const SizedBox(height: 9),
-        const Center(
+        Center(
           child: Text(
             'You will be redirected to the payment provider to complete checkout.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: mutedInk, fontSize: 10),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 10,
+            ),
           ),
         ),
       ],
@@ -960,11 +990,13 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _proof == null
-            ? const Color(0xFFFAFBFA)
-            : const Color(0xFFF0F7F1),
+            ? Theme.of(context).colorScheme.surfaceContainerHighest
+            : Theme.of(context).colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(13),
         border: Border.all(
-          color: _proof == null ? const Color(0xFFDCE4DC) : brandGreen,
+          color: _proof == null
+              ? Theme.of(context).colorScheme.outlineVariant
+              : Theme.of(context).colorScheme.primary,
           style: BorderStyle.solid,
         ),
       ),
@@ -974,14 +1006,14 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F1E9),
+              color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(11),
             ),
             child: Icon(
               _proof == null
                   ? Icons.cloud_upload_outlined
                   : Icons.task_alt_rounded,
-              color: brandGreen,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           const SizedBox(width: 11),
@@ -991,8 +1023,8 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
               children: [
                 Text(
                   _proof?.name ?? 'Upload transfer receipt',
-                  style: const TextStyle(
-                    color: ink,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
@@ -1004,15 +1036,18 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
                   _proof == null
                       ? 'JPG, PNG, WEBP or PDF'
                       : _fileSize(_proof!.size),
-                  style: const TextStyle(color: mutedInk, fontSize: 10),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
           ),
           Text(
             _proof == null ? 'Browse' : 'Change',
-            style: const TextStyle(
-              color: brandGreen,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w800,
               fontSize: 11,
             ),
@@ -1032,22 +1067,22 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     child: FilledButton.icon(
       onPressed: _sending ? null : onPressed,
       icon: _sending
-          ? const SizedBox(
+          ? SizedBox(
               width: 17,
               height: 17,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
             )
           : Icon(icon, size: 18),
       label: Text(
         _sending ? 'Please wait…' : label,
-        style: const TextStyle(fontWeight: FontWeight.w800),
+        style: TextStyle(fontWeight: FontWeight.w800),
       ),
       style: FilledButton.styleFrom(
-        backgroundColor: brandGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
       ),
     ),
@@ -1057,8 +1092,8 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     padding: const EdgeInsets.only(bottom: 7),
     child: Text(
       text,
-      style: const TextStyle(
-        color: Color(0xFF65736A),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontSize: 9,
         letterSpacing: .8,
         fontWeight: FontWeight.w900,
@@ -1071,22 +1106,31 @@ class _TopUpScreenState extends State<TopUpScreen> with WidgetsBindingObserver {
     String? suffix,
   }) => InputDecoration(
     hintText: hint,
-    prefixIcon: prefix == null ? null : Icon(prefix, size: 18, color: mutedInk),
+    prefixIcon: prefix == null
+        ? null
+        : Icon(
+            prefix,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
     suffixText: suffix,
     filled: true,
-    fillColor: const Color(0xFFFAFBFA),
+    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
     contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Color(0xFFE1E7E1)),
+      borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Color(0xFFE1E7E1)),
+      borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: brandGreen, width: 1.4),
+      borderSide: BorderSide(
+        color: Theme.of(context).colorScheme.primary,
+        width: 1.4,
+      ),
     ),
   );
 }
@@ -1109,8 +1153,9 @@ class _DepositRow extends StatelessWidget {
     final digits = currencyPrecision(currency);
     final provider = _humanize(deposit['provider']?.toString() ?? 'manual');
     final status = deposit['status']?.toString() ?? 'pending';
-    final color = _statusColor(status);
+    final color = _statusColor(context, status);
     return _surface(
+      context: context,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1120,12 +1165,12 @@ class _DepositRow extends StatelessWidget {
                 width: 39,
                 height: 39,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF2EB),
+                  color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.receipt_long_outlined,
-                  color: brandGreen,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 20,
                 ),
               ),
@@ -1143,8 +1188,8 @@ class _DepositRow extends StatelessWidget {
                         api.preferredCurrency,
                         isMinor: true,
                       ),
-                      style: const TextStyle(
-                        color: ink,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
                       ),
@@ -1152,7 +1197,10 @@ class _DepositRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '$provider · $currency',
-                      style: const TextStyle(color: mutedInk, fontSize: 10),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
@@ -1179,21 +1227,24 @@ class _DepositRow extends StatelessWidget {
               padding: const EdgeInsets.only(top: 9),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.calendar_today_outlined,
                     size: 12,
-                    color: mutedInk,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     _formatDate(deposit['created_at'].toString()),
-                    style: const TextStyle(color: mutedInk, fontSize: 10),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 10,
+                    ),
                   ),
                 ],
               ),
             ),
           if (onCheck != null || onCancel != null) ...[
-            const Divider(height: 20, color: Color(0xFFECEFEC)),
+            Divider(height: 20, color: Theme.of(context).colorScheme.outlineVariant),
             Align(
               alignment: Alignment.centerRight,
               child: Wrap(
@@ -1202,14 +1253,14 @@ class _DepositRow extends StatelessWidget {
                   if (onCheck != null)
                     TextButton.icon(
                       onPressed: onCheck,
-                      icon: const Icon(Icons.refresh_rounded, size: 15),
-                      label: const Text('Check payment'),
+                      icon: Icon(Icons.refresh_rounded, size: 15),
+                      label: Text('Check payment'),
                     ),
                   if (onCancel != null)
                     TextButton.icon(
                       onPressed: onCancel,
-                      icon: const Icon(Icons.cancel_outlined, size: 15),
-                      label: const Text('Cancel'),
+                      icon: Icon(Icons.cancel_outlined, size: 15),
+                      label: Text('Cancel'),
                     ),
                 ],
               ),
@@ -1229,19 +1280,19 @@ class _InlineNotice extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFF8E8),
+      color: Theme.of(context).colorScheme.tertiaryContainer,
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF987127), size: 18),
+        Icon(icon, color: Theme.of(context).colorScheme.onTertiaryContainer, size: 18),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-              color: Color(0xFF765F32),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onTertiaryContainer,
               fontSize: 11,
               height: 1.4,
             ),
@@ -1252,23 +1303,24 @@ class _InlineNotice extends StatelessWidget {
   );
 }
 
-Widget _surface({required Widget child}) => Container(
-  width: double.infinity,
-  padding: const EdgeInsets.all(15),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(18),
-    border: Border.all(color: const Color(0xFFE6EBE5)),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: .025),
-        blurRadius: 12,
-        offset: const Offset(0, 4),
+Widget _surface({required BuildContext context, required Widget child}) =>
+    Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: .025),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-    ],
-  ),
-  child: child,
-);
+      child: child,
+    );
 
 String _humanize(String value) => value.toLowerCase() == 'bachs'
     ? 'BACHS PAY'
@@ -1287,11 +1339,15 @@ double _pow10(int digits) => digits == 0
     : digits == 3
     ? 1000
     : 100;
-Color _statusColor(String status) => switch (status.toLowerCase()) {
-  'paid' || 'approved' || 'completed' || 'success' => const Color(0xFF21834D),
-  'failed' || 'rejected' || 'cancelled' => const Color(0xFFB54747),
-  'expired' => const Color(0xFF8A6A32),
-  _ => const Color(0xFF9A762E),
+Color _statusColor(BuildContext context, String status) => switch (status
+    .toLowerCase()) {
+  'paid' ||
+  'approved' ||
+  'completed' ||
+  'success' => Theme.of(context).colorScheme.primary,
+  'failed' || 'rejected' || 'cancelled' => Theme.of(context).colorScheme.error,
+  'expired' => Theme.of(context).colorScheme.tertiary,
+  _ => Theme.of(context).colorScheme.secondary,
 };
 String _formatDate(String value) {
   final date = DateTime.tryParse(value)?.toLocal();

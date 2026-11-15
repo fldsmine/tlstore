@@ -81,6 +81,8 @@ final class VerifyGatewayTopup
         $transactionId = (string) ($data['id'] ?? $data['charge']['payment_id'] ?? $data['flw_ref'] ?? $intent->provider_reference);
         if ($intent->purpose === 'subscription') {
             $this->processor->completeVerifiedSubscription($intent, $transactionId, $data);
+        } elseif ($intent->purpose === 'package_addon') {
+            $this->processor->completeVerifiedPackageAddon($intent, $transactionId, $data);
         } else {
             $this->processor->creditVerifiedTopup($intent, $transactionId, $data);
         }

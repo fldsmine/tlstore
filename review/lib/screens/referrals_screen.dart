@@ -40,13 +40,13 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
     'assets/cards/card-10.png',
   ];
 
-  static const _green = Color(0xFF176342);
   static const _deepGreen = Color(0xFF104B32);
-  static const _paleGreen = Color(0xFFEAF4ED);
-  static const _ink = Color(0xFF17231D);
-  static const _muted = Color(0xFF718078);
-  static const _line = Color(0xFFE7ECE8);
-  static const _canvas = Color(0xFFF6F8F6);
+  Color get _green => Theme.of(context).colorScheme.primary;
+  Color get _paleGreen => Theme.of(context).colorScheme.primaryContainer;
+  Color get _ink => Theme.of(context).colorScheme.onSurface;
+  Color get _muted => Theme.of(context).colorScheme.onSurfaceVariant;
+  Color get _line => Theme.of(context).colorScheme.outlineVariant;
+  Color get _canvas => Theme.of(context).scaffoldBackgroundColor;
 
   bool _loading = true;
   String? _error;
@@ -233,7 +233,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
   @override
   Widget build(BuildContext context) {
     final body = _loading && _summary.isEmpty && _referrals.isEmpty
-        ? const Center(child: CircularProgressIndicator(color: _green))
+        ? Center(child: CircularProgressIndicator(color: _green))
         : _error != null
         ? _loadError()
         : RefreshIndicator(
@@ -273,7 +273,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
         backgroundColor: _canvas,
         foregroundColor: _ink,
         titleSpacing: 20,
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -310,10 +310,10 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
           : FloatingActionButton.extended(
               onPressed: _showPromotionalCard,
               backgroundColor: _green,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               elevation: 3,
               icon: const Icon(Icons.auto_awesome_rounded),
-              label: const Text(
+              label: Text(
                 'Create promo card',
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
@@ -329,14 +329,14 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(18),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: _paleGreen,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.cloud_off_rounded, color: _green, size: 30),
+            child: Icon(Icons.cloud_off_rounded, color: _green, size: 30),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'We couldn’t load your referrals',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -349,17 +349,17 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
           Text(
             _error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: _muted, fontSize: 12),
+            style: TextStyle(color: _muted, fontSize: 12),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _load,
             style: FilledButton.styleFrom(
               backgroundColor: _green,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Try again'),
+            label: Text('Try again'),
           ),
         ],
       ),
@@ -426,7 +426,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Good things are\nbetter when shared.',
               style: TextStyle(
                 color: Colors.white,
@@ -458,7 +458,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'YOUR INVITE CODE',
                           style: TextStyle(
                             color: _muted,
@@ -470,7 +470,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                         const SizedBox(height: 3),
                         SelectableText(
                           _referralCode ?? 'Not available',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: _deepGreen,
                             fontSize: 21,
                             letterSpacing: 2.2,
@@ -509,7 +509,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'YOUR PERSONAL INVITE LINK',
                       style: TextStyle(
                         color: Color(0xFFD9F3DF),
@@ -521,7 +521,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                     const SizedBox(height: 5),
                     SelectableText(
                       _referralUri!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 11,
                         height: 1.3,
@@ -538,7 +538,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                             visualDensity: VisualDensity.compact,
                           ),
                           icon: const Icon(Icons.copy_rounded, size: 15),
-                          label: const Text('Copy link'),
+                          label: Text('Copy link'),
                         ),
                         const SizedBox(width: 5),
                         FilledButton.icon(
@@ -553,7 +553,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                             ),
                           ),
                           icon: const Icon(Icons.share_rounded, size: 15),
-                          label: const Text(
+                          label: Text(
                             'Share',
                             style: TextStyle(fontWeight: FontWeight.w800),
                           ),
@@ -573,7 +573,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
   Widget _buildStats() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Padding(
+      Padding(
         padding: EdgeInsets.only(left: 2, bottom: 10),
         child: Text(
           'YOUR PERFORMANCE',
@@ -593,8 +593,8 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
               value: _invitedCount.toString(),
               caption: 'Signups attributed',
               icon: Icons.person_add_alt_1_rounded,
-              tint: const Color(0xFFEAF1FF),
-              iconColor: const Color(0xFF4169A8),
+              tint: Theme.of(context).colorScheme.primaryContainer,
+              iconColor: Theme.of(context).colorScheme.onPrimaryContainer,
             ),
           ),
           const SizedBox(width: 10),
@@ -619,8 +619,8 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
               value: _pendingCount.toString(),
               caption: 'Awaiting qualification',
               icon: Icons.hourglass_top_rounded,
-              tint: const Color(0xFFFFF4E4),
-              iconColor: const Color(0xFFB77A21),
+              tint: Theme.of(context).colorScheme.tertiaryContainer,
+              iconColor: Theme.of(context).colorScheme.onTertiaryContainer,
             ),
           ),
           const SizedBox(width: 10),
@@ -633,8 +633,8 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                 widget.api.preferredCurrency,
               ),
               icon: Icons.account_balance_wallet_rounded,
-              tint: const Color(0xFFF1EBFA),
-              iconColor: const Color(0xFF7854A6),
+              tint: Theme.of(context).colorScheme.secondaryContainer,
+              iconColor: Theme.of(context).colorScheme.onSecondaryContainer,
             ),
           ),
         ],
@@ -652,7 +652,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
   }) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(17),
       border: Border.all(color: _line),
     ),
@@ -673,7 +673,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
             const Spacer(),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 color: _ink,
                 fontSize: 23,
                 fontWeight: FontWeight.w900,
@@ -685,7 +685,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
         const SizedBox(height: 11),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             color: _ink,
             fontSize: 12,
             fontWeight: FontWeight.w800,
@@ -696,7 +696,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
           caption,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: _muted, fontSize: 9.5),
+          style: TextStyle(color: _muted, fontSize: 9.5),
         ),
       ],
     ),
@@ -705,7 +705,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
   Widget _buildSectionHeading() => Row(
     crossAxisAlignment: CrossAxisAlignment.end,
     children: [
-      const Expanded(
+      Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -734,7 +734,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
           ),
           child: Text(
             '$_totalReferrals total',
-            style: const TextStyle(
+            style: TextStyle(
               color: _green,
               fontSize: 10,
               fontWeight: FontWeight.w900,
@@ -753,28 +753,28 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7E9),
+        color: Theme.of(context).colorScheme.tertiaryContainer,
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: const Color(0xFFF3E2C2)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline_rounded,
-            color: Color(0xFFAE7625),
+            color: Theme.of(context).colorScheme.onTertiaryContainer,
             size: 19,
           ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFF785B2F), fontSize: 11),
+              style: TextStyle(color: Theme.of(context).colorScheme.onTertiaryContainer, fontSize: 11),
             ),
           ),
           TextButton(
             onPressed: _load,
             style: TextButton.styleFrom(foregroundColor: _green),
-            child: const Text('Retry'),
+            child: Text('Retry'),
           ),
         ],
       ),
@@ -785,7 +785,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
     width: double.infinity,
     padding: const EdgeInsets.fromLTRB(22, 27, 22, 25),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(19),
       border: Border.all(color: _line),
     ),
@@ -794,14 +794,11 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
         Container(
           height: 62,
           width: 62,
-          decoration: const BoxDecoration(
-            color: _paleGreen,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.group_add_rounded, color: _green, size: 29),
+          decoration: BoxDecoration(color: _paleGreen, shape: BoxShape.circle),
+          child: Icon(Icons.group_add_rounded, color: _green, size: 29),
         ),
         const SizedBox(height: 13),
-        const Text(
+        Text(
           'Your network starts here',
           style: TextStyle(
             color: _ink,
@@ -810,7 +807,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Share your invite link with friends. When they sign up, their referral activity will appear here.',
           textAlign: TextAlign.center,
           style: TextStyle(color: _muted, fontSize: 11, height: 1.5),
@@ -821,10 +818,10 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
             onPressed: _shareReferralLink,
             style: OutlinedButton.styleFrom(
               foregroundColor: _green,
-              side: const BorderSide(color: _green),
+              side: BorderSide(color: _green),
             ),
             icon: const Icon(Icons.share_rounded, size: 17),
-            label: const Text('Invite someone'),
+            label: Text('Invite someone'),
           ),
         ],
       ],
@@ -863,7 +860,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: _line),
       ),
@@ -875,12 +872,16 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                 height: 43,
                 width: 43,
                 decoration: BoxDecoration(
-                  color: isQualified ? _paleGreen : const Color(0xFFFFF4E4),
+                  color: isQualified
+                      ? _paleGreen
+                      : Theme.of(context).colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   Icons.person_rounded,
-                  color: isQualified ? _green : const Color(0xFFB77A21),
+                  color: isQualified
+                      ? _green
+                      : Theme.of(context).colorScheme.onTertiaryContainer,
                   size: 22,
                 ),
               ),
@@ -893,7 +894,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                       username.startsWith('@') ? username : '@$username',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: _ink,
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
@@ -902,7 +903,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'Invited $date',
-                      style: const TextStyle(color: _muted, fontSize: 10),
+                      style: TextStyle(color: _muted, fontSize: 10),
                     ),
                   ],
                 ),
@@ -957,7 +958,11 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: paid ? _paleGreen : const Color(0xFFF2F4F2),
+                      color: paid
+                          ? _paleGreen
+                          : Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Text(
@@ -990,13 +995,13 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(color: _muted, fontSize: 9)),
+            Text(label, style: TextStyle(color: _muted, fontSize: 9)),
             const SizedBox(height: 2),
             Text(
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: _ink,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
@@ -1010,8 +1015,10 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
 
   Widget _statusChip(String status) {
     final qualified = status.toLowerCase() == 'qualified';
-    final color = qualified ? _green : const Color(0xFFAD7625);
-    final background = qualified ? _paleGreen : const Color(0xFFFFF4E4);
+    final color = qualified ? _green : Theme.of(context).colorScheme.tertiary;
+    final background = qualified
+        ? _paleGreen
+        : Theme.of(context).colorScheme.tertiaryContainer;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
@@ -1049,7 +1056,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
       child: Center(
         child: Text(
           'Showing ${_referrals.length} of $total referrals · Page $page of $last',
-          style: const TextStyle(color: _muted, fontSize: 10),
+          style: TextStyle(color: _muted, fontSize: 10),
         ),
       ),
     );
@@ -1101,3 +1108,4 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
       )
       .join(' ');
 }
+

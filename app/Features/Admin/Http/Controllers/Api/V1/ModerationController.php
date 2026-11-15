@@ -17,20 +17,49 @@ use Illuminate\Support\Facades\Storage;
 
 final class ModerationController
 {
-    public function reviews(): JsonResponse
+    public function reviews(Request $request): JsonResponse
     {
-        return response()->json(['data' => ReviewSubmission::query()
-            ->with(['reviewer:id,full_name,username,email', 'task.campaign.app', 'answers.question'])
-            ->where('status', 'pending_review')
-            ->oldest('submitted_at')->paginate(30)]);
+        $filters = $request->validate([
+            'search' => ['sometimes', 'string', 'max:120'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $query = ReviewSubmission::query()
+            ->with(['reviewer:id,full_name,username,email', 'task.campaign.app', 'answers.question', 'riskSignals'])
+            ->where('status', 'pending_review');
+        if (! empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(fn ($rows) => $rows
+                ->whereHas('reviewer', fn ($users) => $users->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%"))
+                ->orWhereHas('task.campaign.app', fn ($apps) => $apps->where('name', 'like', "%{$search}%")));
+        }
+
+        return response()->json(['data' => $query->oldest('submitted_at')->paginate($filters['per_page'] ?? 30)->appends($request->query())]);
     }
 
-    public function shares(): JsonResponse
+    public function shares(Request $request): JsonResponse
     {
-        return response()->json(['data' => AdShareEvent::query()
-            ->with(['task.user:id,full_name,username,email', 'task.ad'])
-            ->where('status', 'pending_validation')
-            ->oldest('created_at')->paginate(30)]);
+        $filters = $request->validate([
+            'search' => ['sometimes', 'string', 'max:120'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $query = AdShareEvent::query()
+            ->with(['task.user:id,full_name,username,email', 'task.ad', 'riskSignals'])
+            ->where('status', 'pending_validation');
+        if (! empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(fn ($rows) => $rows
+                ->whereHas('task.user', fn ($users) => $users->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%"))
+                ->orWhereHas('task.ad', fn ($ads) => $ads->where('title', 'like', "%{$search}%"))
+                ->orWhere('external_reference', 'like', "%{$search}%"));
+        }
+
+        return response()->json(['data' => $query->oldest('created_at')->paginate($filters['per_page'] ?? 30)->appends($request->query())]);
     }
 
     public function decideReview(Request $request, ReviewSubmission $submission, DecideReviewSubmission $decide): JsonResponse
@@ -57,11 +86,27 @@ final class ModerationController
         return response()->json(['data' => $result, 'message' => 'Share decision recorded.']);
     }
 
-    public function deposits(): JsonResponse
+    public function deposits(Request $request): JsonResponse
     {
-        return response()->json(['data' => ManualDepositSubmission::query()
+        $filters = $request->validate([
+            'search' => ['sometimes', 'string', 'max:120'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $query = ManualDepositSubmission::query()
             ->with(['user:id,full_name,username,email', 'paymentIntent'])
-            ->where('status', 'submitted')->oldest('submitted_at')->paginate(30)]);
+            ->where('status', 'submitted');
+        if (! empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(fn ($rows) => $rows
+                ->whereHas('user', fn ($users) => $users->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%"))
+                ->orWhere('bank_reference', 'like', "%{$search}%")
+                ->orWhereHas('paymentIntent', fn ($payments) => $payments->where('provider_reference', 'like', "%{$search}%")));
+        }
+
+        return response()->json(['data' => $query->oldest('submitted_at')->paginate($filters['per_page'] ?? 30)->appends($request->query())]);
     }
 
     public function decideDeposit(Request $request, ManualDepositSubmission $deposit, DecideManualDeposit $decide): JsonResponse
@@ -75,11 +120,27 @@ final class ModerationController
         return response()->json(['data' => $result, 'message' => 'Manual deposit decision recorded.']);
     }
 
-    public function withdrawals(): JsonResponse
+    public function withdrawals(Request $request): JsonResponse
     {
-        return response()->json(['data' => WithdrawalRequest::query()
+        $filters = $request->validate([
+            'search' => ['sometimes', 'string', 'max:120'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $query = WithdrawalRequest::query()
             ->with(['user:id,full_name,username,email', 'wallet', 'option', 'userSubscription.plan.group'])
-            ->where('status', 'pending')->oldest('requested_at')->paginate(30)]);
+            ->where('status', 'pending');
+        if (! empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(fn ($rows) => $rows
+                ->whereHas('user', fn ($users) => $users->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%"))
+                ->orWhereHas('option', fn ($options) => $options->where('name', 'like', "%{$search}%"))
+                ->orWhere('provider_reference', 'like', "%{$search}%"));
+        }
+
+        return response()->json(['data' => $query->oldest('requested_at')->paginate($filters['per_page'] ?? 30)->appends($request->query())]);
     }
 
     public function settleWithdrawal(Request $request, WithdrawalRequest $withdrawal, SettleWithdrawal $settle): JsonResponse

@@ -3,23 +3,24 @@
 namespace App\Application\Actions\Moderation;
 
 use App\Application\Actions\Referrals\CreditReferralReward;
+use App\Application\Actions\Wallets\CreditUserWallet;
+use App\Enums\WalletType;
 use App\Models\Admin;
 use App\Models\AppReviewCampaign;
 use App\Models\AuditLog;
 use App\Models\App as StoreApp;
-use App\Models\LedgerEntry;
 use App\Models\ModerationDecision;
 use App\Models\Notification;
 use App\Models\ReviewSubmission;
-use App\Models\Wallet;
+use App\Models\SubscriptionPlan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class DecideReviewSubmission
 {
-    public function handle(Admin $admin, ReviewSubmission $submission, string $decision, ?string $reasonCode, ?string $reason): ReviewSubmission
+    public function handle(Admin $admin, ReviewSubmission $submission, string $decision, ?string $reasonCode, ?string $reason, ?SubscriptionPlan $referralPlan = null): ReviewSubmission
     {
-        return DB::transaction(function () use ($admin, $submission, $decision, $reasonCode, $reason): ReviewSubmission {
+        return DB::transaction(function () use ($admin, $submission, $decision, $reasonCode, $reason, $referralPlan): ReviewSubmission {
             $submission = ReviewSubmission::query()->with('task.campaign')->lockForUpdate()->findOrFail($submission->id);
             if ($submission->status->value !== 'pending_review') {
                 throw ValidationException::withMessages(['submission' => 'This review has already been decided.']);
@@ -64,27 +65,22 @@ final class DecideReviewSubmission
                 $app = StoreApp::query()->lockForUpdate()->findOrFail($campaign->app_id);
                 $app->total_reviews = (int) ($app->total_reviews ?? 0) + 1;
                 $app->save();
-                $wallet = Wallet::query()->firstOrCreate([
-                    'user_id' => $submission->reviewer_id,
-                    'wallet_type' => 'review',
-                    'currency' => $campaign->currency,
-                ], ['status' => 'active']);
-                $reviewLedger = LedgerEntry::query()->firstOrCreate(['idempotency_key' => 'review-approved-'.$submission->id], [
-                    'wallet_id' => $wallet->id,
-                    'entry_type' => 'review_reward',
-                    'direction' => 'credit',
-                    'amount_minor' => $submission->task->reserved_reward_minor,
-                    'status' => 'posted',
-                    'source_type' => 'review_submission',
-                    'source_id' => $submission->id,
-                    'description' => 'Approved app review reward',
-                    'available_at' => $now,
-                    'posted_at' => $now,
-                ]);
+                app(CreditUserWallet::class)->handle(
+                    $submission->reviewer,
+                    WalletType::forReviewStore($app->store),
+                    (int) $submission->task->reserved_reward_minor,
+                    $campaign->currency,
+                    'review_reward',
+                    'review_submission',
+                    $submission->id,
+                    'review-approved-'.$submission->id,
+                    'Approved app review reward',
+                    $now,
+                );
                 app(CreditReferralReward::class)->handle(
-                    $submission->reviewer, $reviewLedger->amount_minor, $campaign->currency, 'task',
+                    $submission->reviewer, (int) $submission->task->reserved_reward_minor, $campaign->currency, 'task',
                     'review_submission', $submission->id, 'referral-review:'.$submission->id,
-                    'Referral reward for approved app review', null, $submission->task->claimed_at,
+                    'Referral reward for approved app review', $referralPlan, $submission->task->claimed_at,
                 );
             }
 

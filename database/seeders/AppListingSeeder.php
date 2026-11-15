@@ -44,7 +44,7 @@ class AppListingSeeder extends Seeder
                 'updated_at' => $now,
             ];
         }, $model['apps']);
-
+		
         DB::table('apps')->upsert(
             $rows,
             ['prototype_id'],

@@ -1,10 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:review/core/utils/helper.dart';
+import 'package:review/widgets/proxy_prompt_dialog.dart';
 
+import '../../../../core/currency/money.dart';
 import '../../../../services/auth_api.dart';
 import '../../../../widgets/auth_components.dart';
 import '../../../../widgets/task_completion_page.dart';
+import '../../../subscriptions/presentation/widgets/package_addon_purchase_sheet.dart';
 
 class ReviewTaskScreen extends StatefulWidget {
   const ReviewTaskScreen({
@@ -33,11 +37,17 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
   int _page = 0;
   bool _sending = false;
 
+  bool get _backLocked =>
+      _questions.isNotEmpty && _answeredCount >= (_questions.length / 2).ceil();
+
   List<Map<String, dynamic>> get _questions {
     final template = widget.task['template_version'];
     final values = template is Map ? template['questions'] : null;
     return values is List
-        ? values.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        ? values
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
         : const [];
   }
 
@@ -140,7 +150,7 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
   }
 
   void _back() {
-    if (_page == 0) return;
+    if (_page == 0 || _backLocked) return;
     _pageController.previousPage(
       duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
@@ -160,6 +170,9 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
       }
       return;
     }
+
+    final continueSubmission = await _checkAddonBeforeSubmit();
+    if (!continueSubmission || !mounted) return;
 
     setState(() => _sending = true);
     try {
@@ -198,6 +211,134 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
     }
   }
 
+  String _money(Object? minorValue, String currency, [Object? units]) {
+    return moneyConverted(
+      widget.api,
+      minorValue,
+      currency.trim().isEmpty ? 'USD' : currency,
+      units,
+      currency,
+      isMinor: true,
+    );
+  }
+
+Future<bool> _checkAddonBeforeSubmit() async {
+  try {
+    final response = await widget.api.reviewAddonCheck(
+      widget.token,
+      widget.task['id'],
+    );
+
+    final data = _asMap(response['data']);
+
+    if (data['required'] != true || data['active'] == true) {
+      return true;
+    }
+
+    if (!mounted) return false;
+
+    final offer = _asMap(data['addon']);
+
+    final currency = offer['currency']?.toString() ?? 'USD';
+
+    final listed =
+        (data['listed_price_minor'] as num?)?.toInt() ??
+        (offer['price_minor'] as num?)?.toInt() ??
+        0;
+
+    final payable =
+        (data['payable_price_minor'] as num?)?.toInt() ?? listed;
+
+    final offerAvailable = data['offer_available'] == true;
+
+    final addonName = offer['name']?.toString() ?? 'Work permit';
+    final planName = data['plan_name']?.toString() ?? 'review';
+
+    final units = data['currency_minor_units'] ?? offer['currency_minor_units'];
+
+    final price = _money(payable, currency, units);
+
+    final featureList = proxyFeatures(data);
+    final featured = featureList
+        .take(6)
+        .toList(growable: false);
+
+    final choice = await ProxyRequirementDialog.show<String>(
+      context: context,
+      plan: ProxyPromptPlan(
+        storeName: 'TrustLens Store',
+        storeWord: 'proxy',
+        titleLead: 'Why do i need a\n',
+        titleHighlight: 'Proxy',
+        titleTail: '?',
+        noticeLead: 'An ',
+        noticeHighlight: 'active $addonName',
+        noticeBody:
+            ' is required to submit $planName reviews on TrustLens Store. Work done without a proxy ',
+        noticeWarning: 'may be rejected.',
+        price: price,
+        billingPeriod: getDuration(data),
+        requiredLabel: 'Required',
+        purchaseLabel: 'CHOOSE PAYMENT',
+        trustLabel: 'Secure checkout',
+        footerBrand: 'TrustLens Store',
+        features: featured,
+        reviewAction: true,
+        reviewActionLabel: 'Submit review anyway',
+      ),
+      // Keep the prompt route under explicit control. The shared prompt's
+      // default behavior popped first and then the old callback popped the
+      // review route, making both actions look like they simply closed.
+      closeOnPurchase: false,
+      onPurchase: () async {
+        Navigator.of(context, rootNavigator: true).pop();
+        final purchased = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          builder: (_) => PackageAddonPurchaseSheet(
+            api: widget.api,
+            token: widget.token,
+            addonState: data,
+          ),
+        );
+        if (!mounted || purchased != true) return;
+        // Re-run the server eligibility check, then submit if payment activated
+        // the add-on. This keeps the review submission on its normal path.
+        await _submit();
+      },
+      onReview: () =>
+          Navigator.of(context, rootNavigator: true).pop('submit'),
+    );
+
+
+    if (choice == 'submit') return true;
+
+    if (!mounted) return false;
+
+    return choice == 'buy';
+
+  } on AuthException catch (error) {
+    if (mounted) {
+      showAuthMessage(context, error.message);
+    }
+    return false;
+  } catch (error, stackTrace) {
+    debugPrint('Addon check error: $error');
+    debugPrintStack(stackTrace: stackTrace);
+
+    if (mounted) {
+      showAuthMessage(
+        context,
+        'Could not check this review add-on. Please try again.',
+      );
+    }
+
+    return false;
+  }
+}
+
   TextEditingController _controllerFor(Map<String, dynamic> question) {
     final id = _questionId(question);
     if (id == null) return TextEditingController();
@@ -219,8 +360,11 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.assignment_late_outlined,
-                    size: 48, color: scheme.onSurfaceVariant),
+                Icon(
+                  Icons.assignment_late_outlined,
+                  size: 48,
+                  color: scheme.onSurfaceVariant,
+                ),
                 const SizedBox(height: 14),
                 Text(
                   'Questions are unavailable for this task.',
@@ -231,8 +375,9 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
                 Text(
                   'Please go back and try opening the task again.',
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -243,7 +388,9 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
 
     final isSummary = _page == total;
     final currentQuestion = isSummary ? null : _questions[_page];
-    final section = currentQuestion == null ? null : _sectionFor(currentQuestion);
+    final section = currentQuestion == null
+        ? null
+        : _sectionFor(currentQuestion);
     final stepProgress = isSummary ? 1.0 : (_page + 1) / total;
     final appName = _app['name']?.toString() ?? 'App review';
 
@@ -251,11 +398,17 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
       appBar: AppBar(
         title: const Text('App review'),
         centerTitle: false,
-        leading: IconButton(
-          onPressed: _page == 0 ? () => Navigator.maybePop(context) : _back,
-          icon: Icon(_page == 0 ? Icons.close_rounded : Icons.arrow_back_rounded),
-          tooltip: _page == 0 ? 'Close review' : 'Previous question',
-        ),
+        leading: _backLocked
+            ? const SizedBox.shrink()
+            : IconButton(
+                onPressed: _page == 0
+                    ? () => Navigator.maybePop(context)
+                    : _back,
+                icon: Icon(
+                  _page == 0 ? Icons.close_rounded : Icons.arrow_back_rounded,
+                ),
+                tooltip: _page == 0 ? 'Close review' : 'Previous question',
+              ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -272,11 +425,7 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
         top: false,
         child: Column(
           children: [
-            if (!isSummary)
-              _AppOverviewCard(
-                app: _app,
-                task: widget.task,
-              ),
+            if (!isSummary) _AppOverviewCard(app: _app, task: widget.task),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: _ProgressHeader(
@@ -284,7 +433,9 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
                 total: total,
                 answered: _answeredCount,
                 progress: stepProgress,
-                sectionName: isSummary ? 'Review summary' : section?.name ?? 'Review',
+                sectionName: isSummary
+                    ? 'Review summary'
+                    : section?.name ?? 'Review',
               ),
             ),
             Expanded(
@@ -319,7 +470,7 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
             _FooterControls(
               isSummary: isSummary,
               isSending: _sending,
-              hasPrevious: _page > 0,
+              hasPrevious: _page > 0 && !_backLocked,
               onBack: _back,
               onContinue: isSummary ? _submit : _next,
             ),
@@ -329,6 +480,11 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
     );
   }
 }
+
+Map<String, dynamic> _asMap(Object? value) => value is Map
+    ? value.map((key, value) => MapEntry(key.toString(), value))
+    : <String, dynamic>{};
+
 
 int? _questionId(Map<String, dynamic> question) =>
     (question['id'] as num?)?.toInt();
@@ -362,9 +518,9 @@ class _ModeChip extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSecondaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: scheme.onSecondaryContainer,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -394,7 +550,8 @@ class _AppOverviewCard extends StatelessWidget {
     final category = app['category']?.toString();
     final iconUrl = app['app_icon']?.toString();
     final campaign = task['campaign'];
-    final rewardMinor = task['reserved_reward_minor'] ??
+    final rewardMinor =
+        task['reserved_reward_minor'] ??
         (campaign is Map ? campaign['review_reward_minor'] : null);
     final currency = campaign is Map ? campaign['currency'] : app['currency'];
 
@@ -419,7 +576,8 @@ class _AppOverviewCard extends StatelessWidget {
                     ? Image.network(
                         iconUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _AppIconFallback(name: name),
+                        errorBuilder: (_, __, ___) =>
+                            _AppIconFallback(name: name),
                       )
                     : _AppIconFallback(name: name),
               ),
@@ -456,7 +614,10 @@ class _AppOverviewCard extends StatelessWidget {
                       if (store != null && store.isNotEmpty)
                         _MetaTag(icon: Icons.storefront_outlined, label: store),
                       if (category != null && category.isNotEmpty)
-                        _MetaTag(icon: Icons.category_outlined, label: category),
+                        _MetaTag(
+                          icon: Icons.category_outlined,
+                          label: category,
+                        ),
                     ],
                   ),
                 ],
@@ -504,9 +665,9 @@ class _AppIconFallback extends StatelessWidget {
         child: Text(
           initial,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: scheme.onPrimaryContainer,
-                fontWeight: FontWeight.w800,
-              ),
+            color: scheme.onPrimaryContainer,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
@@ -534,9 +695,8 @@ class _MetaTag extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -646,11 +806,15 @@ class _QuestionSlide extends StatelessWidget {
     final prompt = question['prompt']?.toString();
     final hint = question['hint']?.toString();
     final type = question['type']?.toString();
-    final settings = question['settings'] is Map ? question['settings'] as Map : const {};
+    final settings = question['settings'] is Map
+        ? question['settings'] as Map
+        : const {};
     final options = question['options'] is List
         ? (question['options'] as List).map((e) => e.toString()).toList()
         : const <String>[];
-    final scale = settings['scale'] is Map ? settings['scale'] as Map : const {};
+    final scale = settings['scale'] is Map
+        ? settings['scale'] as Map
+        : const {};
     final minimum = (scale['min'] as num?)?.toDouble() ?? 1;
     final maximum = (scale['max'] as num?)?.toDouble() ?? 5;
     final minWords = (settings['min_words'] as num?)?.toInt();
@@ -682,10 +846,10 @@ class _QuestionSlide extends StatelessWidget {
               type == 'multiple_choice'
                   ? 'Select all that apply'
                   : type == 'long_text'
-                      ? 'Written response'
-                      : type == 'rating'
-                          ? 'Rate your experience'
-                          : 'Choose one answer',
+                  ? 'Written response'
+                  : type == 'rating'
+                  ? 'Rate your experience'
+                  : 'Choose one answer',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
@@ -839,7 +1003,8 @@ class _QuestionSlide extends StatelessWidget {
         ],
         if (type == 'confirmation')
           _AnswerChoice(
-            label: settings['confirmation_label']?.toString() ??
+            label:
+                settings['confirmation_label']?.toString() ??
                 'I confirm this answer is accurate and my own.',
             selected: answer == true,
             multiple: true,
@@ -893,11 +1058,11 @@ class _AnswerChoice extends StatelessWidget {
               Icon(
                 selected
                     ? (multiple
-                        ? Icons.check_circle_rounded
-                        : Icons.radio_button_checked_rounded)
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_checked_rounded)
                     : (multiple
-                        ? Icons.circle_outlined
-                        : Icons.radio_button_off_rounded),
+                          ? Icons.circle_outlined
+                          : Icons.radio_button_off_rounded),
                 color: selected ? scheme.primary : scheme.onSurfaceVariant,
                 size: 21,
               ),
@@ -908,7 +1073,9 @@ class _AnswerChoice extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     height: 1.35,
-                    color: selected ? scheme.onSecondaryContainer : scheme.onSurface,
+                    color: selected
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurface,
                   ),
                 ),
               ),
@@ -945,7 +1112,9 @@ class _RatingInput extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final value = ((answer as num?)?.toDouble() ?? minimum).clamp(minimum, maximum).toDouble();
+    final value = ((answer as num?)?.toDouble() ?? minimum)
+        .clamp(minimum, maximum)
+        .toDouble();
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 15),
       decoration: BoxDecoration(
@@ -1039,8 +1208,10 @@ class _TrustSummaryPage extends StatelessWidget {
       final id = _questionId(question);
       if (id == null) continue;
       final value = answers[id];
-      final key = question['question_key']?.toString() ??
-          question['key']?.toString() ?? '';
+      final key =
+          question['question_key']?.toString() ??
+          question['key']?.toString() ??
+          '';
       final settings = question['settings'] is Map
           ? question['settings'] as Map
           : const {};
@@ -1081,8 +1252,11 @@ class _TrustSummaryPage extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.fact_check_outlined,
-                  size: 28, color: scheme.onPrimaryContainer),
+              Icon(
+                Icons.fact_check_outlined,
+                size: 28,
+                color: scheme.onPrimaryContainer,
+              ),
               const SizedBox(width: 13),
               Expanded(
                 child: Column(
@@ -1311,15 +1485,17 @@ class _FooterControls extends StatelessWidget {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(isSummary
-                        ? Icons.send_rounded
-                        : Icons.arrow_forward_rounded),
+                    : Icon(
+                        isSummary
+                            ? Icons.send_rounded
+                            : Icons.arrow_forward_rounded,
+                      ),
                 label: Text(
                   isSending
                       ? 'Submitting…'
                       : isSummary
-                          ? 'Submit review'
-                          : 'Continue',
+                      ? 'Submit review'
+                      : 'Continue',
                 ),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),

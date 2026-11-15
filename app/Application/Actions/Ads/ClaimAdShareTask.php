@@ -21,6 +21,10 @@ final class ClaimAdShareTask
         return DB::transaction(function () use ($user, $ad, $idempotencyKey): AdShareTask {
             $ad = Ad::query()->lockForUpdate()->findOrFail($ad->id);
 
+            if ($ad->user_campaign_order_id !== null && $ad->owner_id === $user->id) {
+                throw ValidationException::withMessages(['ad' => 'You cannot complete tasks for your own campaign.']);
+            }
+
             // A user may claim a campaign only once. Return that assignment on
             // repeat taps/retries instead of attempting a second insert against
             // the unique (ad_id, user_id) constraint.

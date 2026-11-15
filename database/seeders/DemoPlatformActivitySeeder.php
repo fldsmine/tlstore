@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use App\Models\Admin;
+use App\Application\Money\CurrencyMinorUnits;
 
 class DemoPlatformActivitySeeder extends Seeder
 {
@@ -81,27 +82,31 @@ class DemoPlatformActivitySeeder extends Seeder
 
     private function seedReviewCampaigns(array $apps, int $ownerId, $now): array
     {
-        $definitions = [
-            ['campaign_key' => 'demo-review-fitpulse-ng', 'prototype_id' => 0, 'location' => 'NG', 'reward' => 600, 'maximum' => 100],
-            ['campaign_key' => 'demo-review-cashbloom-global', 'prototype_id' => 1, 'location' => null, 'reward' => 750, 'maximum' => 100],
-            ['campaign_key' => 'demo-review-nairawise-global', 'prototype_id' => 2, 'location' => null, 'reward' => 500, 'maximum' => 100],
-            ['campaign_key' => 'demo-review-nairawise-gb', 'prototype_id' => 2, 'location' => 'GB', 'reward' => 500, 'maximum' => 50],
+        $appRows = DB::table('apps')->whereNotNull('prototype_id')->get()->keyBy('prototype_id');
+        $campaignKeys = [
+            0 => 'demo-review-fitpulse-ng',
+            1 => 'demo-review-cashbloom-global',
+            2 => 'demo-review-nairawise-global',
         ];
-
         $rows = [];
-        foreach ($definitions as $definition) {
-            if (!isset($apps[$definition['prototype_id']])) {
+        foreach ($appRows as $prototypeId => $app) {
+            if (! isset($apps[$prototypeId])) {
                 continue;
             }
+            $currency = strtoupper($app->currency ?: 'USD');
+            $maximum = $app->maximum_review === null ? null : (int) $app->maximum_review;
+            $paidAmountMinor = CurrencyMinorUnits::toMinor($app->paid_amount, $currency);
             $rows[] = [
-                'campaign_key' => $definition['campaign_key'],
-                'app_id' => $apps[$definition['prototype_id']],
+                'campaign_key' => $campaignKeys[$prototypeId] ?? 'demo-review-app-'.$prototypeId,
+                'app_id' => $apps[$prototypeId],
                 'owner_id' => $ownerId,
-                'paid_amount_minor' => $definition['reward'] * $definition['maximum'],
-                'currency' => 'USD',
-                'location' => $definition['location'],
-                'review_reward_minor' => $definition['reward'],
-                'maximum_review' => $definition['maximum'],
+                'paid_amount_minor' => $paidAmountMinor,
+                'currency' => $currency,
+                // App locations are descriptive metadata; review eligibility is
+                // controlled by subscription store/category, not country.
+                'location' => $app->location,
+                'review_reward_minor' => CurrencyMinorUnits::toMinor($app->review_reward, $currency),
+                'maximum_review' => $maximum,
                 'reserved_reviews' => 0,
                 'completed_reviews' => 0,
                 'status' => 'active',
@@ -118,6 +123,12 @@ class DemoPlatformActivitySeeder extends Seeder
             ['app_id', 'owner_id', 'paid_amount_minor', 'currency', 'location', 'review_reward_minor',
                 'maximum_review', 'status', 'starts_at', 'ends_at', 'updated_at']
         );
+
+        // Keep historical demo task records linked to their campaign, but stop
+        // exposing the duplicate regional copy of NairaWise as a second listing.
+        DB::table('app_review_campaigns')
+            ->where('campaign_key', 'demo-review-nairawise-gb')
+            ->update(['status' => 'draft', 'location' => null, 'updated_at' => $now]);
 
         return DB::table('app_review_campaigns')->pluck('id', 'campaign_key')->all();
     }
@@ -350,9 +361,7 @@ class DemoPlatformActivitySeeder extends Seeder
             ]], ['provider', 'provider_event_id'], ['event_type', 'payload', 'processing_status', 'processed_at', 'updated_at']);
 
             $providerSubscriptionReference = 'DEMO-LOC-SUB-'.$numberKey;
-            $coverage = DB::table('plan_location_coverage')
-                ->where('subscription_plan_id', $planId)
-                ->get(['target_type', 'target_code']);
+
             $planSnapshot = [
                 'plan_key' => $planKey,
                 'name' => $plan->name,
@@ -360,7 +369,6 @@ class DemoPlatformActivitySeeder extends Seeder
                 'billing_interval' => $plan->billing_interval,
                 'price_minor' => $plan->price_minor,
                 'currency' => $plan->currency,
-                'coverage' => $coverage,
                 'demo' => true,
             ];
 
@@ -368,7 +376,7 @@ class DemoPlatformActivitySeeder extends Seeder
                 'user_id' => $users[$userNumber],
                 'subscription_plan_id' => $planId,
                 'payment_intent_id' => $paymentId,
-                'product_type' => 'location_coverage',
+                'product_type' => 'demo_subscription',
                 'status' => 'active',
                 'provider_subscription_reference' => $providerSubscriptionReference,
                 'starts_at' => $startsAt,

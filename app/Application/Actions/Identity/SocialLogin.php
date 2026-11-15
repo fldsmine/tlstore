@@ -69,14 +69,15 @@ final class SocialLogin
                     'email_verified_at' => $profile['email_verified'] ? now() : null,
                     'country_code' => $country->code,
                     'preferred_currency' => strtoupper($preferredCurrency ?: $country->default_currency ?: 'USD'),
+                    'wallet_currency' => strtoupper($preferredCurrency ?: $country->default_currency ?: 'USD'),
                     'role' => 'reviewer', 'status' => 'active',
                     'avatar' => $profile['avatar'],
                 ]);
 
-                foreach (WalletType::cases() as $type) {
+                foreach (WalletType::accountWalletTypes() as $type) {
                     Wallet::query()->create([
                         'user_id' => $user->id, 'wallet_type' => $type,
-                        'currency' => $user->preferred_currency, 'status' => 'active',
+                        'currency' => $user->wallet_currency, 'status' => 'active',
                     ]);
                 }
                 ReferralCode::query()->create([

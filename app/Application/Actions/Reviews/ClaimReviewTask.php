@@ -38,12 +38,6 @@ final class ClaimReviewTask
             if (($subscription->plan?->max_review_tasks ?? 0) < 1) {
                 throw ValidationException::withMessages(['subscription' => 'Your current package does not include app reviews. Join a review package to continue.']);
             }
-            if ($subscription->plan?->eligible_app_store && strcasecmp($subscription->plan->eligible_app_store, (string) $campaign->app?->store) !== 0) {
-                throw ValidationException::withMessages(['subscription' => 'This review package only covers '.$subscription->plan->eligible_app_store.' apps.']);
-            }
-            if ($subscription->plan?->eligible_app_category && strcasecmp($subscription->plan->eligible_app_category, (string) $campaign->app?->category) !== 0) {
-                throw ValidationException::withMessages(['subscription' => 'This review package only covers '.$subscription->plan->eligible_app_category.' category apps.']);
-            }
             if ($campaign->status->value !== 'active' || ($campaign->starts_at && $campaign->starts_at->isFuture()) || ($campaign->ends_at && $campaign->ends_at->isPast())) {
                 throw ValidationException::withMessages(['campaign' => 'This campaign is not active.']);
             }
@@ -97,8 +91,11 @@ final class ClaimReviewTask
                 }
             }
 
-            $templateVersion = ReviewTemplateVersion::query()->where('status', 'published')
-                ->whereNotNull('published_at')->latest('published_at')->first();
+            $templateVersion = $campaign->reviewTemplateVersion;
+            if (! $templateVersion) {
+                $templateVersion = ReviewTemplateVersion::query()->where('status', 'published')
+                    ->whereNotNull('published_at')->latest('published_at')->first();
+            }
             if (! $templateVersion) {
                 throw ValidationException::withMessages(['campaign' => 'No published review questionnaire is configured.']);
             }

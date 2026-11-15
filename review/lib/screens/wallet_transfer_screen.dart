@@ -25,9 +25,10 @@ class _WalletTransferScreenState extends State<WalletTransferScreen> {
   String? _error;
   List<Map<String, dynamic>> _wallets = const [];
   Map<String, dynamic>? _source;
-  String _target = 'review';
+  String _target = 'review_group_b';
   static const _targets = {
-    'review': 'Review wallet',
+    'review_group_b': 'Play Store & Galaxy review wallet',
+    'review_group_c': 'Apple Store review wallet',
     'share': 'Share wallet',
     'referral': 'Referral wallet',
     'bonus': 'Bonus wallet',
@@ -237,7 +238,7 @@ class _WalletTransferScreenState extends State<WalletTransferScreen> {
                           )
                           .toList(),
                       onChanged: (value) =>
-                          setState(() => _target = value ?? 'review'),
+                          setState(() => _target = value ?? 'review_group_b'),
                     ),
                     const SizedBox(height: 13),
                     TextField(

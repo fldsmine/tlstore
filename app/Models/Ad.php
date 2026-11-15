@@ -8,14 +8,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Ad extends Model
 {
+    use SoftDeletes;
+
     protected $appends = ['currency_minor_units'];
 
     protected $table = 'ads';
     protected $fillable = [
         'campaign_key', 'title', 'type', 'description', 'share_message', 'owner_id', 'creative_path',
+        'user_campaign_order_id',
         'destination_url', 'paid_amount', 'location', 'currency', 'total_share', 'reserved_share',
         'share_reward', 'maximum_share', 'status', 'starts_at', 'ends_at', 'featured',
     ];
@@ -36,6 +40,24 @@ class Ad extends Model
         return $this->belongsTo(User::class, 'owner_id');
     }
 
+    public function campaignOrder(): BelongsTo
+    {
+        return $this->belongsTo(UserCampaignOrder::class, 'user_campaign_order_id');
+    }
+
+    public function getCurrencyAttribute(?string $value): string
+    {
+        $currency = strtoupper(trim((string) $value));
+
+        return $currency !== '' ? $currency : 'USD';
+    }
+
+    public function setCurrencyAttribute(?string $value): void
+    {
+        $currency = strtoupper(trim((string) $value));
+        $this->attributes['currency'] = $currency !== '' ? $currency : 'USD';
+    }
+
     public function shareTasks(): HasMany
     {
         return $this->hasMany(AdShareTask::class);
@@ -48,7 +70,7 @@ class Ad extends Model
 
     public function getCurrencyMinorUnitsAttribute(): int
     {
-        return \App\Application\Money\CurrencyMinorUnits::precision($this->currency);
+        return \App\Application\Money\CurrencyMinorUnits::precision($this->currency ?: 'USD');
     }
 
     public function getCreativePathAttribute(?string $value): ?string

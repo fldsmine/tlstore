@@ -3,24 +3,25 @@
 namespace App\Application\Actions\Moderation;
 
 use App\Application\Actions\Referrals\CreditReferralReward;
+use App\Application\Actions\Wallets\CreditUserWallet;
+use App\Enums\WalletType;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\Ad;
 use App\Models\AdShareEvent;
 use App\Models\AdShareTask;
 use App\Models\Admin;
 use App\Models\AuditLog;
-use App\Models\LedgerEntry;
 use App\Models\ModerationDecision;
 use App\Models\Notification;
-use App\Models\Wallet;
+use App\Models\SubscriptionPlan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class DecideAdShare
 {
-    public function handle(Admin $admin, AdShareEvent $event, string $decision, ?string $reasonCode, ?string $reason): AdShareEvent
+    public function handle(Admin $admin, AdShareEvent $event, string $decision, ?string $reasonCode, ?string $reason, ?SubscriptionPlan $referralPlan = null): AdShareEvent
     {
-        return DB::transaction(function () use ($admin, $event, $decision, $reasonCode, $reason): AdShareEvent {
+        return DB::transaction(function () use ($admin, $event, $decision, $reasonCode, $reason, $referralPlan): AdShareEvent {
             $event = AdShareEvent::query()->with('task')->lockForUpdate()->findOrFail($event->id);
             if ($event->status->value !== 'pending_validation') {
                 throw ValidationException::withMessages(['share' => 'This share has already been decided.']);
@@ -69,27 +70,22 @@ final class DecideAdShare
 
             if ($decision === 'approved') {
                 $ad->total_share++;
-                $wallet = Wallet::query()->firstOrCreate([
-                    'user_id' => $event->task->user_id,
-                    'wallet_type' => 'share',
-                    'currency' => $ad->currency,
-                ], ['status' => 'active']);
-                $shareLedger = LedgerEntry::query()->firstOrCreate(['idempotency_key' => 'ad-share-approved-'.$event->id], [
-                    'wallet_id' => $wallet->id,
-                    'entry_type' => 'ad_share_reward',
-                    'direction' => 'credit',
-                    'amount_minor' => $event->task->reserved_reward_minor,
-                    'status' => 'posted',
-                    'source_type' => 'ad_share_event',
-                    'source_id' => $event->id,
-                    'description' => 'Approved public ad share reward',
-                    'available_at' => $now,
-                    'posted_at' => $now,
-                ]);
+                app(CreditUserWallet::class)->handle(
+                    $event->task->user,
+                    WalletType::Share,
+                    (int) $event->task->reserved_reward_minor,
+                    $ad->currency,
+                    'ad_share_reward',
+                    'ad_share_event',
+                    $event->id,
+                    'ad-share-approved-'.$event->id,
+                    'Approved public ad share reward',
+                    $now,
+                );
                 app(CreditReferralReward::class)->handle(
-                    $event->task->user, $shareLedger->amount_minor, $ad->currency, 'task',
+                    $event->task->user, (int) $event->task->reserved_reward_minor, $ad->currency, 'task',
                     'ad_share_event', $event->id, 'referral-ad-share:'.$event->id,
-                    'Referral reward for approved ad share', null, $event->shared_at,
+                    'Referral reward for approved ad share', $referralPlan, $event->shared_at,
                 );
             }
 

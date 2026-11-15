@@ -2,6 +2,8 @@
 
 namespace App\Application\Actions\Wallets;
 
+use App\Application\Money\CurrencyConverter;
+use App\Enums\WalletType;
 use App\Models\LedgerEntry;
 use App\Models\User;
 use App\Models\Wallet;
@@ -10,9 +12,11 @@ use Illuminate\Validation\ValidationException;
 
 final class TransferTopupFunds
 {
+    public function __construct(private readonly CurrencyConverter $currencyConverter) {}
+
     public function handle(User $user, int $amountMinor, string $targetType, string $idempotencyKey): void
     {
-        if (! in_array($targetType, ['review', 'share', 'referral', 'bonus'], true)) {
+        if (! in_array($targetType, ['review_group_b', 'review_group_c', 'share', 'referral', 'bonus'], true)) {
             throw ValidationException::withMessages(['target_wallet' => 'Funds can only be transferred to review, share, or referral wallets.']);
         }
 
@@ -30,14 +34,13 @@ final class TransferTopupFunds
             }
 
             $source = Wallet::query()->where('user_id', $user->id)->where('wallet_type', 'topup_fund')->where('status', 'active')->lockForUpdate()->firstOrFail();
-            $target = Wallet::query()->where('user_id', $user->id)->where('wallet_type', $targetType)
-                ->where('currency', $source->currency)->where('status', 'active')->lockForUpdate()->first();
-            if (! $target) {
-                $target = Wallet::query()->create([
-                    'user_id' => $user->id, 'wallet_type' => $targetType,
-                    'currency' => $source->currency, 'status' => 'active',
-                ]);
-            }
+            $targetCurrency = strtoupper($user->wallet_currency ?: $user->preferred_currency ?: 'USD');
+            $quote = $this->currencyConverter->convertMinor($amountMinor, $source->currency, $targetCurrency);
+            $targetAmountMinor = $quote['amount_minor'];
+            $target = Wallet::query()->firstOrCreate(
+                ['user_id' => $user->id, 'wallet_type' => $targetType, 'currency' => $targetCurrency],
+                ['status' => 'active'],
+            );
 
             if ((int) $source->balance_minor < $amountMinor) {
                 throw ValidationException::withMessages(['amount_minor' => 'The top-up wallet has insufficient available funds.']);
@@ -52,8 +55,15 @@ final class TransferTopupFunds
             ]);
             LedgerEntry::query()->create([
                 'wallet_id' => $target->id, 'entry_type' => 'wallet_transfer', 'direction' => 'credit',
-                'amount_minor' => $amountMinor, 'status' => 'posted', 'source_type' => null,
+                'amount_minor' => $targetAmountMinor, 'status' => 'posted', 'source_type' => null,
                 'idempotency_key' => $creditKey, 'description' => 'Transfer from top-up funds wallet',
+                'metadata' => [
+                    'source_amount_minor' => $amountMinor,
+                    'source_currency' => strtoupper($source->currency),
+                    'credited_amount_minor' => $targetAmountMinor,
+                    'credited_currency' => $targetCurrency,
+                    'exchange_rate' => $quote['rate'],
+                ],
                 'available_at' => $now, 'posted_at' => $now,
             ]);
         });

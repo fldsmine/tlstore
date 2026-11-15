@@ -34,6 +34,50 @@ final class SystemSettingController
             $data['value'] = ['provider' => strtolower($provider)];
         }
 
+        if ($settingKey === 'campaign.services') {
+            $services = $data['value'];
+            $platforms = ['tiktok', 'youtube', 'twitter', 'instagram', 'facebook', 'whatsapp', 'telegram'];
+            $actions = [
+                'tiktok' => ['followers'], 'youtube' => ['subscribers'], 'twitter' => ['follower'],
+                'instagram' => ['followers', 'likes'], 'facebook' => ['page_like', 'post_share'],
+                'whatsapp' => ['channel'], 'telegram' => ['join'],
+            ];
+            if (! is_array($services) || array_is_list($services) || array_diff(array_keys($services), $platforms) !== []) {
+                return response()->json(['message' => 'Campaign services must map supported platform names to their action rates and minimum quantity.'], 422);
+            }
+            foreach ($services as $platform => $definition) {
+                if (! is_array($definition) || array_is_list($definition) || ! isset($definition['min']) || filter_var($definition['min'], FILTER_VALIDATE_INT) === false || (int) $definition['min'] < 1) {
+                    return response()->json(['message' => "{$platform} needs a positive integer min quantity."], 422);
+                }
+                if (array_diff(array_keys($definition), [...$actions[$platform], 'min']) !== []) {
+                    return response()->json(['message' => "{$platform} contains an unsupported service action."], 422);
+                }
+                foreach ($actions[$platform] as $action) {
+                    if (array_key_exists($action, $definition) && (! is_numeric($definition[$action]) || (float) $definition[$action] <= 0)) {
+                        return response()->json(['message' => "{$platform}.{$action} must be a positive amount."], 422);
+                    }
+                }
+                $data['value'][$platform] = array_merge(
+                    array_intersect_key($definition, array_flip($actions[$platform])),
+                    ['min' => (int) $definition['min']],
+                );
+            }
+        }
+
+        if ($settingKey === 'campaign.service_fee_percent') {
+            if (! is_numeric($data['value']) || (float) $data['value'] < 0 || (float) $data['value'] > 100) {
+                return response()->json(['message' => 'Campaign service fee must be a number from 0 to 100.'], 422);
+            }
+            $data['value'] = (float) $data['value'];
+        }
+
+        if ($settingKey === 'campaign.currency') {
+            if (! is_string($data['value']) || preg_match('/^[A-Za-z]{3}$/', $data['value']) !== 1) {
+                return response()->json(['message' => 'Campaign currency must be a three-letter currency code.'], 422);
+            }
+            $data['value'] = strtoupper($data['value']);
+        }
+
         if ($settingKey === 'payment.active_gateways') {
             $gateways = $data['value'];
             $allowed = ['korapay', 'paystack', 'flutterwave', 'bachs', 'manual'];

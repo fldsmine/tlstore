@@ -3,10 +3,10 @@
 namespace App\Application\Actions\Rankings;
 
 use App\Application\Money\CurrencyMinorUnits;
-use App\Models\LedgerEntry;
+use App\Application\Actions\Wallets\CreditUserWallet;
+use App\Enums\WalletType;
 use App\Models\SystemSetting;
 use App\Models\UserRankQualification;
-use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
 
 final class RewardDueRanks
@@ -26,23 +26,19 @@ final class RewardDueRanks
                         if (! $locked || $locked->status !== 'active' || ! $locked->next_reward_at || $locked->next_reward_at->isFuture()) return;
 
                         $level = $locked->level;
-                        $wallet = Wallet::query()->firstOrCreate(
-                            ['user_id' => $locked->user_id, 'wallet_type' => 'bonus', 'currency' => 'USD'],
-                            ['status' => 'active'],
-                        );
                         $periodNumber = (int) $locked->rewards_paid + 1;
-                        $entry = LedgerEntry::query()->firstOrCreate(['idempotency_key' => 'rank-monthly:'.$locked->id.':'.$periodNumber], [
-                            'wallet_id' => $wallet->id,
-                            'entry_type' => 'rank_earning',
-                            'direction' => 'credit',
-                            'amount_minor' => CurrencyMinorUnits::toMinor($locked->monthly_reward_usd_at_qualification, 'USD'),
-                            'status' => 'posted',
-                            'source_type' => 'user_rank_qualification',
-                            'source_id' => $locked->id,
-                            'description' => $level->name.' rank monthly reward ('.$periodNumber.'/'.$locked->reward_duration_months_at_qualification.')',
-                            'available_at' => now(),
-                            'posted_at' => now(),
-                        ]);
+                        $entry = app(CreditUserWallet::class)->handle(
+                            $locked->user,
+                            WalletType::Bonus,
+                            CurrencyMinorUnits::toMinor($locked->monthly_reward_usd_at_qualification, 'USD'),
+                            'USD',
+                            'rank_earning',
+                            'user_rank_qualification',
+                            $locked->id,
+                            'rank-monthly:'.$locked->id.':'.$periodNumber,
+                            $level->name.' rank monthly reward ('.$periodNumber.'/'.$locked->reward_duration_months_at_qualification.')',
+                            now(),
+                        );
 
                         if (! $entry->wasRecentlyCreated) {
                             $locked->next_reward_at = $locked->next_reward_at->copy()->addMonthNoOverflow();

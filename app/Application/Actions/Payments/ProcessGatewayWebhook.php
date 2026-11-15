@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Actions\Subscriptions\ActivateSubscription;
+use App\Application\Actions\PackageAddons\ActivatePackageAddon;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\LedgerEntry;
 use App\Models\PaymentIntent;
@@ -85,6 +86,8 @@ final class ProcessGatewayWebhook
             $transactionId = (string) ($verified['id'] ?? $verified['charge']['payment_id'] ?? $data['charge_id'] ?? $verified['flw_ref'] ?? $data['reference'] ?? $intent->provider_reference);
             if ($intent->purpose === 'subscription') {
                 $this->completeSubscription($intent, $transactionId, $verified);
+            } elseif ($intent->purpose === 'package_addon') {
+                $this->completePackageAddon($intent, $transactionId, $verified);
             } else {
                 $this->creditTopup($intent, $transactionId, $verified);
             }
@@ -210,6 +213,35 @@ final class ProcessGatewayWebhook
         $this->completeSubscription($intent, $providerTransactionId, $providerResponse);
     }
 
+    public function completeVerifiedPackageAddon(PaymentIntent $intent, string $providerTransactionId, array $providerResponse): void
+    {
+        $this->completePackageAddon($intent, $providerTransactionId, $providerResponse);
+    }
+
+    private function completePackageAddon(PaymentIntent $intent, string $providerTransactionId, array $providerResponse): void
+    {
+        DB::transaction(function () use ($intent, $providerTransactionId, $providerResponse): void {
+            $intent = PaymentIntent::query()->lockForUpdate()->findOrFail($intent->id);
+            if ($intent->status->value === 'paid') return;
+            $now = now();
+            $intent->forceFill(['status' => 'paid', 'paid_at' => $now,
+                'provider_metadata' => array_merge($intent->provider_metadata ?? [], ['verified_transaction' => $providerResponse])])->save();
+            PaymentTransaction::query()->firstOrCreate(['payment_intent_id' => $intent->id], [
+                'provider_transaction_id' => $providerTransactionId, 'transaction_type' => 'package_addon',
+                'amount_minor' => $intent->amount_minor, 'currency' => $intent->currency,
+                'status' => 'succeeded', 'provider_response' => $providerResponse, 'occurred_at' => $now,
+            ]);
+            $addon = \App\Models\PackageAddon::query()->findOrFail($intent->source_id);
+            Transaction::query()->updateOrCreate(['reference' => 'payment-intent:'.$intent->id], [
+                'user_id' => $intent->user_id, 'type' => 'package_addon', 'direction' => 'debit',
+                'amount' => CurrencyMinorUnits::fromMinor($intent->amount_minor, $intent->currency), 'fee' => 0,
+                'wallet' => null, 'status' => 'completed', 'description' => 'Package add-on purchase: '.$addon->name,
+                'meta' => ['payment_intent_id' => $intent->id, 'addon_id' => $addon->id, 'currency' => $intent->currency, 'amount_minor' => $intent->amount_minor, 'provider' => $intent->provider],
+            ]);
+            app(ActivatePackageAddon::class)->handle($intent);
+        });
+    }
+
     private function completeSubscription(PaymentIntent $intent, string $providerTransactionId, array $providerResponse): void
     {
         DB::transaction(function () use ($intent, $providerTransactionId, $providerResponse): void {
@@ -242,7 +274,7 @@ final class ProcessGatewayWebhook
                 ['reference' => 'payment-intent:'.$intent->id],
                 [
                     'user_id' => $intent->user_id,
-                    'type' => $plan->product_type->value === 'location_coverage' ? 'location_addons' : 'subscription_plan',
+                    'type' => $plan->product_type->value,
                     'direction' => 'debit',
                     'amount' => CurrencyMinorUnits::fromMinor($intent->amount_minor, $intent->currency),
                     'fee' => 0,

@@ -21,7 +21,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'product_type' => 'marketplace_access', 'name' => 'Lite', 'tier_key' => 'lite',
                 'billing_interval' => 'monthly', 'duration_count' => 1, 'price_minor' => 150000, 'currency' => 'NGN',
                 'discount' => 0, 'bonus' => 500, 'subscription_referral_percent' => 50, 'task_referral_percent' => 0,
-                'is_special' => 0, 'max_review_tasks' => 0, 'max_ad_shares' => 1000,
+                'is_special' => 0, 'max_review_tasks' => 0, 'max_ad_shares' => 1000, 'addons' => false,
                 'eligible_app_store' => null, 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 600000, 'withdrawal_days' => ['Monthly 28th'],
                 'daily_revenue_minor' => 15000, 'task_reward_minor' => null, 'daily_task_limit' => null,
@@ -37,7 +37,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'product_type' => 'marketplace_access', 'name' => 'Premium', 'tier_key' => 'premium',
                 'billing_interval' => 'monthly', 'duration_count' => 1, 'price_minor' => 350000, 'currency' => 'NGN',
                 'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 50, 'task_referral_percent' => 0,
-                'is_special' => 1, 'max_review_tasks' => 0, 'max_ad_shares' => 120,
+                'is_special' => 1, 'max_review_tasks' => 0, 'max_ad_shares' => 120, 'addons' => false,
                 'eligible_app_store' => null, 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 1150000, 'withdrawal_days' => ['Monthly 28th'],
                 'daily_revenue_minor' => 30000, 'task_reward_minor' => null, 'daily_task_limit' => null,
@@ -52,7 +52,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'product_type' => 'marketplace_access', 'name' => 'Gold', 'tier_key' => 'gold',
                 'billing_interval' => 'monthly', 'duration_count' => 1, 'price_minor' => 620000, 'currency' => 'NGN',
                 'discount' => 12, 'bonus' => 0, 'subscription_referral_percent' => 54.6, 'task_referral_percent' => 0,
-                'is_special' => 1, 'max_review_tasks' => 0, 'max_ad_shares' => 140,
+                'is_special' => 1, 'max_review_tasks' => 0, 'max_ad_shares' => 140, 'addons' => false,
                 'eligible_app_store' => null, 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 1850000, 'withdrawal_days' => ['Monthly 28th'],
                 'daily_revenue_minor' => 45000, 'task_reward_minor' => null, 'daily_task_limit' => null,
@@ -68,7 +68,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'product_type' => 'marketplace_access', 'name' => 'Playstore review', 'tier_key' => 'playstore_review',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 1215000, 'currency' => 'NGN',
                 'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 0, 'task_referral_percent' => 6,
-                'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0,
+                'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Google Play', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday'],
                 'daily_revenue_minor' => 63000, 'task_reward_minor' => 21000, 'daily_task_limit' => 3,
@@ -86,7 +86,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'product_type' => 'marketplace_access', 'name' => 'Samsung store', 'tier_key' => 'samsung_store',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 2485000, 'currency' => 'NGN',
                 'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 0, 'task_referral_percent' => 6,
-                'is_special' => 1, 'max_review_tasks' => 360, 'max_ad_shares' => 0,
+                'is_special' => 1, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Samsung Galaxy Store', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday'],
                 'daily_revenue_minor' => 99000, 'task_reward_minor' => 33000, 'daily_task_limit' => 3,
@@ -104,8 +104,8 @@ class SubscriptionPlanSeeder extends Seeder
                 'product_type' => 'marketplace_access', 'name' => 'Apple store', 'tier_key' => 'apple_store',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 5775000, 'currency' => 'NGN',
                 'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 0, 'task_referral_percent' => 6,
-                'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0,
-                'eligible_app_store' => null, 'eligible_app_category' => 'Apple',
+                'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
+                'eligible_app_store' => 'Apple App Store', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday', 'Wednesday'],
                 'daily_revenue_minor' => 210000, 'task_reward_minor' => 70000, 'daily_task_limit' => 3,
                 'features' => [
@@ -118,13 +118,6 @@ class SubscriptionPlanSeeder extends Seeder
                 ],
             ],
         ];
-
-        // The location add-on plans are no longer offered. Their historical
-        // subscription rows are retained rather than deleted.
-        DB::table('subscription_plans')->where('product_type', 'location_coverage')->update([
-            'is_active' => false,
-            'updated_at' => $now,
-        ]);
 
         foreach ($plans as $plan) {
             $features = $plan['features'];
@@ -143,7 +136,7 @@ class SubscriptionPlanSeeder extends Seeder
                 [
                     'subscription_group_id', 'product_type', 'name', 'tier_key', 'billing_interval', 'duration_count',
                     'price_minor', 'currency', 'discount', 'bonus', 'is_special',
-                    'subscription_referral_percent', 'task_referral_percent', 'max_review_tasks', 'max_ad_shares',
+                    'subscription_referral_percent', 'task_referral_percent', 'max_review_tasks', 'max_ad_shares', 'addons',
                     'eligible_app_store', 'eligible_app_category', 'minimum_withdrawal_minor',
                     'withdrawal_days', 'daily_revenue_minor', 'task_reward_minor', 'daily_task_limit', 'features',
                     'is_active', 'updated_at',

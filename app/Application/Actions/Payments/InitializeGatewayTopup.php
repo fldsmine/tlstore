@@ -6,6 +6,7 @@ use App\Application\Money\CurrencyMinorUnits;
 use App\Application\Support\PaymentGatewaySettings;
 use App\Models\PaymentIntent;
 use App\Models\SubscriptionPlan;
+use App\Models\PackageAddon;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -26,6 +27,7 @@ final class InitializeGatewayTopup
         string $purpose = 'topup',
         ?SubscriptionPlan $subscriptionPlan = null,
         ?string $customerEmail = null,
+        ?PackageAddon $packageAddon = null,
     ): array
     {
         $gateway = strtolower($gateway);
@@ -57,18 +59,20 @@ final class InitializeGatewayTopup
             throw ValidationException::withMessages(['gateway' => 'Online payments require a public HTTPS payment return URL.']);
         }
         $reference = 'tls-'.$user->id.'-'.Str::lower(Str::random(24));
-        if (! in_array($purpose, ['topup', 'subscription'], true)
-            || ($purpose === 'subscription' && $subscriptionPlan === null)) {
+        if (! in_array($purpose, ['topup', 'subscription', 'package_addon'], true)
+            || ($purpose === 'subscription' && $subscriptionPlan === null)
+            || ($purpose === 'package_addon' && $packageAddon === null)) {
             throw ValidationException::withMessages(['payment' => 'Invalid payment purpose.']);
         }
         $intentKey = $purpose === 'topup'
             ? $gateway.'-topup:'.$user->id.':'.hash('sha256', $idempotencyKey)
-            : $gateway.'-sub:'.hash('sha256', $user->id.':'.$idempotencyKey);
+            : $gateway.'-'.($purpose === 'subscription' ? 'sub' : 'addon').':'.hash('sha256', $user->id.':'.$idempotencyKey);
         $intent = PaymentIntent::query()->where('idempotency_key', $intentKey)->first();
         if ($intent) {
             if ($intent->amount_minor !== $amountMinor || $intent->currency !== $currency
                 || $intent->purpose !== $purpose
-                || ($purpose === 'subscription' && (int) $intent->source_id !== (int) $subscriptionPlan?->id)) {
+                || ($purpose === 'subscription' && (int) $intent->source_id !== (int) $subscriptionPlan?->id)
+                || ($purpose === 'package_addon' && (int) $intent->source_id !== (int) $packageAddon?->id)) {
                 throw ValidationException::withMessages(['idempotency_key' => 'This idempotency key was already used for a different top-up.']);
             }
             $url = $intent->provider_metadata['checkout_url'] ?? null;
@@ -81,8 +85,8 @@ final class InitializeGatewayTopup
         $intent = DB::transaction(fn () => PaymentIntent::query()->create([
             'user_id' => $user->id,
             'purpose' => $purpose,
-            'source_type' => $purpose === 'subscription' ? 'subscription_plan' : null,
-            'source_id' => $subscriptionPlan?->id,
+            'source_type' => match ($purpose) { 'subscription' => 'subscription_plan', 'package_addon' => 'package_addon', default => null },
+            'source_id' => $subscriptionPlan?->id ?? $packageAddon?->id,
             'amount_minor' => $amountMinor,
             'currency' => $currency,
             'provider' => $gateway,
@@ -115,8 +119,8 @@ final class InitializeGatewayTopup
                     'redirect_url' => $returnUrl,
                     'customer' => ['email' => $email, 'name' => $name, 'phonenumber' => $user->phone],
                     'customizations' => [
-                        'title' => $purpose === 'subscription' ? 'TrustLens package' : 'TrustLens wallet top-up',
-                        'description' => $purpose === 'subscription' ? 'Purchase '.$subscriptionPlan?->name.' package' : 'Add funds to your TrustLens top-up wallet',
+                        'title' => in_array($purpose, ['subscription', 'package_addon'], true) ? 'TrustLens package' : 'TrustLens wallet top-up',
+                        'description' => $purpose === 'subscription' ? 'Purchase '.$subscriptionPlan?->name.' package' : ($purpose === 'package_addon' ? 'Purchase '.$packageAddon?->name.' add-on' : 'Add funds to your TrustLens top-up wallet'),
                     ],
                     'meta' => ['user_id' => $user->id, 'payment_intent_id' => $intent->id],
                 ]),
@@ -126,7 +130,7 @@ final class InitializeGatewayTopup
                     'reference' => $reference,
                     'redirect_url' => $returnUrl,
                     'notification_url' => $notificationUrl,
-                    'narration' => $purpose === 'subscription' ? 'TrustLens '.$subscriptionPlan?->name.' package' : 'TrustLens wallet top-up',
+                    'narration' => $purpose === 'subscription' ? 'TrustLens '.$subscriptionPlan?->name.' package' : ($purpose === 'package_addon' ? 'TrustLens '.$packageAddon?->name.' add-on' : 'TrustLens wallet top-up'),
                     'customer' => ['email' => $email, 'name' => $name],
                     'metadata' => ['user_id' => (string) $user->id, 'intent-id' => (string) $intent->id],
                 ]),

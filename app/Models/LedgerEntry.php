@@ -15,12 +15,13 @@ class LedgerEntry extends Model
     protected $table = 'ledger_entries';
     protected $fillable = [
         'wallet_id', 'entry_type', 'direction', 'amount_minor', 'status', 'source_type',
-        'source_id', 'idempotency_key', 'description', 'available_at', 'posted_at',
+        'source_id', 'idempotency_key', 'description', 'metadata', 'available_at', 'posted_at',
     ];
     protected $casts = [
         'direction' => LedgerDirection::class,
         'amount_minor' => 'integer',
         'status' => LedgerEntryStatus::class,
+        'metadata' => 'array',
         'available_at' => 'datetime',
         'posted_at' => 'datetime',
     ];

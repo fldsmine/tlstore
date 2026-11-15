@@ -3,14 +3,14 @@
 namespace App\Application\Actions\Subscriptions;
 
 use App\Application\Actions\Referrals\CreditReferralReward;
+use App\Application\Actions\Wallets\CreditUserWallet;
 use App\Application\Money\CurrencyMinorUnits;
-use App\Models\LedgerEntry;
+use App\Enums\WalletType;
 use App\Models\PaymentIntent;
 use App\Models\SubscriptionPlan;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\UserSubscription;
-use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
 
 final class ActivateSubscription
@@ -80,28 +80,24 @@ final class ActivateSubscription
 
             $bonusMinor = CurrencyMinorUnits::toMinor($plan->bonus, $plan->currency);
             if ($bonusMinor > 0 && $this->rewardSettingEnabled('rewards.subscription_bonus_active')) {
-                $bonusWallet = Wallet::query()->firstOrCreate(
-                    ['user_id' => $user->id, 'wallet_type' => 'bonus', 'currency' => $plan->currency],
-                    ['status' => 'active'],
+                app(CreditUserWallet::class)->handle(
+                    $user,
+                    WalletType::Bonus,
+                    $bonusMinor,
+                    $plan->currency,
+                    'subscription_bonus',
+                    'user_subscription',
+                    $subscription->id,
+                    'subscription-bonus:'.$intent->id,
+                    'Plan welcome bonus',
+                    $now,
                 );
-                LedgerEntry::query()->firstOrCreate(['idempotency_key' => 'subscription-bonus:'.$intent->id], [
-                    'wallet_id' => $bonusWallet->id,
-                    'entry_type' => 'subscription_bonus',
-                    'direction' => 'credit',
-                    'amount_minor' => $bonusMinor,
-                    'status' => 'posted',
-                    'source_type' => 'user_subscription',
-                    'source_id' => $subscription->id,
-                    'description' => 'Plan welcome bonus',
-                    'available_at' => $now,
-                    'posted_at' => $now,
-                ]);
             }
 
             app(CreditReferralReward::class)->handle(
                 $user,
                 $intent->amount_minor,
-                $plan->currency,
+                $intent->currency,
                 'subscription',
                 'user_subscription',
                 $subscription->id,

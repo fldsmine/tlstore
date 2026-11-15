@@ -27,8 +27,8 @@ class User extends Authenticatable
     protected $table = 'users';
 
     protected $fillable = [
-        'full_name', 'username', 'email', 'phone', 'email_verified_at', 'password',
-        'country_code', 'preferred_currency', 'role', 'status', 'avatar', 'cover_image',
+        'full_name', 'username', 'email', 'phone', 'email_verified_at', 'password', 'has_addon',
+        'country_code', 'preferred_currency', 'wallet_currency', 'role', 'status', 'avatar', 'cover_image',
         'is_banned', 'ban_reason', 'subscription_questionnaire_answers',
         'subscription_questionnaire_completed_groups', 'subscription_questionnaire_completed_at',
     ];
@@ -106,6 +106,11 @@ class User extends Authenticatable
         return $this->hasMany(AppReviewCampaign::class, 'owner_id');
     }
 
+    public function campaignOrders(): HasMany
+    {
+        return $this->hasMany(UserCampaignOrder::class);
+    }
+
     public function reviewTasks(): HasMany
     {
         return $this->hasMany(ReviewTask::class, 'reviewer_id');
@@ -116,6 +121,11 @@ class User extends Authenticatable
         return $this->hasMany(ReviewSubmission::class, 'reviewer_id');
     }
 
+    public function appReports(): HasMany
+    {
+        return $this->hasMany(AppReport::class, 'reporter_user_id');
+    }
+
     public function adShareTasks(): HasMany
     {
         return $this->hasMany(AdShareTask::class);
@@ -124,6 +134,11 @@ class User extends Authenticatable
     public function subscriptions(): HasMany
     {
         return $this->hasMany(UserSubscription::class);
+    }
+
+    public function packageAddons(): HasMany
+    {
+        return $this->hasMany(UserPackageAddon::class);
     }
 
     public function wallets(): HasMany

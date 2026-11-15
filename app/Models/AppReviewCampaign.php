@@ -15,7 +15,7 @@ class AppReviewCampaign extends Model
     protected $fillable = [
         'campaign_key', 'app_id', 'owner_id', 'paid_amount_minor', 'currency', 'location',
         'review_reward_minor', 'maximum_review', 'reserved_reviews', 'completed_reviews',
-        'status', 'starts_at', 'ends_at',
+        'status', 'starts_at', 'ends_at', 'review_template_version_id',
     ];
     protected $casts = [
         'paid_amount_minor' => 'integer',
@@ -33,6 +33,11 @@ class AppReviewCampaign extends Model
         return $this->belongsTo(App::class);
     }
 
+    public function reviewTemplateVersion(): BelongsTo
+    {
+        return $this->belongsTo(ReviewTemplateVersion::class, 'review_template_version_id');
+    }
+
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
@@ -41,6 +46,11 @@ class AppReviewCampaign extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(ReviewTask::class);
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(AppReport::class, 'app_review_campaign_id');
     }
 
     public function getCurrencyMinorUnitsAttribute(): int

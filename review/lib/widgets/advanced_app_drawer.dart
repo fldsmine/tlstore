@@ -19,6 +19,7 @@ enum AppDrawerDestination {
   help,
   profile,
   settings,
+  campaigns,
   privacy,
   terms,
   about,
@@ -31,12 +32,14 @@ class AdvancedAppDrawer extends StatelessWidget {
     super.key,
     required this.user,
     required this.preferredCurrency,
+    required this.onCurrencyTap,
     required this.onSelect,
     this.selectedDestination,
   });
 
   final Map<String, dynamic> user;
   final String preferredCurrency;
+  final VoidCallback onCurrencyTap;
   final ValueChanged<AppDrawerDestination> onSelect;
   final AppDrawerDestination? selectedDestination;
 
@@ -68,6 +71,7 @@ class AdvancedAppDrawer extends StatelessWidget {
         AppDrawerDestination.rankings,
       ),
       (Icons.add_card_rounded, 'Topup fund', AppDrawerDestination.topUp),
+      (Icons.campaign_outlined, 'Campaign', AppDrawerDestination.campaigns),
       (Icons.task_alt_rounded, 'My Tasks', AppDrawerDestination.tasks),
       (Icons.help_center_rounded, 'FAQs', AppDrawerDestination.help),
       (Icons.settings_rounded, 'Settings', AppDrawerDestination.settings),
@@ -238,36 +242,45 @@ class AdvancedAppDrawer extends StatelessWidget {
                       Expanded(
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .12),
+                          child: Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            child: InkWell(
                               borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.currency_exchange_rounded,
-                                  color: Colors.white,
-                                  size: 19,
+                              onTap: onCurrencyTap,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 8,
                                 ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    preferredCurrency.toUpperCase(),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: .12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.currency_exchange_rounded,
                                       color: Colors.white,
-                                      fontWeight: FontWeight.w600,
+                                      size: 19,
                                     ),
-                                  ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        preferredCurrency.toUpperCase(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         ),

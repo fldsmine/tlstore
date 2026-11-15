@@ -20,10 +20,10 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
   String? _error;
   bool _loading = true;
 
-  static const Color _primary = Color(0xFF635BFF);
-  static const Color _dark = Color(0xFF17172F);
-  static const Color _background = Color(0xFFF6F7FC);
-  static const Color _green = Color(0xFF159B72);
+  Color get _primary => Theme.of(context).colorScheme.primary;
+  Color get _dark => Theme.of(context).colorScheme.onSurface;
+  Color get _background => Theme.of(context).scaffoldBackgroundColor;
+  Color get _green => Theme.of(context).colorScheme.tertiary;
 
   @override
   void initState() {
@@ -75,7 +75,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'Rank Rewards',
           style: TextStyle(
             fontSize: 21,
@@ -86,14 +86,14 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         actions: [
           IconButton(
             onPressed: _load,
-            icon: const Icon(Icons.refresh_rounded, color: _dark),
+            icon: Icon(Icons.refresh_rounded, color: _dark),
             tooltip: 'Refresh',
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _primary))
+          ? Center(child: CircularProgressIndicator(color: _primary))
           : _error != null
           ? _errorView()
           : _content(),
@@ -230,7 +230,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                         const SizedBox(width: 6),
                         Text(
                           enabled ? 'REWARDS PROGRAM ACTIVE' : 'PROGRAM PAUSED',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
@@ -243,7 +243,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 ],
               ),
               const SizedBox(height: 22),
-              const Text(
+              Text(
                 'Build your referral rank',
                 style: TextStyle(
                   color: Colors.white,
@@ -306,7 +306,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             children: [
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 21,
                   fontWeight: FontWeight.w900,
@@ -334,7 +334,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             color: _dark,
             fontSize: 18,
             fontWeight: FontWeight.w800,
@@ -343,7 +343,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
         ),
       ],
     );
@@ -361,8 +361,8 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 title: 'Subscribed referrals',
                 value: '${progress['subscribed_referrals'] ?? 0}',
                 icon: Icons.people_alt_rounded,
-                color: const Color(0xFF635BFF),
-                background: const Color(0xFFECEBFF),
+                color: Theme.of(context).colorScheme.primary,
+                background: Theme.of(context).colorScheme.primaryContainer,
               ),
             ),
             const SizedBox(width: 12),
@@ -371,8 +371,8 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 title: 'Referral cash inflow',
                 value: _usd(progress['referral_cash_inflow_usd']),
                 icon: Icons.groups_rounded,
-                color: const Color(0xFF159B72),
-                background: const Color(0xFFE3F7EF),
+                color: Theme.of(context).colorScheme.tertiary,
+                background: Theme.of(context).colorScheme.tertiaryContainer,
               ),
             ),
           ],
@@ -382,8 +382,8 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
           title: 'Your personal cash inflow',
           value: _usd(progress['user_cash_inflow_usd']),
           icon: Icons.account_balance_wallet_rounded,
-          color: const Color(0xFFDB9231),
-          background: const Color(0xFFFFF3E1),
+          color: Theme.of(context).colorScheme.secondary,
+          background: Theme.of(context).colorScheme.secondaryContainer,
           horizontal: true,
         ),
       ],
@@ -402,9 +402,9 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEEEEF5)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: horizontal
           ? Row(
@@ -418,14 +418,14 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                       Text(
                         title,
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 11,
                         ),
                       ),
                       const SizedBox(height: 5),
                       Text(
                         value,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _dark,
                           fontSize: 21,
                           fontWeight: FontWeight.w900,
@@ -443,7 +443,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 const SizedBox(height: 14),
                 Text(
                   title,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
                 ),
                 const SizedBox(height: 6),
                 FittedBox(
@@ -451,7 +451,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     value,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: _dark,
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -523,15 +523,15 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: eligible ? _green.withOpacity(0.4) : const Color(0xFFEEEEF5),
+          color: eligible ? _green.withOpacity(0.4) : Theme.of(context).colorScheme.outlineVariant,
           width: eligible ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.025),
+          color: Theme.of(context).colorScheme.shadow.withOpacity(0.025),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -552,7 +552,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                     children: [
                       Text(
                         level['name']?.toString() ?? 'Rank',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _dark,
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
@@ -562,7 +562,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                       Text(
                         'LEVEL ${level['level'] ?? index + 1}',
                         style: TextStyle(
-                          color: Colors.grey.shade500,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1,
@@ -576,7 +576,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   const SizedBox(width: 7),
                   Icon(
                     Icons.lock_rounded,
-                    color: Colors.grey.shade500,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     size: 19,
                   ),
                 ],
@@ -602,7 +602,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                         Text(
                           'MONTHLY REWARD',
                           style: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.8,
@@ -632,7 +632,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                       Text(
                         'DURATION',
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
                         ),
@@ -640,7 +640,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                       const SizedBox(height: 5),
                       Text(
                         '${level['reward_duration_months'] ?? 0} months',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _dark,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -657,7 +657,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
 
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'REQUIREMENTS PROGRESS',
                       style: TextStyle(
@@ -708,18 +708,22 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(11),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE6F7EF),
+                    color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.check_circle_rounded, color: _green, size: 17),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: Theme.of(context).colorScheme.tertiary,
+                        size: 17,
+                      ),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Congratulations! You qualify for this rank.',
                           style: TextStyle(
-                            color: _green,
+                            color: Theme.of(context).colorScheme.tertiary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -736,14 +740,14 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(11),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF2F3F7),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.lock_outline_rounded,
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         size: 17,
                       ),
                       const SizedBox(width: 8),
@@ -751,7 +755,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                         child: Text(
                           'Unlock this level by qualifying for the previous rank.',
                           style: TextStyle(
-                            color: Colors.grey.shade700,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -766,7 +770,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'This ranking level is currently inactive.',
-                  style: TextStyle(color: Colors.red.shade400, fontSize: 11),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 11),
                 ),
               ],
             ],
@@ -798,7 +802,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
               child: Text(
                 title,
                 style: TextStyle(
-                  color: Colors.grey.shade700,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -806,7 +810,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             ),
             Text(
               '$currentText / $targetText',
-              style: const TextStyle(
+              style: TextStyle(
                 color: _dark,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
@@ -820,7 +824,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
           child: LinearProgressIndicator(
             value: fraction,
             minHeight: 7,
-            backgroundColor: const Color(0xFFF0F0F5),
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
@@ -830,12 +834,12 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
 
   Widget _statusBadge(bool active, bool eligible, {bool locked = false}) {
     final color = locked
-        ? Colors.grey
+        ? Theme.of(context).colorScheme.onSurfaceVariant
         : !active
-        ? Colors.red
+        ? Theme.of(context).colorScheme.error
         : eligible
         ? _green
-        : const Color(0xFFD18A28);
+        : Theme.of(context).colorScheme.secondary;
 
     final label = locked
         ? 'Locked'
@@ -906,13 +910,14 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
   }
 
   Color _rankColor(int index) {
-    const colors = [
-      Color(0xFFCD8B46),
-      Color(0xFFB87948),
-      Color(0xFF8A91A5),
-      Color(0xFF577DD5),
-      Color(0xFF7D55C7),
-      Color(0xFF159B72),
+    final palette = Theme.of(context).colorScheme;
+    final colors = [
+      palette.tertiary,
+      palette.secondary,
+      palette.outline,
+      palette.primary,
+      palette.secondary,
+      palette.primary,
     ];
 
     return colors[index % colors.length];
@@ -938,9 +943,9 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEAEAF2)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -952,7 +957,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
               children: [
                 Text(
                   level['name']?.toString() ?? 'Rank',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _dark,
                     fontWeight: FontWeight.w900,
                     fontSize: 14,
@@ -961,7 +966,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                 const SizedBox(height: 5),
                 Text(
                   '${_usd(reward)} / month',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: _primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -972,7 +977,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   completed
                       ? 'Reward period complete'
                       : 'Next payment: ${_date(item['next_reward_at'])}',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 10),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10),
                 ),
                 const SizedBox(height: 9),
                 ClipRRect(
@@ -980,14 +985,14 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
                   child: LinearProgressIndicator(
                     value: total <= 0 ? 0 : (paid / total).clamp(0.0, 1.0),
                     minHeight: 5,
-                    backgroundColor: const Color(0xFFF0F0F5),
-                    valueColor: const AlwaysStoppedAnimation(_green),
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation(_green),
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   '$paid of $total payments',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10),
                 ),
               ],
             ),
@@ -995,7 +1000,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
           const SizedBox(width: 8),
           Icon(
             completed ? Icons.check_circle_rounded : Icons.schedule_rounded,
-            color: completed ? _green : Colors.orange,
+            color: completed ? _green : Theme.of(context).colorScheme.tertiary,
             size: 22,
           ),
         ],
@@ -1009,7 +1014,7 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
     return Container(
       padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -1017,17 +1022,17 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
           Icon(
             Icons.emoji_events_outlined,
             size: 48,
-            color: Colors.grey.shade400,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'No ranking levels available',
             style: TextStyle(color: _dark, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 5),
           Text(
             'Please check back later.',
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
           ),
         ],
       ),
@@ -1038,19 +1043,19 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: const Color(0xFFECEBFF),
+        color: Theme.of(context).colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           Icon(Icons.info_outline_rounded, color: _primary, size: 20),
           SizedBox(width: 10),
           Expanded(
             child: Text(
               'Meet all the requirements of a ranking level to qualify for its monthly bonus wallet rewards. Your progress updates as your referral activity grows.',
               style: TextStyle(
-                color: Color(0xFF5146A8),
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
                 fontSize: 11,
                 height: 1.6,
               ),
@@ -1073,10 +1078,10 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             Icon(
               Icons.cloud_off_rounded,
               size: 55,
-              color: Colors.grey.shade400,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 15),
-            const Text(
+            Text(
               'Unable to load rankings',
               style: TextStyle(
                 color: _dark,
@@ -1088,16 +1093,16 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
             Text(
               _error ?? 'Please try again.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
             ),
             const SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: _load,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try again'),
+              icon: Icon(Icons.refresh_rounded),
+              label: Text('Try again'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primary,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 22,
                   vertical: 12,
@@ -1152,3 +1157,4 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
         'Pending';
   }
 }
+

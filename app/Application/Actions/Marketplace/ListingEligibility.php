@@ -47,8 +47,8 @@ final class ListingEligibility
                 if (! $plan) return false;
                 if ($taskType === 'review') {
                     if (($plan->max_review_tasks ?? 0) < 1) return false;
-                    if ($plan->eligible_app_store && strcasecmp(trim($plan->eligible_app_store), trim((string) $store)) !== 0) return false;
-                    if ($plan->eligible_app_category && strcasecmp(trim($plan->eligible_app_category), trim((string) $category)) !== 0) return false;
+                    if (! $this->matchesStore($plan->eligible_app_store, $store)) return false;
+                    if (! $this->matchesCategory($plan->eligible_app_category, $category, $store)) return false;
                 } elseif (($plan->max_ad_shares ?? 0) < 1) {
                     return false;
                 }
@@ -109,5 +109,36 @@ final class ListingEligibility
         if (! in_array($groupKey, ['group_b', 'group_c'], true)) return true;
 
         return in_array($groupKey, $user->subscription_questionnaire_completed_groups ?? [], true);
+    }
+
+    private function matchesStore(?string $eligibleStore, ?string $store): bool
+    {
+        if ($eligibleStore === null || trim($eligibleStore) === '') return true;
+        if ($store === null || trim($store) === '') return false;
+
+        return $this->storeKey($eligibleStore) === $this->storeKey($store);
+    }
+
+    private function matchesCategory(?string $eligibleCategory, ?string $category, ?string $store): bool
+    {
+        if ($eligibleCategory === null || trim($eligibleCategory) === '') return true;
+        // Older Apple plans were configured with "Apple" in the category field.
+        // Continue to honor those plans based on the app's store until all old
+        // records have been normalized by the migration.
+        if (strcasecmp(trim($eligibleCategory), 'Apple') === 0 && $this->storeKey($store) === 'apple_store') {
+            return true;
+        }
+
+        return $category !== null && strcasecmp(trim($eligibleCategory), trim($category)) === 0;
+    }
+
+    private function storeKey(?string $store): string
+    {
+        $value = strtolower(trim($store ?? ''));
+        if (str_contains($value, 'apple') || str_contains($value, 'ios')) return 'apple_store';
+        if (str_contains($value, 'samsung') || str_contains($value, 'galaxy')) return 'samsung_store';
+        if (str_contains($value, 'google') || str_contains($value, 'play')) return 'google_play';
+
+        return preg_replace('/[^a-z0-9]+/', '', $value) ?? '';
     }
 }

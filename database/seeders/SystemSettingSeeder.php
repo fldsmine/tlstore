@@ -82,6 +82,31 @@ class SystemSettingSeeder extends Seeder
             'rewards.subscription_bonus_active' => [true, false],
             'rewards.social_follow_active' => [true, false],
             'rewards.user_ranking_active' => [true, true],
+
+            // --- app auto-approval delays (minutes) ----------------------
+            'app.auto_approve_ads.delay_minutes' => [2, false],
+            'app.auto_approve_reviews.delay_minutes' => [5, false],
+
+            // --- user campaign order pricing (amounts are NGN per action) --
+            'campaign.services' => [[
+                'tiktok' => ['followers' => 40, 'min' => 50],
+                'youtube' => ['subscribers' => 100, 'min' => 40],
+                'twitter' => ['follower' => 70, 'min' => 30],
+                'instagram' => [
+                    'followers' => 50,
+                    'likes' => 30,
+                    'min' => 40,
+                ],
+                'facebook' => [
+                    'page_like' => 40,
+                    'post_share' => 20,
+                    'min' => 50,
+                ],
+                'whatsapp' => ['channel' => 20, 'min' => 50],
+                'telegram' => ['join' => 20, 'min' => 50],
+            ], true],
+            'campaign.service_fee_percent' => [5, true],
+            'campaign.currency' => ['NGN', true],
         ];
     }
 }

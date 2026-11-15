@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Wallets;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Money\CurrencyConverter;
 use App\Models\LedgerEntry;
 use App\Models\User;
 use App\Models\Wallet;
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 final class RequestWithdrawal
 {
+    public function __construct(private readonly CurrencyConverter $currencyConverter) {}
+
     public function handle(User $user, int $walletId, int $optionId, int $amountMinor, array $payoutDetails, string $idempotencyKey): Withdrawal
     {
         return DB::transaction(function () use ($user, $walletId, $optionId, $amountMinor, $payoutDetails, $idempotencyKey): Withdrawal {
@@ -29,21 +32,30 @@ final class RequestWithdrawal
             }
 
             $wallet = Wallet::query()->where('user_id', $user->id)->lockForUpdate()->findOrFail($walletId);
-            if (! in_array($wallet->wallet_type->value, ['review', 'share', 'referral', 'bonus'], true)) {
+            $walletType = $wallet->wallet_type->value;
+            if (! in_array($walletType, ['review', 'review_group_b', 'review_group_c', 'share', 'referral', 'bonus'], true)) {
                 throw ValidationException::withMessages(['wallet_id' => 'Top-up funds cannot be withdrawn.']);
             }
             $option = WithdrawalOption::query()->where('is_available', true)->findOrFail($optionId);
-            $subscription = UserSubscription::query()->with('plan.group')
+            $requiredGroup = match ($walletType) {
+                'share' => 'group_a',
+                'review_group_c' => 'group_c',
+                'review_group_b', 'review' => 'group_b',
+                default => null,
+            };
+            $subscriptionQuery = UserSubscription::query()->with('plan.group')
                 ->where('user_id', $user->id)->where('product_type', 'marketplace_access')
-                ->where('status', 'active')->where('starts_at', '<=', now())->where('ends_at', '>', now())
-                ->latest('ends_at')->first();
+                ->where('status', 'active')->where('starts_at', '<=', now())->where('ends_at', '>', now());
+            if ($requiredGroup !== null) {
+                $subscriptionQuery->whereHas('plan.group', fn ($query) => $query->where('group_key', $requiredGroup));
+            }
+            $subscription = $subscriptionQuery->latest('starts_at')->first();
             if (! $subscription?->plan) {
-                throw ValidationException::withMessages(['subscription' => 'An active package is required to request a withdrawal.']);
+                throw ValidationException::withMessages(['subscription' => $requiredGroup === null
+                    ? 'An active package is required to request a withdrawal.'
+                    : 'An active package in the matching group is required to withdraw from this wallet.']);
             }
             $plan = $subscription->plan;
-            if (strtoupper($wallet->currency) !== strtoupper($plan->currency)) {
-                throw ValidationException::withMessages(['wallet_id' => 'Withdrawals must use a wallet in your active package currency ('.$plan->currency.').']);
-            }
             $withdrawalDays = $plan->withdrawal_days ?? [];
             if (! $this->isWithdrawalDay($withdrawalDays, now())) {
                 throw ValidationException::withMessages(['withdrawal' => 'Your package allows withdrawals on: '.implode(' and ', $withdrawalDays).'.']);
@@ -63,7 +75,11 @@ final class RequestWithdrawal
             }
 
             $minimumMinor = CurrencyMinorUnits::toMinor($option->min_withdrawal, $wallet->currency);
-            $packageMinimumMinor = (int) ($plan->minimum_withdrawal_minor ?? 0);
+            $packageMinimumMinor = $this->currencyConverter->convertMinor(
+                (int) ($plan->minimum_withdrawal_minor ?? 0),
+                $plan->currency,
+                $wallet->currency,
+            )['amount_minor'];
             $minimumMinor = max($minimumMinor, $packageMinimumMinor);
             if ($amountMinor < $minimumMinor) {
                 throw ValidationException::withMessages(['amount_minor' => 'The requested amount is below the package or payout method minimum.']);
@@ -77,7 +93,8 @@ final class RequestWithdrawal
             $withdrawal = Withdrawal::query()->create([
                 'user_id' => $user->id, 'wallet_id' => $wallet->id, 'user_subscription_id' => $subscription->id,
                 'package_withdrawal_terms_snapshot' => [
-                    'plan_key' => $plan->plan_key, 'plan_name' => $plan->name, 'currency' => $plan->currency,
+                    'plan_key' => $plan->plan_key, 'plan_name' => $plan->name,
+                    'currency' => $wallet->currency, 'source_currency' => $plan->currency,
                     'minimum_withdrawal_minor' => $packageMinimumMinor, 'withdrawal_days' => $withdrawalDays,
                 ],
                 'withdrawal_option_id' => $option->id,

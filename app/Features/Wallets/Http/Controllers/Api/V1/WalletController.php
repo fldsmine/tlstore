@@ -22,6 +22,7 @@ final class WalletController
             return [
                 'id' => $wallet->id,
                 'type' => $wallet->wallet_type->value,
+                'label' => $wallet->wallet_type->label(),
                 'currency' => $wallet->currency,
                 'balance_minor' => (int) $wallet->balance_minor,
                 'available_balance_minor' => (int) $wallet->balance_minor,
@@ -43,7 +44,7 @@ final class WalletController
     {
         $data = $request->validate([
             'amount_minor' => ['required', 'integer', 'min:1'],
-            'target_wallet' => ['required', 'in:review,share,referral,bonus'],
+            'target_wallet' => ['required', 'in:review,review_group_b,review_group_c,share,referral,bonus'],
             'idempotency_key' => ['required', 'string', 'max:80'],
         ]);
         $transfer->handle($request->user(), $data['amount_minor'], $data['target_wallet'], $data['idempotency_key']);

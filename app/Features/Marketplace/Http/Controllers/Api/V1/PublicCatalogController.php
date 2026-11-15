@@ -139,7 +139,7 @@ final class PublicCatalogController
         $plans = SubscriptionPlan::query()
             ->where('is_active', true)
             ->when(isset($validated['product_type']), fn ($query) => $query->where('product_type', $validated['product_type']))
-            ->with(['features', 'group'])
+            ->with(['features', 'group', 'packageAddon'])
             ->orderBy('product_type')
             ->orderBy('price_minor')
             ->get();

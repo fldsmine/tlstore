@@ -28,7 +28,7 @@ return new class extends Migration
             $table->string('category', 100);
             $table->string('install_count_label', 32)->nullable();
             $table->text('description');
-            $table->string('store_link', 180)->nullable();
+            $table->string('store_link', 2048)->nullable();
             $table->string('app_icon', 255)->nullable()->comment('App icon storage path or URL');
             $table->string('status', 24)->default('active');
             $table->integer('featured')->default(0)->comment('If listing is featured or not [0,1], featured shows on HomeScreen and special pages');

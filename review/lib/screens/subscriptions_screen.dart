@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/currency/money.dart';
+import '../core/utils/helper.dart';
 import '../services/auth_api.dart';
 import 'subscription_questionnaire_screen.dart';
 import 'topup_screen.dart';
@@ -89,6 +90,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     try {
       await widget.api.loadExchangeRates(widget.token);
       final fresh = await widget.api.refreshUser(widget.token);
+
       if (!mounted) return;
       setState(() {
         _applySnapshot(fresh);
@@ -327,20 +329,28 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                       final plan = _planForSubscription(subscription);
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.verified_rounded,
-                            color: colors.primary,
-                          ),
-                          title: Text(
-                            plan['name']?.toString() ?? 'Active package',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          subtitle: Text(
-                            '${plan['group_key']?.toString().replaceAll('_', ' ').toUpperCase() ?? 'PACKAGE'} · until ${_formatDate(subscription['ends_at'])}',
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => _showActiveDetails(subscription),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ListTile(
+                              leading: Icon(
+                                Icons.verified_rounded,
+                                color: colors.primary,
+                              ),
+                              title: Text(
+                                plan['name']?.toString() ?? 'Active package',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${plan['group_key']?.toString().replaceAll('_', ' ').toUpperCase() ?? 'PACKAGE'} · until ${_formatDate(subscription['ends_at'])}',
+                              ),
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () => _showActiveDetails(subscription),
+                            ),
+                          ],
                         ),
                       );
                     }),
@@ -803,6 +813,7 @@ class _GroupCard extends StatelessWidget {
     required this.planCount,
     required this.onTap,
   });
+
   final Map<String, dynamic> group;
   final int planCount;
   final VoidCallback onTap;
@@ -825,13 +836,35 @@ class _GroupCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundColor: colors.primaryContainer,
-                child: Icon(
-                  Icons.card_membership_rounded,
-                  color: colors.onPrimaryContainer,
-                ),
-              ),
+			Row(
+			  children: [
+				  CircleAvatar(
+					backgroundColor: colors.primaryContainer,
+					child: Icon(
+					  Icons.card_membership_rounded,
+					  color: colors.onPrimaryContainer,
+					),
+				  ),
+				const Spacer(),
+				Container(
+				  padding: const EdgeInsets.symmetric(
+					horizontal: 10,
+					vertical: 6,
+				  ),
+				  decoration: BoxDecoration(
+					color: colors.secondaryContainer,
+					borderRadius: BorderRadius.circular(30),
+				  ),
+				  child: Text(
+					'$planCount ${planCount == 1 ? 'package' : 'packages'}',
+					style: Theme.of(context).textTheme.labelSmall?.copyWith(
+					  color: colors.onSecondaryContainer,
+					  fontWeight: FontWeight.w800,
+					),
+				  ),
+				),
+			  ],
+			),
               const SizedBox(height: 12),
               Text(
                 group['name']?.toString() ?? 'Package group',
@@ -840,7 +873,7 @@ class _GroupCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${group['description'] ?? ''} · $planCount packages',
+                '${group['description'] ?? ''}',
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall
@@ -1075,24 +1108,57 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
     return null;
   }
 
-  int _cachedFunds() {
-    final snapshot = _map(widget.user['subscription_context']);
-    final wallets = _rows(snapshot['wallets']);
-    for (final wallet in wallets) {
-      if (wallet['type'] == 'topup_fund' &&
-          wallet['currency']?.toString().toUpperCase() ==
-              _currency.toUpperCase()) {
-        return _asInt(wallet['available_balance_minor']);
+  CurrencyOption? _currencyInfo(String currency) {
+    final code = currency.toUpperCase();
+
+    for (final item in supportedCurrencies) {
+      if (item.code.toUpperCase() == code) {
+        return item;
       }
     }
-    return 0;
+
+    return null;
+  }
+
+  Map<String, dynamic>? _fundsQuote() {
+    final snapshot = _map(widget.user['subscription_context']);
+    final wallets = _rows(snapshot['wallets'])
+        .where((wallet) => wallet['type'] == 'topup_fund')
+        .toList()
+      ..sort((a, b) {
+        final aNative = a['currency']?.toString().toUpperCase() == _currency.toUpperCase();
+        final bNative = b['currency']?.toString().toUpperCase() == _currency.toUpperCase();
+        return (bNative ? 1 : 0).compareTo(aNative ? 1 : 0);
+      });
+    Map<String, dynamic>? firstAvailableQuote;
+    for (final wallet in wallets) {
+      final walletCurrency = wallet['currency']?.toString().toUpperCase() ?? _currency.toUpperCase();
+      final planMajor = _priceMinor / math.pow(10, currencyPrecision(_currency));
+      final walletMajor = walletCurrency == _currency.toUpperCase()
+          ? planMajor
+          : widget.api.convertMajor(planMajor, _currency, walletCurrency);
+      if (walletMajor == null) continue;
+      final requiredMinor = (walletMajor * math.pow(10, currencyPrecision(walletCurrency))).round();
+      final quote = <String, dynamic>{
+        'currency': walletCurrency,
+        'required_minor': requiredMinor,
+        'balance_minor': _asInt(wallet['available_balance_minor']),
+      };
+      firstAvailableQuote ??= quote;
+      if (quote['balance_minor'] >= quote['required_minor']) return quote;
+    }
+    return firstAvailableQuote;
   }
 
   Future<void> _payWithFunds() async {
-    if (_cachedFunds() < _priceMinor) {
+    final quote = _fundsQuote();
+    final walletCurrency = quote?['currency']?.toString() ?? _currency;
+    if (quote == null || quote['balance_minor']! < quote['required_minor']!) {
       setState(
         () => _message =
-            'Your top-up wallet does not have enough $_currency funds. Use Secure payment or fund your wallet first.',
+            quote == null
+                ? 'A current exchange rate or top-up wallet is unavailable. Use Secure payment or fund your wallet first.'
+                : 'Your $walletCurrency top-up wallet needs ${_money(quote['required_minor']!, walletCurrency, currencyPrecision(walletCurrency))}. Use Secure payment or fund your wallet first.',
       );
       return;
     }
@@ -1207,6 +1273,8 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
       selected?['currency_minor_units'] ?? widget.plan['currency_minor_units'],
       fallback: 2,
     ).clamp(0, 4);
+    final fundsQuote = _fundsQuote();
+    final fundsCurrency = fundsQuote?['currency']?.toString();
     return SafeArea(
       child: SingleChildScrollView(
         child: Padding(
@@ -1276,17 +1344,26 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
                 )
               else
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 230),
-                  child: ListView.builder(
+                  constraints: const BoxConstraints(maxHeight: 270),
+                  child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: _checkoutOptions.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 6),
                     itemBuilder: (context, index) {
                       final option = _checkoutOptions[index];
+
                       final optionKey = option['option_key']?.toString() ?? '';
+
                       final currency =
-                          option['currency']?.toString() ?? _currency;
-                      final label = option['label']?.toString() ?? currency;
+                          option['currency']?.toString().toUpperCase() ?? _currency;
+
+                      final currencyInfo = _currencyInfo(currency);
+
+                      final currencyName = currencyInfo?.name ?? currency;
+                      final flag = currencyInfo?.flag ?? '🌐';
+
                       final gateway = option['gateway']?.toString() ?? '';
+
                       final amount = _money(
                         _asInt(option['amount_minor']),
                         currency,
@@ -1295,24 +1372,93 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
                           fallback: 2,
                         ).clamp(0, 4),
                       );
-                      return CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: _selectedOptionKey == optionKey,
-                        title: Text('$label · $currency'),
-                        subtitle: Text('${_humanize(gateway)} · $amount'),
-                        onChanged: _busy
-                            ? null
-                            : (checked) => setState(() {
-                                _selectedOptionKey = checked == true
-                                    ? optionKey
-                                    : null;
-                                _message = null;
-                              }),
+
+                      final isSelected = _selectedOptionKey == optionKey;
+
+                      return Material(
+                        color: isSelected
+                            ? theme.colorScheme.primaryContainer.withValues(alpha: .45)
+                            : theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: _busy
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _selectedOptionKey = optionKey;
+                                    _message = null;
+                                  });
+                                },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: [
+                                // Country flag
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: .6),
+                                    borderRadius: BorderRadius.circular(13),
+                                  ),
+                                  child: Text(
+                                    flag,
+                                    style: const TextStyle(fontSize: 26),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 12),
+
+                                // Currency and payment information
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '$currencyName · $currency',
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${_humanize(gateway)} · $amount',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(width: 8),
+
+                                // Selection indicator
+                                Icon(
+                                  isSelected
+                                      ? Icons.check_circle_rounded
+                                      : Icons.circle_outlined,
+                                  color: isSelected
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.outline,
+                                  size: 24,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       );
                     },
                   ),
                 ),
+
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
@@ -1328,13 +1474,15 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
                 child: OutlinedButton.icon(
                   onPressed: _busy ? null : _payWithFunds,
                   icon: const Icon(Icons.account_balance_wallet_rounded),
-                  label: Text('Funds wallet · $_currency'),
+                  label: Text(fundsCurrency == null
+                      ? 'Funds wallet'
+                      : 'Funds wallet · $fundsCurrency'),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Funds wallet uses your top-up balance in $_currency.',
+                  'Funds wallet checks your available top-up balances and converts the package price when needed.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

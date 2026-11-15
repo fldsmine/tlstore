@@ -72,6 +72,7 @@ final class LedgerEntryObserver
             str_contains($entry->entry_type, 'rank') => 'rank_earning',
             str_contains($entry->entry_type, 'transfer') => 'fund_transfer',
             str_contains($entry->entry_type, 'topup') || str_contains($entry->entry_type, 'deposit') => 'top_up_fund',
+            str_contains($entry->entry_type, 'campaign_order') => 'campaign_order',
             default => 'fund_transfer',
         };
 
@@ -86,7 +87,7 @@ final class LedgerEntryObserver
                 'wallet' => $wallet->wallet_type->value,
                 'status' => $entry->status->value,
                 'description' => $entry->description,
-                'meta' => [
+                'meta' => array_merge($entry->metadata ?? [], [
                     'ledger_entry_id' => $entry->id,
                     'currency' => $currency,
                     'currency_minor_units' => CurrencyMinorUnits::precision($currency),
@@ -94,7 +95,7 @@ final class LedgerEntryObserver
                     'entry_type' => $entry->entry_type,
                     'source_type' => $entry->source_type,
                     'source_id' => $entry->source_id,
-                ],
+                ]),
             ],
         );
     }

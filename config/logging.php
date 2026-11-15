@@ -73,6 +73,24 @@ return [
             'replace_placeholders' => true,
         ],
 
+		'purge' => [
+            'driver' => 'single',
+			'path' => storage_path('logs/purge.log'),
+			'level' => 'info',
+		],
+
+		'adshare' => [
+            'driver' => 'single',
+			'path' => storage_path('logs/adshare.log'),
+			'level' => 'info',
+		],
+		
+		'review' => [
+            'driver' => 'single',
+			'path' => storage_path('logs/reviews.log'),
+			'level' => 'info',
+		],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

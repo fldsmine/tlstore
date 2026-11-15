@@ -21,6 +21,9 @@ class DatabaseSeeder extends Seeder
         // Everything below is demo content. It is only safe to insert in
         // non-production environments.
         if (! app()->environment(['local', 'testing', 'staging'])) {
+            // Add-on defaults are feature configuration, not demo activity.
+            // Seed them for existing production subscription plan records too.
+            $this->call(PackageAddonSeeder::class);
             return;
         }
 
@@ -35,6 +38,7 @@ class DatabaseSeeder extends Seeder
             WithdrawalOptionSeeder::class,
             ExchangeRateSnapshotSeeder::class,
             SubscriptionPlanSeeder::class,
+            PackageAddonSeeder::class,
             DemoUserSeeder::class,
             SocialHandleSeeder::class,
             SocialFollowSeeder::class,

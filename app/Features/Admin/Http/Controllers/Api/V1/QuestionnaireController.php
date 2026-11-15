@@ -16,7 +16,7 @@ final class QuestionnaireController
 {
     public function questions(): JsonResponse
     {
-        return response()->json(['data' => ReviewQuestion::query()
+        return response()->json(['data' => ReviewQuestion::query()->with('templateVersionLinks.templateVersion')
             ->orderBy('step_order')->orderBy('question_order')->paginate(100)]);
     }
 

@@ -26,12 +26,14 @@ class UserResource extends JsonResource
             'country_code' => $this->country_code,
             'country_name' => $this->country?->name,
             'preferred_currency' => $this->preferred_currency,
+            'wallet_currency' => $this->wallet_currency ?: $this->preferred_currency,
             'avatar' => \App\Application\Support\Media::url($this->avatar),
             'cover_image' => \App\Application\Support\Media::url($this->cover_image),
             'status' => $this->status?->value,
             'email_verified' => $this->email_verified_at !== null,
             'has_password' => filled($this->password),
             'security_pin_set' => filled($this->security_pin),
+            'has_addon' => $this->has_addon,
             'two_factor' => (bool) $this->two_factor,
             'created_at' => $this->created_at,
             'subscription_context' => $subscriptionContext,
@@ -100,7 +102,6 @@ class UserResource extends JsonResource
                         $group = $plans->first()->group->toArray();
                         $group['plans'] = $plans->map(function (SubscriptionPlan $plan) use ($bonusActive, $priceQuote, $paymentOptions, $group): array {
                             $data = $this->decoratePlan($plan, $bonusActive, $priceQuote, $paymentOptions);
-                            unset($data['group'], $data['location_coverage']);
                             $data['group_key'] = $group['group_key'];
                             return $data;
                         })->values()->all();
@@ -129,7 +130,6 @@ class UserResource extends JsonResource
     ): array {
         $data = $plan->toArray();
         $data['group_key'] = $plan->group?->group_key;
-        unset($data['group'], $data['location_coverage']);
         $data['bonus_active'] = $bonusActive;
         $data['checkout_options'] = $priceQuote->optionsFor($plan, $paymentOptions);
 

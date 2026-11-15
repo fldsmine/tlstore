@@ -40,6 +40,7 @@ return new class extends Migration
             $table->json('subscription_questionnaire_answers')->nullable();
             $table->json('subscription_questionnaire_completed_groups')->nullable();
             $table->timestamp('subscription_questionnaire_completed_at')->nullable();
+            $table->integer('has_addon')->default(0)->comment('shows user has a package that has addons on it or not. 0=does not, 1 has');
             $table->string('avatar', 512)->nullable();
             $table->string('cover_image', 512)->nullable();
             $table->string('role', 32)->default('reviewer');

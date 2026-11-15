@@ -53,7 +53,8 @@ class SubscriptionPackageGroupsTest extends TestCase
 
         $this->assertSame('Google Play', $plans['review-google-play-4m']->eligible_app_store);
         $this->assertSame('Samsung Galaxy Store', $plans['review-samsung-store-4m']->eligible_app_store);
-        $this->assertSame('Apple', $plans['review-apple-store-4m']->eligible_app_category);
+        $this->assertSame('Apple App Store', $plans['review-apple-store-4m']->eligible_app_store);
+        $this->assertNull($plans['review-apple-store-4m']->eligible_app_category);
         $this->assertSame(0, $plans['review-google-play-4m']->max_ad_shares);
     }
 
@@ -66,6 +67,7 @@ class SubscriptionPackageGroupsTest extends TestCase
             'email' => 'switching-package@example.test',
             'country_code' => null,
             'preferred_currency' => 'NGN',
+            'wallet_currency' => 'NGN',
             'role' => 'reviewer',
             'status' => 'active',
         ]);
@@ -107,7 +109,7 @@ class SubscriptionPackageGroupsTest extends TestCase
         $user->forceFill(['subscription_questionnaire_completed_groups' => ['group_b', 'group_c']])->save();
         $eligibility = app(ListingEligibility::class);
         $this->assertSame('eligible', $eligibility->taskAccessStatus($user, null, taskType: 'ad'));
-        $this->assertSame('eligible', $eligibility->taskAccessStatus($user, null, null, 'Apple', 'review'));
+        $this->assertSame('eligible', $eligibility->taskAccessStatus($user, null, 'Apple App Store', 'Finance', 'review'));
 
         $lite = SubscriptionPlan::query()->where('plan_key', 'demo-market-lite')->firstOrFail();
         $replacement = app(PurchaseSubscription::class)->handle($user, $lite, 'switch-back-to-lite');
@@ -133,6 +135,7 @@ class SubscriptionPackageGroupsTest extends TestCase
             'email' => 'package-test@example.test',
             'country_code' => null,
             'preferred_currency' => 'USD',
+            'wallet_currency' => 'USD',
             'role' => 'reviewer',
             'status' => 'active',
         ]);
@@ -157,6 +160,7 @@ class SubscriptionPackageGroupsTest extends TestCase
             'email' => 'review-package@example.test',
             'country_code' => null,
             'preferred_currency' => 'NGN',
+            'wallet_currency' => 'NGN',
             'subscription_questionnaire_completed_groups' => ['group_b'],
             'role' => 'reviewer',
             'status' => 'active',
@@ -175,5 +179,69 @@ class SubscriptionPackageGroupsTest extends TestCase
         $this->assertTrue($eligibility->appAllowed($reviewer, null, 'Google Play', 'Finance'));
         $this->assertFalse($eligibility->appAllowed($reviewer, null, 'Samsung Galaxy Store', 'Finance'));
         $this->assertSame('share_package_required', $eligibility->taskAccessStatus($reviewer, null, taskType: 'ad'));
+    }
+
+    public function test_user_with_android_and_apple_packages_can_see_and_claim_both_store_tasks(): void
+    {
+        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $user = User::query()->create([
+            'full_name' => 'Dual Store Reviewer',
+            'username' => 'dual-store-reviewer',
+            'email' => 'dual-store-reviewer@example.test',
+            'country_code' => null,
+            'preferred_currency' => 'USD',
+            'wallet_currency' => 'USD',
+            'role' => 'reviewer',
+            'status' => 'active',
+            'subscription_questionnaire_completed_groups' => ['group_b', 'group_c'],
+        ]);
+        $plans = SubscriptionPlan::query()->whereIn('plan_key', [
+            'review-google-play-4m',
+            'review-apple-store-4m',
+        ])->get()->keyBy('plan_key');
+        foreach ($plans as $plan) {
+            UserSubscription::query()->create([
+                'user_id' => $user->id,
+                'subscription_plan_id' => $plan->id,
+                'product_type' => 'marketplace_access',
+                'status' => 'active',
+                'starts_at' => now()->subDay(),
+                'ends_at' => now()->addMonths(4),
+                'plan_snapshot' => [],
+            ]);
+        }
+        $token = $user->createToken('dual-store-review-test')->plainTextToken;
+
+        $listings = $this->withToken($token)->getJson('/api/v1/listings/apps?per_page=50');
+        $listings->assertOk();
+        $listedStores = collect($listings->json('data'))
+            ->filter(fn (array $campaign): bool => $campaign['task_access_status'] === 'eligible')
+            ->pluck('app.store')->unique()->sort()->values()->all();
+        $this->assertContains('Google Play', $listedStores);
+        $this->assertContains('Apple App Store', $listedStores);
+        $this->assertNotContains('Samsung Galaxy Store', $listedStores);
+
+        $dailyTasks = $this->withToken($token)->getJson('/api/v1/me/daily-tasks/apps');
+        $dailyTasks->assertOk();
+        $dailyStores = collect($dailyTasks->json('data'))->pluck('app.store')->unique()->all();
+        $this->assertContains('Google Play', $dailyStores);
+        $this->assertContains('Apple App Store', $dailyStores);
+
+        foreach (['Google Play', 'Apple App Store'] as $store) {
+            $campaign = \App\Models\AppReviewCampaign::query()
+                ->where('status', 'active')
+                ->whereHas('app', fn ($query) => $query->where('store', $store))
+                ->firstOrFail();
+            $this->withToken($token)->postJson('/api/v1/review-campaigns/'.$campaign->id.'/claim', [
+                'idempotency_key' => 'dual-store-claim-'.strtolower(str_replace(' ', '-', $store)),
+            ])->assertCreated();
+        }
+
+        $myTasks = $this->withToken($token)->getJson('/api/v1/me/review-tasks');
+        $myTasks->assertOk()->assertJsonCount(2, 'data.data');
+        $this->assertSame(
+            ['reserved', 'reserved'],
+            collect($myTasks->json('data.data'))->pluck('status')->sort()->values()->all(),
+        );
     }
 }

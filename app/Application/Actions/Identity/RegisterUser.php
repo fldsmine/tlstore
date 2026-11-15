@@ -35,15 +35,16 @@ final class RegisterUser
                 'password' => $data['password'],
                 'country_code' => $country->code,
                 'preferred_currency' => $data['preferred_currency'] ?? $country->default_currency ?? 'USD',
+                'wallet_currency' => strtoupper($data['preferred_currency'] ?? $country->default_currency ?? 'USD'),
                 'role' => 'reviewer',
                 'status' => 'active',
             ]);
 
-            foreach (WalletType::cases() as $type) {
+            foreach (WalletType::accountWalletTypes() as $type) {
                 Wallet::query()->create([
                     'user_id' => $user->id,
                     'wallet_type' => $type,
-                    'currency' => $user->preferred_currency,
+                    'currency' => $user->wallet_currency,
                 ]);
             }
 

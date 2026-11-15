@@ -36,7 +36,11 @@ final class ReviewTaskController
     public function mine(Request $request): JsonResponse
     {
         return response()->json(['data' => ReviewTask::query()->with(['campaign.app.screenshots', 'templateVersion.questions'])
-            ->where('reviewer_id', $request->user()->id)->latest('claimed_at')->paginate(30)]);
+            ->where('reviewer_id', $request->user()->id)
+            ->whereDoesntHave('submission')
+            ->whereIn('status', ['reserved', 'in_progress', 'assigned'])
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->latest('claimed_at')->paginate(30)]);
     }
 
     public function submissions(Request $request): JsonResponse

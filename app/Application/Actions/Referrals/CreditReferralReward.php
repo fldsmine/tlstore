@@ -2,14 +2,14 @@
 
 namespace App\Application\Actions\Referrals;
 
-use App\Models\LedgerEntry;
+use App\Application\Actions\Wallets\CreditUserWallet;
+use App\Enums\WalletType;
 use App\Models\ReferralAttribution;
 use App\Models\ReferralReward;
 use App\Models\SubscriptionPlan;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\UserSubscription;
-use App\Models\Wallet;
 
 final class CreditReferralReward
 {
@@ -58,22 +58,20 @@ final class CreditReferralReward
         }
 
         $now = now();
-        $wallet = Wallet::query()->firstOrCreate(
-            ['user_id' => $attribution->referrer_user_id, 'wallet_type' => 'referral', 'currency' => strtoupper($currency)],
-            ['status' => 'active'],
+        $referrer = User::query()->findOrFail($attribution->referrer_user_id);
+        $ledger = app(CreditUserWallet::class)->handle(
+            $referrer,
+            WalletType::Referral,
+            $amountMinor,
+            strtoupper($currency),
+            'referral_'.$rewardType.'_reward',
+            $sourceType,
+            $sourceId,
+            $idempotencyKey,
+            $description,
+            $now,
         );
-        $ledger = LedgerEntry::query()->firstOrCreate(['idempotency_key' => $idempotencyKey], [
-            'wallet_id' => $wallet->id,
-            'entry_type' => 'referral_'.$rewardType.'_reward',
-            'direction' => 'credit',
-            'amount_minor' => $amountMinor,
-            'status' => 'posted',
-            'source_type' => $sourceType,
-            'source_id' => $sourceId,
-            'description' => $description,
-            'available_at' => $now,
-            'posted_at' => $now,
-        ]);
+        $wallet = $ledger->wallet;
 
         $reward = ReferralReward::query()->firstOrCreate(
             [
@@ -85,8 +83,8 @@ final class CreditReferralReward
             [
                 'wallet_id' => $wallet->id,
                 'ledger_entry_id' => $ledger->id,
-                'amount_minor' => $amountMinor,
-                'currency' => strtoupper($currency),
+                'amount_minor' => (int) $ledger->amount_minor,
+                'currency' => strtoupper($wallet->currency),
                 'status' => 'paid',
             ],
         );

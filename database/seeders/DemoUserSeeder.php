@@ -28,6 +28,7 @@ class DemoUserSeeder extends Seeder
                 'password' => Hash::make($password),
                 'country_code' => $countries[$number - 1],
                 'preferred_currency' => $currencies[$number - 1],
+                'wallet_currency' => $currencies[$number - 1],
                 'role' => $number === 2 ? 'owner' : 'reviewer',
                 'status' => $number === 15 ? 'restricted' : 'active',
                 'avatar' => $imgList[$number % count($imgList)],
@@ -44,7 +45,7 @@ class DemoUserSeeder extends Seeder
             ['email'],
             [
                 'full_name', 'username', 'phone', 'email_verified_at', 'password', 'country_code',
-                'preferred_currency', 'role', 'status', 'avatar', 'cover_image', 'is_banned',
+                'preferred_currency', 'wallet_currency', 'role', 'status', 'avatar', 'cover_image', 'is_banned',
                 'ban_reason', 'updated_at',
             ]
         );
@@ -56,11 +57,11 @@ class DemoUserSeeder extends Seeder
         foreach ($users as $user) {
             $number = (int) substr($user->email, 9, 2);
             $walletRows = [];
-            foreach (['review', 'share', 'referral', 'bonus', 'topup_fund'] as $walletType) {
+            foreach (['review_group_b', 'review_group_c', 'share', 'referral', 'bonus', 'topup_fund'] as $walletType) {
                 $walletRows[] = [
                     'user_id' => $user->id,
                     'wallet_type' => $walletType,
-                    'currency' => 'NGN',
+                    'currency' => $currencies[$number - 1],
                     'status' => 'active',
                     'created_at' => $now,
                     'updated_at' => $now,

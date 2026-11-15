@@ -51,6 +51,11 @@ class PaymentIntent extends Model
         return $this->hasMany(UserSubscription::class);
     }
 
+    public function userPackageAddon(): HasOne
+    {
+        return $this->hasOne(UserPackageAddon::class);
+    }
+
     public function ledgerEntries(): HasMany
     {
         return $this->hasMany(LedgerEntry::class, 'source_id')->where('source_type', 'payment_intent');

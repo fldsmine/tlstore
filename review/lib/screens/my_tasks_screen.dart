@@ -146,7 +146,7 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
               task['created_at'],
           decision: _lastDecision(status),
           task: task,
-          canResume: task['status']?.toString() == 'reserved' && status == null,
+          canResume: _canResumeReview(task, status),
         ),
       );
     }
@@ -183,6 +183,19 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
       if (reason != null && reason.trim().isNotEmpty) return reason;
     }
     return null;
+  }
+
+  bool _canResumeReview(
+    Map<String, dynamic> task,
+    Map<String, dynamic>? submission,
+  ) {
+    if (submission != null) return false;
+    final status = task['status']?.toString();
+    if (!const {'reserved', 'in_progress', 'assigned'}.contains(status)) {
+      return false;
+    }
+    final expiresAt = DateTime.tryParse(task['expires_at']?.toString() ?? '');
+    return expiresAt == null || expiresAt.isAfter(DateTime.now());
   }
 
   Map<String, dynamic> _entry({

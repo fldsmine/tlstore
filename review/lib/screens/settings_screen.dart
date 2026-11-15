@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../core/theme/app_theme_controller.dart';
 import '../core/update/update_service.dart';
+import '../core/utils/helper.dart';
 import '../services/auth_api.dart';
 import '../widgets/auth_components.dart';
 import 'notification_settings_screen.dart';
@@ -11,6 +12,15 @@ import 'admin_payment_gateways_screen.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_reward_settings_screen.dart';
 import 'admin_user_rankings_screen.dart';
+import 'admin_package_addons_screen.dart';
+import 'admin_subscription_plans_screen.dart';
+import 'admin_moderation_screen.dart';
+import 'admin_app_reports_screen.dart';
+import 'admin_users_screen.dart';
+import 'admin_campaign_orders_screen.dart';
+import 'admin_app_listings_screen.dart';
+import 'admin_review_templates_screen.dart';
+import 'admin_ads_screen.dart';
 import '../services/push_notification_service.dart';
 import 'legal_document_screen.dart';
 
@@ -47,7 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadCurrencies() async {
     try {
-      final response = await widget.api.getPublic('currencies');
+      final response = await widget.api.appCurrencies();
       final data = response['data'];
       if (!mounted) return;
       setState(() {
@@ -68,37 +78,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     final current = widget.user['preferred_currency']?.toString() ?? 'USD';
+
+    // Only display currencies supported by the application.
+    final apiCodes = _currencies
+        .map((item) => item['code']?.toString().toUpperCase())
+        .whereType<String>()
+        .toSet();
+
+    final availableCurrencies = supportedCurrencies
+        .where((currency) => apiCodes.contains(currency.code))
+        .toList();
+
+    if (availableCurrencies.isEmpty) {
+      showAuthMessage(context, 'Currency options are unavailable right now.');
+      return;
+    }
+
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.only(bottom: 16),
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Text(
-                'Display currency',
-                style: Theme.of(ctx).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-            ),
-            for (final item in _currencies)
-              ListTile(
-                title: Text(item['code']?.toString() ?? ''),
-                trailing: item['code'] == current
-                    ? Icon(
-                        Icons.check_circle_rounded,
-                        color: Theme.of(ctx).colorScheme.primary,
-                      )
-                    : null,
-                onTap: () => Navigator.pop(ctx, item['code']?.toString()),
-              ),
-          ],
-        ),
-      ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final colors = theme.colorScheme;
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            String searchQuery = '';
+
+            return CurrencyPickerContent(
+              currencies: availableCurrencies,
+              current: current,
+              onSelect: (code) {
+                Navigator.pop(context, code);
+              },
+            );
+          },
+        );
+      },
     );
 
     if (selected == null || selected == current || !mounted) return;
@@ -115,7 +133,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {});
         showAuthMessage(
           context,
-          'Display currency set to $selected. Campaign rewards remain in their listed currency.',
+          'Preferred currency updated to ${selected.toUpperCase()}.',
         );
       }
     } on AuthException catch (e) {
@@ -476,6 +494,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               children: [
                 _SettingsTile(
+                  icon: Icons.app_registration_outlined,
+                  title: 'App listings and review questions',
+                  subtitle: 'Admin access: create apps, campaigns, screenshots and assign questionnaires',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAppListingsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.quiz_outlined,
+                  title: 'Questionnaire templates',
+                  subtitle: 'Admin access: manage question bank, versions and publishing',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AdminReviewTemplatesScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.campaign_rounded,
+                  title: 'Ad listings',
+                  subtitle: 'Admin access: create, edit, approve and remove ad campaigns',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAdsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
                   icon: Icons.admin_panel_settings_outlined,
                   title: 'App release management',
                   subtitle: 'Admin access: publish Android/iOS updates',
@@ -517,6 +572,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 const _PanelDivider(),
                 _SettingsTile(
+                  icon: Icons.flag_outlined,
+                  title: 'App listing reports',
+                  subtitle: 'Admin access: review user reports about apps',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAppReportsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.campaign_outlined,
+                  title: 'Campaign approvals',
+                  subtitle: 'Admin access: review paid user campaigns and refund rejected orders',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AdminCampaignOrdersScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.manage_accounts_outlined,
+                  title: 'User management',
+                  subtitle:
+                      'Admin access: accounts, wallets, bans and passwords',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminUsersScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
                   icon: Icons.card_giftcard_outlined,
                   title: 'Reward settings',
                   subtitle: 'Admin access: enable or pause reward programs',
@@ -539,6 +635,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     MaterialPageRoute<void>(
                       builder: (_) => AdminUserRankingsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'Subscription plans',
+                  subtitle: 'Admin access: create, edit, activate plans and review subscribers',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminSubscriptionPlansScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.fact_check_outlined,
+                  title: 'Task moderation',
+                  subtitle: 'Admin access: review tasks, ad shares, deposits and withdrawals',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminModerationScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.add_box_outlined,
+                  title: 'Review package add-ons',
+                  subtitle: 'Admin access: monthly prices and availability',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminPackageAddonsScreen(api: widget.api),
                     ),
                   ),
                 ),

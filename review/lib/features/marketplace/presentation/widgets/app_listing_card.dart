@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../services/media_url.dart';
+import '../../../../core/utils/helper.dart';
 
 /// Compact store-style card for an app review campaign.
 class AppListingCard extends StatelessWidget {
@@ -48,6 +49,7 @@ class AppListingCard extends StatelessWidget {
     final location = item['location']?.toString();
     final iconUrl = MediaUrl.resolve(app['app_icon']?.toString());
     final radius = BorderRadius.circular(16);
+	final storeInfo = getStoreInfo(app['store']?.toString());
 
     return Card(
       margin: EdgeInsets.zero,
@@ -63,10 +65,6 @@ class AppListingCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (screenshots.isNotEmpty) ...[
-                _ScreenshotStrip(urls: screenshots),
-                const SizedBox(height: 14),
-              ],
               Row(
                 children: [
                   _AppIcon(url: iconUrl),
@@ -106,6 +104,10 @@ class AppListingCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 11),
+              if (screenshots.isNotEmpty) ...[
+                _ScreenshotStrip(urls: screenshots),
+                const SizedBox(height: 14),
+              ],
               Text(
                 description,
                 maxLines: expanded ? 5 : 2,
@@ -117,10 +119,10 @@ class AppListingCard extends StatelessWidget {
                 spacing: 7,
                 runSpacing: 7,
                 children: [
-                  _Pill(
-                    icon: Icons.shop_rounded,
-                    label: _storeName(app['store']?.toString()),
-                    color: scheme.primary,
+                  _StoreDiv(
+                    icon: storeInfo.icon,
+                    label: storeInfo.name,
+					color: storeInfo.color,
                   ),
                   if (location != null && location.isNotEmpty)
                     _Pill(
@@ -141,17 +143,13 @@ class AppListingCard extends StatelessWidget {
                   ),
                 ],
               ),
-              /*if (status != null) ...[
-                const SizedBox(height: 11),
-                _AccessNotice(status: status),
-              ],*/
               if (!expanded) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: onTap,
-                    child: Text(_actionLabel(status)),
+                    child: Text('View Review & Earn'),
                   ),
                 ),
               ],
@@ -161,24 +159,6 @@ class AppListingCard extends StatelessWidget {
       ),
     );
   }
-
-  String _storeName(String? store) {
-    if (store == null || store.isEmpty) return 'App store';
-    final normalized = store.toLowerCase();
-    if (normalized.contains('google')) return 'Google Play';
-    if (normalized.contains('apple') || normalized.contains('ios'))
-      return 'App Store';
-    if (normalized.contains('samsung')) return 'Galaxy Store';
-    return store;
-  }
-
-  String _actionLabel(String? status) => switch (status) {
-    'marketplace_plan_required' => 'Review & Earn',
-    'store_package_required' => 'Choose review package',
-    'review_package_required' => 'Join review package',
-    'subscription_questionnaire_required' => 'Complete package setup',
-    _ => 'Review this app',
-  };
 }
 
 class _ScreenshotStrip extends StatelessWidget {
@@ -273,41 +253,43 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _AccessNotice extends StatelessWidget {
-  const _AccessNotice({required this.status});
-  final String status;
+class _StoreDiv extends StatelessWidget {
+  const _StoreDiv({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final ready = status == 'eligible';
-    final text = switch (status) {
-      'marketplace_plan_required' => 'Make Your Review & Earn',
-      'store_package_required' => 'Join the matching store package',
-      'review_package_required' => 'Join a review package',
-      'subscription_questionnaire_required' => 'Complete package setup',
-      _ => 'Review now & earn your reward',
-    };
-    final color = ready ? scheme.primary : scheme.tertiary;
+
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 6,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .10),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: color.withValues(alpha: .20),
+        ),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            ready ? Icons.check_circle_outline : Icons.lock_outline_rounded,
-            size: 15,
-            color: color,
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.labelMedium
-                  ?.copyWith(color: color, fontWeight: FontWeight.w700),
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: scheme.onSurface,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -315,3 +297,4 @@ class _AccessNotice extends StatelessWidget {
     );
   }
 }
+

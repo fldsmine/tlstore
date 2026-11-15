@@ -127,15 +127,22 @@ class AuthApi {
   static const _spotlightsCacheKey = 'trustlens.spotlights.response.v1';
   static const _spotlightsCachedAtKey = 'trustlens.spotlights.cached_at.v1';
   static const _spotlightsCacheDuration = Duration(minutes: 60);
+
   static const _countriesCacheKey = 'trustlens.countries.response.v1';
   static const _countriesCachedAtKey = 'trustlens.countries.cached_at.v1';
   static const _countriesCacheDuration = Duration(hours: 24);
+
+  static const _currenciesCacheDuration = Duration(minutes: 1440);
+  static const _currenciesCacheKey = 'trustlens.currencies.response.v1';
+  static const _currenciesCachedAtKey = 'trustlens.currencies.cached_at.v1';
+
   static const _legalCacheDuration = Duration(hours: 24);
   static const _faqCacheDuration = Duration(hours: 24);
   Map<String, double>? _usdRates;
   DateTime? _ratesLoadedAt;
   Future<Map<String, dynamic>>? _spotlightsInFlight;
   Future<List<CountryOption>>? _countriesInFlight;
+  Future<Map<String, dynamic>>? _currenciesInFlight;
   final Map<String, Future<Map<String, dynamic>>> _legalInFlight = {};
   Future<List<Map<String, dynamic>>>? _faqsInFlight;
   String _preferredCurrency = 'USD';
@@ -490,16 +497,35 @@ class AuthApi {
     return data.map((key, value) => MapEntry(key.toString(), value.toString()));
   }
 
-  Future<Map<String, dynamic>> setSocialAccount(String token, String platform, String handle) =>
-      put('me/social-accounts/${Uri.encodeComponent(platform)}', token, {'handle': handle});
+  Future<Map<String, dynamic>> setSocialAccount(
+    String token,
+    String platform,
+    String handle,
+  ) => put('me/social-accounts/${Uri.encodeComponent(platform)}', token, {
+    'handle': handle,
+  });
 
-  Future<List<Map<String, dynamic>>> banks(String token, {required String country, String? search, String? type}) async {
+  Future<List<Map<String, dynamic>>> banks(
+    String token, {
+    required String country,
+    String? search,
+    String? type,
+  }) async {
     final query = <String, String>{'country': country};
-    if (search != null && search.trim().isNotEmpty) query['search'] = search.trim();
+    if (search != null && search.trim().isNotEmpty)
+      query['search'] = search.trim();
     if (type != null && type.isNotEmpty) query['type'] = type;
-    final response = await get('banks?${Uri(queryParameters: query).query}', token);
+    final response = await get(
+      'banks?${Uri(queryParameters: query).query}',
+      token,
+    );
     final data = response['data'];
-    return data is List ? data.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList() : const [];
+    return data is List
+        ? data
+              .whereType<Map>()
+              .map((row) => Map<String, dynamic>.from(row))
+              .toList()
+        : const [];
   }
 
   Future<Map<String, dynamic>> dailyTasks(
@@ -555,6 +581,58 @@ class AuthApi {
     return response;
   }
 
+  Future<Map<String, dynamic>> appCurrencies() {
+    final pending = _currenciesInFlight;
+    if (pending != null) return pending;
+    final request = _loadCurrencies();
+    _currenciesInFlight = request;
+    return request.whenComplete(() {
+      if (identical(_currenciesInFlight, request)) _currenciesInFlight = null;
+    });
+  }
+
+  Future<Map<String, dynamic>> _loadCurrencies() async {
+    String? cachedJson;
+    String? cachedAtText;
+    try {
+      cachedJson = await _storage.read(key: _currenciesCacheKey);
+      cachedAtText = await _storage.read(key: _currenciesCachedAtKey);
+    } catch (_) {
+      // The network response remains available if the platform cache fails.
+    }
+    final cachedAt = DateTime.tryParse(cachedAtText ?? '')?.toUtc();
+    final cacheAge = cachedAt == null
+        ? null
+        : DateTime.now().toUtc().difference(cachedAt);
+    if (cachedJson != null &&
+        cacheAge != null &&
+        !cacheAge.isNegative &&
+        cacheAge < _currenciesCacheDuration) {
+      try {
+        final decoded = jsonDecode(cachedJson);
+        if (decoded is Map<String, dynamic>) return decoded;
+      } on FormatException {
+        // Discard malformed cache content and load a fresh response.
+      }
+    }
+
+    final response = await _request('GET', 'currencies');
+    try {
+      await _storage.write(
+        key: _currenciesCacheKey,
+        value: jsonEncode(response),
+      );
+      await _storage.write(
+        key: _currenciesCachedAtKey,
+        value: DateTime.now().toUtc().toIso8601String(),
+      );
+    } catch (_) {
+      // Return successful content even if it could not be persisted.
+    }
+    return response;
+  }
+
+
   Future<Map<String, dynamic>> getPublic(String path) => _request('GET', path);
 
   Future<Map<String, dynamic>> about() => getPublic('about');
@@ -607,8 +685,72 @@ class AuthApi {
     Object intentId,
   ) => post('subscriptions/$intentId/check', token, const {});
 
+  Future<Map<String, dynamic>> reviewAddonCheck(String token, Object taskId) =>
+      get('review-tasks/$taskId/addon-check', token);
+
+  Future<Map<String, dynamic>> purchasePackageAddonWithFunds({
+    required String token,
+    required int addonId,
+    required String idempotencyKey,
+  }) => post('package-addons/$addonId/purchase', token, {
+    'idempotency_key': idempotencyKey,
+  });
+
+  Future<Map<String, dynamic>> checkoutPackageAddon({
+    required String token,
+    required int addonId,
+    required String gateway,
+    required String currency,
+    required String idempotencyKey,
+  }) => post('package-addons/checkout', token, {
+    'package_addon_id': addonId,
+    'gateway': gateway,
+    'currency': currency,
+    'idempotency_key': idempotencyKey,
+  });
+
+  Future<Map<String, dynamic>> checkPackageAddonPayment(
+    String token,
+    Object intentId,
+  ) => post('package-addons/$intentId/check', token, const {});
+
   Future<Map<String, dynamic>> get(String path, String token) =>
       _request('GET', path, token: token);
+
+  Future<http.Response> download(String path, String token) async {
+    try {
+      final response = await http
+          .get(
+            ApiConfig.endpoint(path),
+            headers: {
+              'Accept': '*/*',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 45));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return response;
+      }
+      String message = 'Could not download the evidence file.';
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map && body['message'] != null) {
+          message = body['message'].toString();
+        }
+      } catch (_) {
+        // Keep a safe generic message for non-JSON error bodies.
+      }
+      throw AuthException(message, unauthorized: response.statusCode == 401);
+    } on AuthException {
+      rethrow;
+    } on TimeoutException {
+      throw const AuthException('The evidence download timed out.');
+    } on FormatException {
+      throw const AuthException('The evidence URL is invalid.');
+    } catch (_) {
+      throw const AuthException('Could not download the evidence file.');
+    }
+  }
 
   Future<Map<String, dynamic>> post(
     String path,
@@ -723,11 +865,28 @@ class AuthApi {
     String token, {
     int page = 1,
     int perPage = 5,
+    String category = 'all',
+    String status = 'all',
+    DateTime? fromDate,
+    DateTime? toDate,
   }) => _request(
     'GET',
-    'me/account-history?page=$page&per_page=$perPage',
+    Uri(
+      path: 'me/account-history',
+      queryParameters: {
+        'page': '$page',
+        'per_page': '$perPage',
+        'category': category,
+        'status': status,
+        if (fromDate != null) 'from_date': _dateQuery(fromDate),
+        if (toDate != null) 'to_date': _dateQuery(toDate),
+      },
+    ).toString(),
     token: token,
   );
+
+  String _dateQuery(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   Future<List<Map<String, dynamic>>> walletLedger(
     String token,

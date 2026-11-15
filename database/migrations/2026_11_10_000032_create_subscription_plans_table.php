@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Relationships:
  *   - subscription_group_id -> subscription_groups.id (null on delete)
- *   - has many subscription_plan_features, plan_location_coverage, user_subscriptions
+ *   - has many subscription_plan_features, user_subscriptions
  *
  */
 return new class extends Migration
@@ -22,9 +22,10 @@ return new class extends Migration
             $table->id();
             $table->string('plan_key', 64)->unique();
             $table->foreignId('subscription_group_id')->nullable()->constrained('subscription_groups')->nullOnDelete();
-            $table->string('product_type', 32)->comment('marketplace_access or location_coverage');
+            $table->string('product_type', 32)->comment('marketplace_access');
             $table->string('name', 180);
             $table->string('tier_key', 64)->nullable();
+            $table->boolean('addons')->default(false);
             $table->string('billing_interval', 24);
             $table->unsignedSmallInteger('duration_count')->default(1);
             $table->unsignedBigInteger('price_minor');
