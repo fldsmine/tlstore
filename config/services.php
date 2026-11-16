@@ -50,4 +50,14 @@ return [
         ],
     ],
 
+    // VTpass is the sole provider for user value-added services.
+    'vtpass' => [
+        'base_url' => env('VTPASS_BASE_URL', 'https://sandbox.vtpass.com'),
+        'api_key' => env('VTPASS_API_KEY'),
+        'public_key' => env('VTPASS_PUBLIC_KEY'),
+        'secret_key' => env('VTPASS_SECRET_KEY'),
+        'webhook_secret' => env('VTPASS_WEBHOOK_SECRET'),
+        'timeout' => (int) env('VTPASS_TIMEOUT', 20),
+    ],
+
 ];

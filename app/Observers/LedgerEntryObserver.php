@@ -70,10 +70,18 @@ final class LedgerEntryObserver
             str_contains($entry->entry_type, 'subscription') => 'subscription_plan',
             str_contains($entry->entry_type, 'location') => 'location_addons',
             str_contains($entry->entry_type, 'rank') => 'rank_earning',
+            str_contains($entry->entry_type, 'vtu') => 'vtu_purchase',
             str_contains($entry->entry_type, 'transfer') => 'fund_transfer',
             str_contains($entry->entry_type, 'topup') || str_contains($entry->entry_type, 'deposit') => 'top_up_fund',
             str_contains($entry->entry_type, 'campaign_order') => 'campaign_order',
             default => 'fund_transfer',
+        };
+
+        $transactionStatus = match (true) {
+            str_contains($entry->entry_type, 'vtu') && $entry->status->value === 'reserved' => 'pending',
+            str_contains($entry->entry_type, 'vtu') && $entry->status->value === 'posted' => 'completed',
+            str_contains($entry->entry_type, 'vtu') && $entry->status->value === 'reversed' => 'failed',
+            default => $entry->status->value,
         };
 
         Transaction::query()->updateOrCreate(
@@ -85,7 +93,7 @@ final class LedgerEntryObserver
                 'amount' => CurrencyMinorUnits::fromMinor($entry->amount_minor, $currency),
                 'fee' => 0,
                 'wallet' => $wallet->wallet_type->value,
-                'status' => $entry->status->value,
+                'status' => $transactionStatus,
                 'description' => $entry->description,
                 'meta' => array_merge($entry->metadata ?? [], [
                     'ledger_entry_id' => $entry->id,

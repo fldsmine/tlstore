@@ -43,6 +43,10 @@ use App\Features\Rankings\Http\Controllers\Api\V1\UserRankingController;
 use App\Features\Admin\Http\Controllers\Api\V1\UserRankLevelController;
 use App\Features\Campaigns\Http\Controllers\Api\V1\CampaignOrderController;
 use App\Features\Admin\Http\Controllers\Api\V1\CampaignOrderController as AdminCampaignOrderController;
+use App\Features\Vas\Http\Controllers\Api\V1\VasCatalogController;
+use App\Features\Vas\Http\Controllers\Api\V1\VasPurchaseController;
+use App\Features\Vas\Http\Controllers\Api\V1\VasOrderController;
+use App\Features\Vas\Http\Controllers\Api\V1\VtpassWebhookController;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('api.v1.health');
@@ -68,6 +72,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/payment-gateways', [PublicCatalogController::class, 'paymentGateways'])->name('api.v1.payment-gateways.index');
     Route::get('/exchange-rates', [PublicCatalogController::class, 'exchangeRates'])->name('api.v1.exchange-rates.index');
     Route::get('/currencies', [PublicCatalogController::class, 'currencies'])->name('api.v1.currencies.index');
+    Route::post('/webhooks/vtpass', VtpassWebhookController::class)->middleware('throttle:30,1')->name('api.v1.vas.webhook');
     Route::post('/webhooks/{provider}', [TopupController::class, 'webhook'])->name('api.v1.payments.webhook');
 	Route::get('/banks', [BankController::class, 'index'])->name('api.v1.banks.index');
 
@@ -79,6 +84,15 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/announcements', [PublicAnnouncementController::class, 'index'])->name('api.v1.announcements.index');
         Route::post('/announcements/{announcement}/dismiss', [PublicAnnouncementController::class, 'dismiss'])->name('api.v1.announcements.dismiss');
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
+        Route::get('/vas/catalog', [VasCatalogController::class, 'index'])->name('api.v1.vas.catalog');
+        Route::get('/vas/services/{service}/plans', [VasCatalogController::class, 'plans'])
+            ->whereIn('service', ['airtime', 'data', 'tv', 'electricity', 'education'])
+            ->name('api.v1.vas.plans');
+        Route::post('/vas/verify', [VasCatalogController::class, 'verify'])->middleware('throttle:12,1')->name('api.v1.vas.verify');
+        Route::post('/vas/purchases', [VasPurchaseController::class, 'store'])->middleware('throttle:6,1')->name('api.v1.vas.purchases.store');
+        Route::get('/me/vas-orders', [VasOrderController::class, 'index'])->name('api.v1.me.vas-orders.index');
+        Route::get('/me/vas-orders/{order}', [VasOrderController::class, 'show'])->name('api.v1.me.vas-orders.show');
+        Route::post('/me/vas-orders/{order}/check', [VasOrderController::class, 'check'])->middleware('throttle:6,1')->name('api.v1.me.vas-orders.check');
         Route::get('/me/referral-code', [ReferralController::class, 'code'])->name('api.v1.referral.code');
         Route::get('/me/referrals', [ReferralController::class, 'attributions'])->name('api.v1.referrals.index');
         Route::get('/me', [AuthController::class, 'me'])->name('api.v1.me');

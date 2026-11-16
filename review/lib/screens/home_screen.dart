@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:review/screens/addons_screen.dart';
-import 'package:review/screens/my_tasks_screen.dart';
+import 'package:review/features/vas/presentation/screens/vas_screens.dart';
+import 'package:review/widgets/quick_slideshow.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme/app_colors.dart';
@@ -16,7 +18,6 @@ import '../features/wallets/presentation/wallet_detail_screens.dart';
 import '../services/auth_api.dart';
 import '../widgets/auth_components.dart';
 import '../widgets/advanced_app_drawer.dart';
-import 'frontend/landing_sreen.dart';
 import 'history_screen.dart';
 import 'daily_tasks_screen.dart';
 import 'faq_screen.dart';
@@ -51,8 +52,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
+  static const _earningsVisibilityKey = 'tlstore.hide_total_earnings';
+  static const _deviceStorage = FlutterSecureStorage();
+
   late final AnimationController _drawerController;
   late final Animation<double> _drawerProgress;
+  Future<void>? _earningsVisibilityReady;
+  bool _hideTotalEarnings = false;
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _wallets = const [];
@@ -109,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    _earningsVisibilityReady = _restoreEarningsVisibility();
     _sessionUser = widget.result.user;
     _drawerController = AnimationController(
       vsync: this,
@@ -140,6 +147,39 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  Future<void> _restoreEarningsVisibility() async {
+    try {
+      final hidden = await _deviceStorage.read(key: _earningsVisibilityKey);
+      if (mounted && hidden != null) {
+        setState(() => _hideTotalEarnings = hidden == 'true');
+      }
+    } catch (_) {
+      // Keep earnings visible if device storage is unavailable.
+    }
+  }
+
+  Future<void> _toggleTotalEarningsVisibility() async {
+    await _earningsVisibilityReady;
+    if (!mounted) return;
+
+    final hidden = !_hideTotalEarnings;
+    setState(() => _hideTotalEarnings = hidden);
+    try {
+      await _deviceStorage.write(
+        key: _earningsVisibilityKey,
+        value: hidden.toString(),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save the earnings display preference.'),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _notificationTapSubscription?.cancel();
@@ -167,9 +207,9 @@ class _HomeScreenState extends State<HomeScreen>
 
       final currencies = rows is List
           ? rows
-              .whereType<Map>()
-              .map((row) => Map<String, dynamic>.from(row))
-              .toList()
+                .whereType<Map>()
+                .map((row) => Map<String, dynamic>.from(row))
+                .toList()
           : <Map<String, dynamic>>[];
 
       if (!mounted || currencies.isEmpty) {
@@ -193,10 +233,7 @@ class _HomeScreenState extends State<HomeScreen>
           .toList();
 
       if (availableCurrencies.isEmpty) {
-        showAuthMessage(
-          context,
-          'Currency options are unavailable right now.',
-        );
+        showAuthMessage(context, 'Currency options are unavailable right now.');
         return;
       }
 
@@ -227,28 +264,20 @@ class _HomeScreenState extends State<HomeScreen>
         },
       );
 
-      if (!mounted ||
-          selected == null ||
-          selected.toUpperCase() == current) {
+      if (!mounted || selected == null || selected.toUpperCase() == current) {
         return;
       }
 
       setState(() => _currencyUpdating = true);
 
-      final result = await widget.api.patch(
-        'me',
-        widget.result.token,
-        {
-          'preferred_currency': selected.toUpperCase(),
-        },
-      );
+      final result = await widget.api.patch('me', widget.result.token, {
+        'preferred_currency': selected.toUpperCase(),
+      });
 
       final data = result['data'];
 
       if (data is Map) {
-        _sessionUser.addAll(
-          Map<String, dynamic>.from(data),
-        );
+        _sessionUser.addAll(Map<String, dynamic>.from(data));
       }
 
       widget.api.setPreferredCurrency(selected);
@@ -780,19 +809,16 @@ class _HomeScreenState extends State<HomeScreen>
                   _buildEarningsCard(),
                   _buildAccountSetupCard(),
                   _buildInlineAnnouncements(),
+                  _buildQuickAccess(),
                   const SizedBox(height: 14),
                   _buildCategoryTabs(),
                   const SizedBox(height: 19),
-                  if (_selectedTab == 1) ...[
-                    _buildFeaturedSection(),
-                    const SizedBox(height: 17),
-                    _buildWalletGrid(),
-                    const SizedBox(height: 23),
-                    _buildRecentHeading(),
-                    const SizedBox(height: 10),
-                    _buildTransactions(),
-                  ] else
-                    _buildTabTeaser(),
+                  _buildWalletGrid(),
+                  const SizedBox(height: 23),
+                  _buildRecentHeading(),
+                  const SizedBox(height: 10),
+                  _buildTransactions(),
+
                   if (_error != null) ...[
                     const SizedBox(height: 15),
                     _buildErrorCard(),
@@ -806,6 +832,183 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     ),
   );
+
+  Widget _buildQuickAccess() {
+    final scheme = Theme.of(context).colorScheme;
+
+    final slides = <QuickySlide>[
+      QuickySlide(
+        actionKey: 'referrals',
+        icon: Icons.group_add_rounded,
+        eyebrow: 'Share The Good News',
+        title: 'Invite friends. Earn together.',
+        subtitle: 'Share your referral link and follow your rewards.',
+        ctaLabel: 'Refer & earn',
+      ),
+      QuickySlide(
+        actionKey: 'subscriptions',
+        icon: Icons.workspace_premium_rounded,
+        eyebrow: 'Find Your Next Level',
+        title: 'Choose a package that fits.',
+        subtitle: 'See your active plans and explore more access.',
+        ctaLabel: 'View packages',
+      ),
+      QuickySlide(
+        actionKey: 'vas:data',
+        serviceKey: 'data',
+        icon: Icons.wifi_rounded,
+        eyebrow: 'Stay Connected',
+        title: 'Get data for your network.',
+        subtitle: 'Pick a network and bundle in a few quick steps.',
+        ctaLabel: 'Buy data',
+      ),
+      QuickySlide(
+        actionKey: 'vas:airtime',
+        serviceKey: 'airtime',
+        icon: Icons.phone_android_rounded,
+        eyebrow: 'Instant Recharge',
+        title: 'Top up airtime in a tap.',
+        subtitle: 'Recharge your line securely from your top-up fund.',
+        ctaLabel: 'Buy airtime',
+      ),
+      QuickySlide(
+        actionKey: 'tasks',
+        icon: Icons.task_alt_rounded,
+        eyebrow: 'Your Next Reward',
+        title: 'Today’s tasks are waiting.',
+        subtitle: 'Review apps and share ads to earn rewards.',
+        ctaLabel: 'Explore tasks',
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, color: scheme.primary, size: 19),
+              const SizedBox(width: 8),
+              Text(
+                'Quick access',
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const Spacer(),
+              Text(
+                'Swipe to explore',
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          QuickSlideShow(
+            slides: slides,
+            height: kSlideShowHeight,
+            accent: Color(0xFFD7F52F),
+            foreground: scheme.primary,
+            onSlideTap: _openQuickAccessSlide,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openQuickAccessSlide(int index, QuickySlide slide) async {
+    switch (slide.actionKey) {
+      case 'referrals':
+        _pushPage(
+          ReferralsScreen(
+            api: widget.api,
+            token: widget.result.token,
+            user: _sessionUser,
+          ),
+          0,
+        );
+        return;
+      case 'subscriptions':
+        _pushPage(
+          SubscriptionsScreen(
+            api: widget.api,
+            token: widget.result.token,
+            user: _sessionUser,
+          ),
+          0,
+        );
+        return;
+      case 'tasks':
+        _pushPage(
+          DailyTasksScreen(
+            api: widget.api,
+            token: widget.result.token,
+            user: _sessionUser,
+          ),
+          0,
+        );
+        return;
+      case 'vas:data':
+      case 'vas:airtime':
+        await _openQuickVasService(slide);
+        return;
+    }
+  }
+
+  Future<void> _openQuickVasService(QuickySlide slide) async {
+    try {
+      final response = await widget.api.vasCatalog(widget.result.token);
+      final catalog = response['data'];
+      if (catalog is! Map || catalog['enabled'] != true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Airtime and data services are not available right now.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      final services = catalog['services'];
+      final key = slide.serviceKey;
+      if (services is! List || key == null) return;
+      Map<String, dynamic>? service;
+      for (final item in services.whereType<Map>()) {
+        if ('${item['key']}' == key) {
+          service = Map<String, dynamic>.from(item);
+          break;
+        }
+      }
+      if (!mounted) return;
+      if (service == null || catalog['provider_ready'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${slide.title} is unavailable right now.')),
+        );
+        return;
+      }
+      _pushPage(
+        VasPurchaseScreen(
+          api: widget.api,
+          token: widget.result.token,
+          service: service,
+          currency: _currency,
+          initialProviderId: slide.providerId,
+          securityPinSet:
+              _sessionUser['security_pin_set'] == true ||
+              _sessionUser['security_pin_set'] == 1 ||
+              _sessionUser['security_pin_set'] == '1',
+        ),
+        0,
+      );
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+  }
 
   void _toggleDrawer() {
     if (_drawerController.value > 0) {
@@ -880,6 +1083,22 @@ class _HomeScreenState extends State<HomeScreen>
             api: widget.api,
             token: widget.result.token,
             user: _sessionUser,
+          ),
+          0,
+        );
+      case AppDrawerDestination.valueAddedServices:
+        _pushPage(
+          VasHomeScreen(
+            api: widget.api,
+            token: widget.result.token,
+            currency: _currency,
+            securityPinSet:
+                _sessionUser['security_pin_set'] == true ||
+                _sessionUser['security_pin_set'] == 1 ||
+                _sessionUser['security_pin_set'] == '1' ||
+                _sessionUser['has_security_pin'] == true ||
+                _sessionUser['has_security_pin'] == 1 ||
+                _sessionUser['has_security_pin'] == '1',
           ),
           0,
         );
@@ -988,7 +1207,9 @@ class _HomeScreenState extends State<HomeScreen>
             child: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProxyPromptExamplePage()),
+                  MaterialPageRoute(
+                    builder: (_) => const ProxyPromptExamplePage(),
+                  ),
                 );
               },
               child: Column(
@@ -1040,13 +1261,10 @@ class _HomeScreenState extends State<HomeScreen>
                     border: Border.all(color: brandGreen, width: 1.5),
                   ),
                   padding: const EdgeInsets.all(5),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/ranks/vpn.png',
-                      width: 35,
-                      height: 35,
-                      fit: BoxFit.cover,
-                    ),
+                  child: Icon(
+                    Icons.shield_outlined,
+                    color: brandGreen,
+                    size: 26,
                   ),
                 ),
               ),
@@ -1329,10 +1547,19 @@ class _HomeScreenState extends State<HomeScreen>
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        Icon(
-                          Icons.auto_awesome_rounded,
-                          color: Colors.white.withValues(alpha: .9),
-                          size: 27,
+                        IconButton(
+                          onPressed: _toggleTotalEarningsVisibility,
+                          tooltip: _hideTotalEarnings
+                              ? 'Show total earnings'
+                              : 'Hide total earnings',
+                          color: Colors.white.withValues(alpha: .95),
+                          iconSize: 26,
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            _hideTotalEarnings
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
+                          ),
                         ),
                       ],
                     ),
@@ -1350,7 +1577,7 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           )
                         : Text(
-                            total,
+                            _hideTotalEarnings ? '••••••••' : total,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 32,
@@ -1411,14 +1638,6 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
           ),
-
-          // Separate overlapping bottom action panel
-          /*Positioned(
-            left: 2,
-            right: 2,
-            bottom: 0,
-            child: _buildEarningsActions(),
-          ),*/
         ],
       ),
     );
@@ -1785,23 +2004,23 @@ class _HomeScreenState extends State<HomeScreen>
         Icons.android_rounded,
         Color(0xFF16A34A),
       ),
-      'review_group_c': ('Apple reviews', Icons.apple, Color(0xFF64748B)),
+      'review_group_c': ('Apple reviews', Icons.apple, Color(0xFF16A34A)),
       'review': (
         'Legacy reviews',
         Icons.rate_review_rounded,
-        Color(0xFF2563EB),
+        Color(0xFF16A34A),
       ),
-      'share': ('Share wallet', Icons.campaign_rounded, Color(0xFF8B5CF6)),
+      'share': ('Share wallet', Icons.campaign_rounded, Color(0xFF16A34A)),
       'referral': (
         'Referral wallet',
         Icons.group_add_rounded,
-        Color(0xFF0D9488),
+        Color(0xFF16A34A),
       ),
-      'bonus': ('Bonus wallet', Icons.card_giftcard_rounded, Color(0xFFF59E0B)),
+      'bonus': ('Bonus wallet', Icons.card_giftcard_rounded, Color(0xFF16A34A)),
       'topup_fund': (
         'Top-up fund',
         Icons.account_balance_wallet_rounded,
-        Color(0xFFEC4899),
+        Color(0xFFE34234),
       ),
     };
 
@@ -1884,7 +2103,7 @@ class _HomeScreenState extends State<HomeScreen>
               children: [
                 const Expanded(
                   child: Text(
-                    '__💰__',
+                    '',
                     style: TextStyle(
                       color: mutedInk,
                       fontSize: 10,

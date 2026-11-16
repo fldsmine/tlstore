@@ -9,6 +9,7 @@ enum AppDrawerDestination {
   ads,
   wallets,
   subscriptions,
+  valueAddedServices,
   topUp,
   transfer,
   referrals,
@@ -73,6 +74,11 @@ class AdvancedAppDrawer extends StatelessWidget {
       (Icons.add_card_rounded, 'Topup fund', AppDrawerDestination.topUp),
       (Icons.campaign_outlined, 'Campaign', AppDrawerDestination.campaigns),
       (Icons.task_alt_rounded, 'My Tasks', AppDrawerDestination.tasks),
+      (
+        Icons.bolt_rounded,
+        'Utilities',
+        AppDrawerDestination.valueAddedServices,
+      ),
       (Icons.help_center_rounded, 'FAQs', AppDrawerDestination.help),
       (Icons.settings_rounded, 'Settings', AppDrawerDestination.settings),
     ];
@@ -351,7 +357,7 @@ class AdvancedAppDrawer extends StatelessWidget {
     required bool active,
   }) => AnimatedContainer(
     duration: const Duration(milliseconds: 180),
-    margin: const EdgeInsets.only(bottom: 4),
+    margin: const EdgeInsets.only(bottom: 2),
     child: Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(12),
@@ -368,7 +374,7 @@ class AdvancedAppDrawer extends StatelessWidget {
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           minLeadingWidth: 20,
-          horizontalTitleGap: 14,
+          horizontalTitleGap: 10,
           leading: Icon(
             icon,
             color: active ? Colors.white : Colors.white70,

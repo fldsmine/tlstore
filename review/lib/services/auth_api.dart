@@ -147,6 +147,17 @@ class AuthApi {
   Future<List<Map<String, dynamic>>>? _faqsInFlight;
   String _preferredCurrency = 'USD';
 
+  // VAS responses are cached for an hour so reopening a screen paints instantly
+  // instead of re-fetching the catalog, wallet balance and order activity every
+  // time. Provider prices are stable over short intervals, so the catalog and
+  // plan lists stay warm; a completed purchase clears only the wallet and order
+  // entries so the next visit still shows the new balance and activity.
+  static const _vasCacheTtl = Duration(hours: 12);
+  static const _vasCacheIndexKey = 'trustlens.vas.cache.index.v1';
+  final Map<String, _CacheEntry> _vasCache = {};
+  Set<String>? _vasCacheIndex;
+  String _cachePrincipal = 'anonymous';
+
   String get preferredCurrency => _preferredCurrency;
 
   void setPreferredCurrency(String currency) {
@@ -197,6 +208,7 @@ class AuthApi {
       final token = session['token'] as String;
       final profile = session['user'] as Map<String, dynamic>;
       setPreferredCurrency(profile['preferred_currency']?.toString() ?? 'USD');
+      _cachePrincipal = _principalFor(profile);
       try {
         final response = await _request('GET', 'me', token: token);
         final user = response['data'];
@@ -229,6 +241,7 @@ class AuthApi {
     setPreferredCurrency(
       result.user['preferred_currency']?.toString() ?? 'USD',
     );
+    _cachePrincipal = _principalFor(result.user);
     await _storage.write(
       key: _sessionKey,
       value: jsonEncode({'token': result.token, 'user': result.user}),
@@ -239,6 +252,8 @@ class AuthApi {
     _preferredCurrency = 'USD';
     _usdRates = null;
     _ratesLoadedAt = null;
+    _cachePrincipal = 'anonymous';
+    await _clearVasCache();
     await _storage.delete(key: _sessionKey);
   }
 
@@ -632,7 +647,6 @@ class AuthApi {
     return response;
   }
 
-
   Future<Map<String, dynamic>> getPublic(String path) => _request('GET', path);
 
   Future<Map<String, dynamic>> about() => getPublic('about');
@@ -717,15 +731,242 @@ class AuthApi {
   Future<Map<String, dynamic>> get(String path, String token) =>
       _request('GET', path, token: token);
 
+  /// VAS catalog (services, providers and pricing mode).
+  ///
+  /// Responses are persisted for an hour, because provider prices do not change
+  /// in short intervals. Pass [forceRefresh] for an explicit user refresh.
+  Future<Map<String, dynamic>> vasCatalog(
+    String token, {
+    bool forceRefresh = false,
+  }) async {
+    final value = await _cachedValue(
+      _vasCacheKey('vas.catalog'),
+      () => _request('GET', 'vas/catalog', token: token),
+      forceRefresh: forceRefresh,
+    );
+    return _asJsonObject(value);
+  }
+
+  /// Plans for a service/provider pair, cached for an hour per provider.
+  Future<Map<String, dynamic>> vasPlans(
+    String token, {
+    required String service,
+    required String serviceId,
+    bool forceRefresh = false,
+  }) async {
+    final value = await _cachedValue(
+      _vasCacheKey('vas.plans.$service.$serviceId'),
+      () => _request(
+        'GET',
+        'vas/services/$service/plans?service_id=${Uri.encodeQueryComponent(serviceId)}',
+        token: token,
+      ),
+      forceRefresh: forceRefresh,
+    );
+    return _asJsonObject(value);
+  }
+
+  Future<Map<String, dynamic>> verifyVasRecipient(
+    String token,
+    Map<String, dynamic> data,
+  ) => post('vas/verify', token, data);
+
+  Future<Map<String, dynamic>> purchaseVas(
+    String token,
+    Map<String, dynamic> data,
+  ) async {
+    final response = await post('vas/purchases', token, data);
+    // A purchase moves the wallet balance and creates an order. Provider prices
+    // are unchanged, so the catalog and plan caches remain valid.
+    await _clearVasCache(where: _isVasActivityKey);
+    return response;
+  }
+
+  Future<Map<String, dynamic>> vasOrders(
+    String token, {
+    int perPage = 20,
+    bool forceRefresh = false,
+  }) async {
+    final value = await _cachedValue(
+      _vasCacheKey('vas.orders.$perPage'),
+      () => _request('GET', 'me/vas-orders?per_page=$perPage', token: token),
+      forceRefresh: forceRefresh,
+    );
+    return _asJsonObject(value);
+  }
+
+  Future<Map<String, dynamic>> checkVasOrder(
+    String token,
+    Object orderId,
+  ) async {
+    final response = await post(
+      'me/vas-orders/$orderId/check',
+      token,
+      const {},
+    );
+    final status = _asJsonObject(response['data'])['status']?.toString();
+    if (status != null && status.isNotEmpty && status != 'pending') {
+      // A settled order can refund reserved funds, so balances must re-sync.
+      await _clearVasCache(where: _isVasActivityKey);
+    }
+    return response;
+  }
+
+  /// Drops every cached VAS response. Call after a wallet top-up, transfer or
+  /// any balance change made outside the VAS flow.
+  Future<void> invalidateVasCache() => _clearVasCache();
+
+  /// Drops cached wallet balances and order activity, keeping catalog and plan
+  /// prices warm. Used after a purchase completes.
+  Future<void> invalidateVasActivityCache() =>
+      _clearVasCache(where: _isVasActivityKey);
+
+  /// Age of the cached catalog (or another scope), handy for "updated 5m ago".
+  Duration? vasCacheAge([String scope = 'vas.catalog']) {
+    final entry = _vasCache[_vasCacheKey(scope)];
+    if (entry == null) return null;
+    return DateTime.now().toUtc().difference(entry.storedAt);
+  }
+
+  String _vasCacheKey(String scope) => '$scope::$_cachePrincipal';
+
+  static bool _isVasActivityKey(String storageKey) =>
+      storageKey.contains('vas.wallets') || storageKey.contains('vas.orders');
+
+  String _principalFor(Map<String, dynamic>? user) {
+    final raw =
+        '${user?['id'] ?? user?['user_id'] ?? user?['uuid'] ?? user?['email'] ?? ''}'
+            .trim();
+    if (raw.isEmpty) return 'anonymous';
+    return raw.replaceAll(RegExp(r'[^A-Za-z0-9@._-]'), '_');
+  }
+
+  Future<Object?> _cachedValue(
+    String key,
+    Future<Object?> Function() load, {
+    bool forceRefresh = false,
+    Duration ttl = _vasCacheTtl,
+  }) async {
+    var cached = _vasCache[key];
+    cached ??= await _readCacheEntry(key);
+    if (!forceRefresh && cached != null && cached.isFresh(ttl)) {
+      return cached.value;
+    }
+    try {
+      final value = await load();
+      final entry = _CacheEntry(value, DateTime.now().toUtc());
+      _vasCache[key] = entry;
+      await _writeCacheEntry(key, entry);
+      return value;
+    } on AuthException catch (error) {
+      // Serve the last known response when the device is offline, but never
+      // mask an expired session.
+      if (!error.unauthorized && cached != null) return cached.value;
+      rethrow;
+    }
+  }
+
+  String _cacheStorageKey(String key) {
+    final host = Uri.tryParse(ApiConfig.baseUrl)?.host.toLowerCase() ?? 'api';
+    final safe = key.replaceAll(RegExp(r'[^A-Za-z0-9@._-]'), '_');
+    return 'trustlens.vas.cache.v1.$host.$safe';
+  }
+
+  Future<_CacheEntry?> _readCacheEntry(String key) async {
+    final storageKey = _cacheStorageKey(key);
+    try {
+      final storedAtText = await _storage.read(key: '$storageKey.at');
+      final storedAt = DateTime.tryParse(storedAtText ?? '')?.toUtc();
+      if (storedAt == null) return null;
+      final body = await _storage.read(key: storageKey);
+      if (body == null || body.isEmpty) return null;
+      final entry = _CacheEntry(jsonDecode(body), storedAt);
+      _vasCache[key] = entry;
+      return entry;
+    } catch (_) {
+      // Unreadable or unavailable storage behaves like a cache miss.
+      return null;
+    }
+  }
+
+  Future<void> _writeCacheEntry(String key, _CacheEntry entry) async {
+    final storageKey = _cacheStorageKey(key);
+    try {
+      await _storage.write(key: storageKey, value: jsonEncode(entry.value));
+      await _storage.write(
+        key: '$storageKey.at',
+        value: entry.storedAt.toIso8601String(),
+      );
+      final index = await _cacheIndex();
+      if (index.add(storageKey)) await _saveCacheIndex(index);
+    } catch (_) {
+      // The live response is still returned when caching is unavailable.
+    }
+  }
+
+  Future<Set<String>> _cacheIndex() async {
+    final existing = _vasCacheIndex;
+    if (existing != null) return existing;
+    final index = <String>{};
+    _vasCacheIndex = index;
+    try {
+      final raw = await _storage.read(key: _vasCacheIndexKey);
+      if (raw != null) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          for (final value in decoded) {
+            final text = value?.toString();
+            if (text != null && text.isNotEmpty) index.add(text);
+          }
+        }
+      }
+    } catch (_) {
+      // Start a fresh index when the previous one cannot be read.
+    }
+    return index;
+  }
+
+  Future<void> _saveCacheIndex(Set<String> index) async {
+    try {
+      await _storage.write(
+        key: _vasCacheIndexKey,
+        value: jsonEncode(index.toList()),
+      );
+    } catch (_) {
+      // Losing the index only leaves stale keys behind; requests stay correct.
+    }
+  }
+
+  Future<void> _clearVasCache({bool Function(String storageKey)? where}) async {
+    _vasCache.removeWhere((key, _) {
+      final storageKey = _cacheStorageKey(key);
+      return where == null || where(storageKey);
+    });
+    final index = await _cacheIndex();
+    final dropped = <String>[];
+    for (final storageKey in index.toList()) {
+      if (where == null || where(storageKey)) {
+        index.remove(storageKey);
+        dropped.add(storageKey);
+      }
+    }
+    for (final storageKey in dropped) {
+      try {
+        await _storage.delete(key: storageKey);
+        await _storage.delete(key: '$storageKey.at');
+      } catch (_) {
+        // A locked keychain must not block a purchase or a sign-out.
+      }
+    }
+    if (dropped.isNotEmpty) await _saveCacheIndex(index);
+  }
+
   Future<http.Response> download(String path, String token) async {
     try {
       final response = await http
           .get(
             ApiConfig.endpoint(path),
-            headers: {
-              'Accept': '*/*',
-              'Authorization': 'Bearer $token',
-            },
+            headers: {'Accept': '*/*', 'Authorization': 'Bearer $token'},
           )
           .timeout(const Duration(seconds: 45));
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -853,12 +1094,18 @@ class AuthApi {
     return decoded;
   }
 
-  Future<List<Map<String, dynamic>>> wallets(String token) async {
-    final response = await _request('GET', 'wallets', token: token);
-    final data = response['data'];
-    return data is List
-        ? data.whereType<Map<String, dynamic>>().toList()
-        : const [];
+  /// Wallet balances, cached for an hour. Purchases, top-ups and settlements
+  /// invalidate this entry so the next visit re-reads the live balance.
+  Future<List<Map<String, dynamic>>> wallets(
+    String token, {
+    bool forceRefresh = false,
+  }) async {
+    final value = await _cachedValue(
+      _vasCacheKey('vas.wallets'),
+      () => _request('GET', 'wallets', token: token),
+      forceRefresh: forceRefresh,
+    );
+    return _asJsonRows(_asJsonObject(value)['data']);
   }
 
   Future<Map<String, dynamic>> accountHistory(
@@ -1065,5 +1312,28 @@ class AuthApi {
     }
     return json['message']?.toString() ??
         'Something went wrong. Please try again.';
+  }
+}
+
+Map<String, dynamic> _asJsonObject(Object? value) => value is Map
+    ? Map<String, dynamic>.from(value)
+    : <String, dynamic>{};
+
+List<Map<String, dynamic>> _asJsonRows(Object? value) => value is List
+    ? value
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(growable: false)
+    : const <Map<String, dynamic>>[];
+
+class _CacheEntry {
+  const _CacheEntry(this.value, this.storedAt);
+
+  final Object? value;
+  final DateTime storedAt;
+
+  bool isFresh(Duration ttl) {
+    final age = DateTime.now().toUtc().difference(storedAt);
+    return !age.isNegative && age < ttl;
   }
 }

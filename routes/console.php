@@ -9,6 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('tasks:expire-reservations')->everyMinute();
+Schedule::command('vas:reconcile-pending')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('rankings:check-eligibility')->dailyAt('00:05');
 Schedule::command('rankings:reward-monthly')->dailyAt('00:10');
 Schedule::command('demo:generate-listings')

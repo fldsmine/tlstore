@@ -76,6 +76,17 @@ class SystemSettingSeeder extends Seeder
             'payment.active_payment_currency' => [$activePaymentCurrency, true],
             'account_validation.provider' => [['provider' => 'paystack'], false],
 
+            // VAS remains disabled until purchase and wallet settlement are deployed.
+            'vas.enabled' => [true, true],
+            'vas.services' => [[
+                'airtime' => true,
+                'data' => true,
+                'tv' => true,
+                'electricity' => true,
+                'education' => true,
+            ], false],
+            'vas.catalog_cache_minutes' => [360, false],
+
             // --- rewards ----------------------------------------------------
             'rewards.referral_subscription_active' => [true, false],
             'rewards.referral_task_active' => [true, false],

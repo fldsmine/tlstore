@@ -541,19 +541,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (id != null) plansById[id] = Map<String, dynamic>.from(plan);
       }
     }
-    final profileCompletionFields = <bool>[
-      name.isNotEmpty,
-      user['username']?.toString().trim().isNotEmpty == true,
-      user['phone']?.toString().trim().isNotEmpty == true,
-      user['preferred_currency']?.toString().trim().isNotEmpty == true,
-      avatar != null,
-      user['email_verified'] == true,
-    ];
-    final profileCompletion =
-        (profileCompletionFields.where((complete) => complete).length * 100 /
-                profileCompletionFields.length)
-            .round();
-    final memberSince = _formatDate(user['created_at']?.toString());
+    final hasAddonSubscription = activeSubscriptions.any((subscription) {
+      final plan = plansById[
+        subscription['subscription_plan_id']?.toString()
+      ];
+      return plan?['addons'] == true || plan?['addons'] == 1;
+    });
 
     return Theme(
       data: theme.copyWith(
@@ -592,26 +585,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         appBar: AppBar(
           title: Text(
             _editing ? 'Edit profile' : 'My profile',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-              letterSpacing: -.3,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
           ),
-          foregroundColor: Colors.white,
-          backgroundColor: Colors.transparent,
+          backgroundColor: theme.scaffoldBackgroundColor,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
-          flexibleSpace: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [colors.primary, colors.secondary],
-              ),
-            ),
-          ),
           actions: [
             if (!_editing)
               IconButton(
@@ -627,7 +605,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _editing = false;
                         _fillControllers();
                       }),
-                style: TextButton.styleFrom(foregroundColor: Colors.white),
                 child: const Text('Cancel'),
               )
             else
@@ -635,7 +612,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.only(right: 8),
                 child: TextButton.icon(
                   onPressed: () => setState(() => _editing = true),
-                  style: TextButton.styleFrom(foregroundColor: Colors.white),
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: const Text('Edit'),
                 ),
@@ -660,14 +636,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 coverUrl: cover,
                 verified: user['email_verified'] == true,
               ),
-              if (!_editing) ...[
-                const SizedBox(height: 12),
-                _ProfileOverview(
-                  completion: profileCompletion,
-                  activePackages: activeSubscriptions.length,
-                  memberSince: memberSince,
-                ),
-              ],
               const SizedBox(height: 15),
               if (_editing) ...[
                 if (_mediaBusy)
@@ -825,7 +793,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
+                
                 _SectionCard(
                   title: 'My subscriptions',
                   subtitle: activeSubscriptions.isEmpty
@@ -866,7 +834,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                 ),
-
+                
                 const SizedBox(height: 12),
                 _SectionCard(
                   title: 'Account overview',
@@ -978,7 +946,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-
+                
               ],
                 const SizedBox(height: 13),
                 const _PrivacyNote(),
@@ -1370,134 +1338,6 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
   }
 }
 
-class _ProfileOverview extends StatelessWidget {
-  const _ProfileOverview({
-    required this.completion,
-    required this.activePackages,
-    required this.memberSince,
-  });
-
-  final int completion;
-  final int activePackages;
-  final String memberSince;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = (constraints.maxWidth / 132).floor().clamp(1, 3).toInt();
-        final width = (constraints.maxWidth - (columns - 1) * 10) / columns;
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            SizedBox(
-              width: width,
-              child: _OverviewTile(
-                label: 'Profile complete',
-                value: '$completion%',
-                icon: Icons.donut_large_rounded,
-                color: colors.primary,
-                progress: completion / 100,
-              ),
-            ),
-            SizedBox(
-              width: width,
-              child: _OverviewTile(
-                label: 'Active packages',
-                value: '$activePackages',
-                icon: Icons.workspace_premium_outlined,
-                color: colors.tertiary,
-              ),
-            ),
-            SizedBox(
-              width: width,
-              child: _OverviewTile(
-                label: 'Member since',
-                value: memberSince,
-                icon: Icons.calendar_month_outlined,
-                color: colors.secondary,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _OverviewTile extends StatelessWidget {
-  const _OverviewTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    this.progress,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final double? progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(icon, size: 17, color: color),
-            const Spacer(),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: colors.onSurfaceVariant,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (progress != null) ...[
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: LinearProgressIndicator(
-                value: progress!.clamp(0, 1).toDouble(),
-                minHeight: 4,
-                backgroundColor: color.withValues(alpha: .14),
-                color: color,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _ProfileHero extends StatelessWidget {
   const _ProfileHero({
     required this.name,
@@ -1738,80 +1578,43 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final icon = switch (title) {
-      'Profile appearance' => Icons.photo_camera_back_outlined,
-      'Personal details' => Icons.badge_outlined,
-      'My subscriptions' => Icons.workspace_premium_outlined,
-      'Account overview' => Icons.insights_outlined,
-      'Security centre' => Icons.shield_outlined,
-      _ => Icons.account_circle_outlined,
-    };
-    final accent = switch (title) {
-      'Profile appearance' => colors.tertiary,
-      'My subscriptions' => colors.primary,
-      'Security centre' => colors.error,
-      'Account overview' => colors.secondary,
-      _ => colors.primary,
-    };
-
     return Container(
-      padding: const EdgeInsets.all(17),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(21),
+        borderRadius: BorderRadius.circular(19),
         border: Border.all(color: colors.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: colors.shadow.withValues(alpha: .035),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: colors.shadow.withValues(alpha: .02),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: accent, size: 21),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: colors.onSurface,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          color: colors.onSurfaceVariant,
-                          fontSize: 11,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+          Text(
+            title,
+            style: TextStyle(
+              color: colors.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          const SizedBox(height: 14),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ],
+          const SizedBox(height: 13),
           child,
         ],
       ),

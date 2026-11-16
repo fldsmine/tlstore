@@ -39,6 +39,7 @@ trait TrustLensMorphMap
             'withdrawal_request' => WithdrawalRequest::class,
             'notification' => Notification::class,
             'user_social_follow' => UserSocialFollow::class,
+            'vtu_order' => VtuOrder::class,
         ]);
     }
 }

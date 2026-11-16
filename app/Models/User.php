@@ -146,6 +146,11 @@ class User extends Authenticatable
         return $this->hasMany(Wallet::class);
     }
 
+    public function vtuOrders(): HasMany
+    {
+        return $this->hasMany(VtuOrder::class);
+    }
+
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);

@@ -123,6 +123,31 @@ final class SystemSettingController
             $data['value'] = $normalized;
         }
 
+        if ($settingKey === 'vas.enabled' && ! is_bool($data['value'])) {
+            return response()->json(['message' => 'VAS enabled must be true or false.'], 422);
+        }
+
+        if ($settingKey === 'vas.services') {
+            $services = $data['value'];
+            $allowedServices = ['airtime', 'data', 'tv', 'electricity', 'education'];
+            if (! is_array($services) || array_is_list($services) || array_diff(array_keys($services), $allowedServices) !== []) {
+                return response()->json(['message' => 'VAS services must map supported service names to enabled flags.'], 422);
+            }
+            foreach ($services as $service => $enabled) {
+                if (! is_bool($enabled)) {
+                    return response()->json(['message' => "The {$service} VAS flag must be true or false."], 422);
+                }
+            }
+            $data['value'] = array_merge(array_fill_keys($allowedServices, false), $services);
+        }
+
+        if ($settingKey === 'vas.catalog_cache_minutes') {
+            if (filter_var($data['value'], FILTER_VALIDATE_INT) === false || (int) $data['value'] < 5 || (int) $data['value'] > 1440) {
+                return response()->json(['message' => 'VAS catalog cache duration must be an integer from 5 to 1440 minutes.'], 422);
+            }
+            $data['value'] = (int) $data['value'];
+        }
+
         $normalizedKey = strtolower($settingKey);
         if (str_contains($normalizedKey, 'secret') || str_contains($normalizedKey, 'credential') || str_contains($normalizedKey, 'private_key')) {
             return response()->json(['message' => 'Provider secrets must be configured in server environment, not stored as editable settings.'], 422);

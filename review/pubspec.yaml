@@ -55,8 +55,10 @@ flutter:
 
   uses-material-design: true
   assets:
+    - assets/others/
     - assets/ranks/
     - assets/cards/
+    - assets/vas/
     - assets/logo.jpg
     - assets/native-splash.png
     - assets/splash-bg.png
