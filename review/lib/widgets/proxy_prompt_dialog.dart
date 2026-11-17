@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/utils/pulsing_info_button.dart';
+import 'proxy_info_dialog.dart';
+
 /// A single feature shown on the proxy plan card.
 @immutable
 class ProxyPromptFeature {
@@ -25,8 +28,7 @@ class ProxyPromptPlan {
     this.titleTail = '?',
     this.noticeLead = 'An ',
     this.noticeHighlight = 'active proxy',
-    this.noticeBody =
-        ' is required to submit Reviews on Trustlens Store. Work done without a proxy ',
+    this.noticeBody = ' is required to submit Reviews on Trustlens Store. Work done without a proxy ',
     this.noticeWarning = 'may be rejected.',
     this.price = '\$5',
     this.billingPeriod = '/mo.',
@@ -38,23 +40,11 @@ class ProxyPromptPlan {
     this.reviewActionLabel = 'Submit review anyway',
     this.features = const <ProxyPromptFeature>[
       ProxyPromptFeature(label: '2 Location', icon: Icons.location_on_rounded),
-      ProxyPromptFeature(
-        label: '1GB Bandwidth',
-        icon: Icons.speed_rounded,
-      ),
-      ProxyPromptFeature(
-        label: 'Email Support',
-        icon: Icons.email_rounded,
-      ),
+      ProxyPromptFeature(label: '1GB Bandwidth', icon: Icons.speed_rounded),
+      ProxyPromptFeature(label: 'Email Support', icon: Icons.email_rounded),
       ProxyPromptFeature(label: 'SSO+SCIM', icon: Icons.shield_outlined),
-      ProxyPromptFeature(
-        label: 'Dedicated IPS',
-        icon: Icons.dns_rounded,
-      ),
-      ProxyPromptFeature(
-        label: 'Encrypted Tunnel',
-        icon: Icons.lock_rounded,
-      ),
+      ProxyPromptFeature(label: 'Dedicated IPS', icon: Icons.dns_rounded),
+      ProxyPromptFeature(label: 'Encrypted Tunnel', icon: Icons.lock_rounded),
     ],
   });
 
@@ -77,7 +67,6 @@ class ProxyPromptPlan {
   final List<ProxyPromptFeature> features;
   final String reviewActionLabel;
   final bool? reviewAction;
-
 }
 
 /// Tall proxy prompt matching the first reference image's vertical feature list.
@@ -173,6 +162,306 @@ class ProxyRequirementGridDialog extends StatelessWidget {
   );
 }
 
+/// A focused proxy add-on prompt for the add-on purchase flow. It keeps the
+/// details and actions from [ProxyRequirementDialog] while presenting them in
+/// a compact, theme-aware layout.
+class ProxyAddonsDialog extends StatelessWidget {
+  const ProxyAddonsDialog({
+    super.key,
+    required this.plan,
+    required this.onPurchase,
+    required this.onReview,
+    this.closeOnPurchase = true,
+  });
+
+  final ProxyPromptPlan plan;
+  final VoidCallback onPurchase;
+  final VoidCallback onReview;
+  final bool closeOnPurchase;
+
+  static Future<T?> show<T>({
+    required BuildContext context,
+    required ProxyPromptPlan plan,
+    required VoidCallback onPurchase,
+    required VoidCallback onReview,
+    bool barrierDismissible = true,
+    bool closeOnPurchase = true,
+  }) => showDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    builder: (_) => ProxyAddonsDialog(
+      plan: plan,
+      onPurchase: onPurchase,
+      onReview: onReview,
+      closeOnPurchase: closeOnPurchase,
+    ),
+  );
+
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final features = plan.features;
+
+    return Dialog(
+      backgroundColor: colors.surface,
+      surfaceTintColor: colors.surfaceTint,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 460,
+          maxHeight: MediaQuery.sizeOf(context).height * .88,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Icon(
+                      Icons.shield_outlined,
+                      color: colors.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      plan.storeName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              RichText(
+                text: TextSpan(
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: colors.onSurface,
+                    fontWeight: FontWeight.w900,
+                    height: 1.12,
+                  ),
+                  children: [
+                    TextSpan(text: plan.titleLead),
+                    TextSpan(
+                      text: plan.titleHighlight,
+                      style: TextStyle(color: colors.primary),
+                    ),
+                    TextSpan(text: plan.titleTail),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer.withValues(alpha: .48),
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: .18),
+                  ),
+                ),
+                child: RichText(
+                  text: TextSpan(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurface,
+                      height: 1.45,
+                    ),
+                    children: [
+                      TextSpan(text: plan.noticeLead),
+                      TextSpan(
+                        text: plan.noticeHighlight,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      TextSpan(text: plan.noticeBody),
+                      TextSpan(
+                        text: plan.noticeWarning,
+                        style: TextStyle(
+                          color: colors.error,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: colors.outlineVariant),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                              children: [
+                                TextSpan(text: plan.price),
+                                TextSpan(
+                                  text: plan.billingPeriod,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.secondaryContainer,
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Text(
+                            plan.requiredLabel,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colors.onSecondaryContainer,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (plan.reviewAction == true) ...[
+                      const SizedBox(height: 12),
+                      Divider(color: colors.outlineVariant),
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          PulsingInfoButton(
+                            color: colors.primary,
+                            onPressed:  () => showProxyInformation(context),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              'Please activate your proxy now to continue without interruptions.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colors.onSurfaceVariant,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (features.isNotEmpty) ...[
+                      const SizedBox(height: 13),
+                      Divider(color: colors.outlineVariant),
+                      const SizedBox(height: 9),
+                      for (final feature in features)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(
+                            children: [
+                              Icon(
+                                feature.icon,
+                                size: 19,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  feature.label,
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.verified_user_outlined,
+                    size: 17,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    plan.trustLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('·', style: TextStyle(color: colors.onSurfaceVariant)),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      plan.footerBrand,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (plan.reviewAction == true) ...[
+                const SizedBox(height: 13),
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      _purchase(context, onReview, closeOnPurchase),
+                  icon: const Icon(Icons.rate_review_outlined),
+                  label: Text(plan.reviewActionLabel),
+                ),
+              ],
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () =>
+                    _purchase(context, onPurchase, closeOnPurchase),
+                icon: const Icon(Icons.shopping_bag_outlined),
+                label: Text(plan.purchaseLabel),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 abstract final class _ProxyColors {
   static const ink = Color(0xFF141922);
   static const muted = Color(0xFF667085);
@@ -243,11 +532,11 @@ class _TallProxyPrompt extends StatelessWidget {
       const SizedBox(height: 12),
       _TallPriceFeatures(plan: plan),
       const SizedBox(height: 12),
-      if(plan.reviewAction == true)
-      _ReviewAction(
-        label: plan.reviewActionLabel,
-        onPressed: () => _purchase(context, onReview, closeOnPurchase),
-      ),
+      if (plan.reviewAction == true)
+        _ReviewAction(
+          label: plan.reviewActionLabel,
+          onPressed: () => _purchase(context, onReview, closeOnPurchase),
+        ),
       const SizedBox(height: 12),
       _PurchaseButton(
         label: plan.purchaseLabel,
@@ -775,7 +1064,7 @@ class _TallPriceFeatures extends StatelessWidget {
                 ),
 
                 Padding(
-                  padding: EdgeInsets.only(left: 17, right: 8, bottom:15),
+                  padding: EdgeInsets.only(left: 17, right: 8, bottom: 15),
                   child: Row(
                     children: [
                       Expanded(
@@ -908,7 +1197,11 @@ class _CheckFeature extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const Icon(Icons.check_circle_rounded, size: 21, color: _ProxyColors.green),
+      const Icon(
+        Icons.check_circle_rounded,
+        size: 21,
+        color: _ProxyColors.green,
+      ),
       const SizedBox(width: 9),
       Expanded(
         child: Text(
@@ -956,10 +1249,7 @@ class _MapDecoration extends StatelessWidget {
           color: _ProxyColors.green.withValues(alpha: .9),
         ),
       ),
-      CustomPaint(
-        size: const Size(112, 62),
-        painter: _RoutePainter(),
-      ),
+      CustomPaint(size: const Size(112, 62), painter: _RoutePainter()),
     ],
   );
 }
@@ -1033,10 +1323,8 @@ class _FeatureGrid extends StatelessWidget {
           mainAxisSpacing: 1,
           childAspectRatio: narrow ? 1.32 : 1.55,
         ),
-        itemBuilder: (context, index) => _GridFeatureCell(
-          feature: features[index],
-          narrow: narrow,
-        ),
+        itemBuilder: (context, index) =>
+            _GridFeatureCell(feature: features[index], narrow: narrow),
       );
     },
   );
@@ -1109,7 +1397,6 @@ class _GridFeatureCell extends StatelessWidget {
   }
 }
 
-
 class _ReviewAction extends StatelessWidget {
   const _ReviewAction({required this.label, required this.onPressed});
 
@@ -1161,7 +1448,11 @@ class _PurchaseButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.shopping_cart_rounded, color: Colors.white, size: 25),
+            const Icon(
+              Icons.shopping_cart_rounded,
+              color: Colors.white,
+              size: 25,
+            ),
             const SizedBox(width: 13),
             Flexible(
               child: Text(
@@ -1178,7 +1469,11 @@ class _PurchaseButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 30),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
           ],
         ),
       ),
@@ -1198,7 +1493,11 @@ class _TallFooter extends StatelessWidget {
     spacing: 11,
     runSpacing: 5,
     children: [
-      const Icon(Icons.verified_user_rounded, color: _ProxyColors.green, size: 22),
+      const Icon(
+        Icons.verified_user_rounded,
+        color: _ProxyColors.green,
+        size: 22,
+      ),
       Text(
         plan.trustLabel,
         style: const TextStyle(
@@ -1241,7 +1540,11 @@ class _WaveFooter extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.verified_user_rounded, color: _ProxyColors.green, size: 21),
+            const Icon(
+              Icons.verified_user_rounded,
+              color: _ProxyColors.green,
+              size: 21,
+            ),
             const SizedBox(width: 8),
             Text(
               label,
@@ -1267,15 +1570,23 @@ class _FooterWavePainter extends CustomPainter {
     final dark = Paint()..color = const Color(0xFF09A75C);
     final lightPath = Path()
       ..moveTo(0, size.height * .32)
-      ..quadraticBezierTo(size.width * .5, size.height * .92, size.width,
-          size.height * .25)
+      ..quadraticBezierTo(
+        size.width * .5,
+        size.height * .92,
+        size.width,
+        size.height * .25,
+      )
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
     final darkPath = Path()
       ..moveTo(0, size.height * .64)
-      ..quadraticBezierTo(size.width * .5, size.height * 1.15, size.width,
-          size.height * .55)
+      ..quadraticBezierTo(
+        size.width * .5,
+        size.height * 1.15,
+        size.width,
+        size.height * .55,
+      )
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();

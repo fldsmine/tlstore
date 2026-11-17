@@ -117,7 +117,7 @@ class _WalletTransferScreenState extends State<WalletTransferScreen> {
       _amount.clear();
       showAuthMessage(
         context,
-        '$currency ${amount.toStringAsFixed(digits)} moved to ${_targets[_target]}.',
+        '${formatMajorMoney(amount, currency)} moved to ${_targets[_target]}.',
       );
       await _load();
     } on AuthException catch (error) {

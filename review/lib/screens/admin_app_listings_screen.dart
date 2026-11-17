@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 
 // ---------------------------------------------------------------------------
@@ -1057,7 +1058,7 @@ class _CampaignStrip extends StatelessWidget {
     final int units = precision[code] ?? 2;
     final int value = int.tryParse(minor?.toString() ?? '') ?? 0;
     final double amount = value / math.pow(10, units);
-    return '$code ${amount.toStringAsFixed(units)}';
+    return '$code ${formatGroupedNumber(amount, units)}';
   }
 
   @override
@@ -2224,7 +2225,7 @@ class _AppListingFormState extends State<_AppListingForm> {
 
   String _money(int minor) {
     final int units = _precision;
-    return '${(minor / math.pow(10, units)).toStringAsFixed(units)} $_currency';
+    return '${formatGroupedNumber(minor / math.pow(10, units), units)} $_currency';
   }
 
   // -- pickers -----------------------------------------------------------

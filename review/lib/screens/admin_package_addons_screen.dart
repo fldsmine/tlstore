@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 
 /// Admin console for the package_addons catalog and its user entitlements.
@@ -178,7 +179,7 @@ class _AdminPackageAddonsScreenState extends State<AdminPackageAddonsScreen> {
       3 => 1000,
       _ => 10000,
     };
-    return '$code ${(amount / divisor).toStringAsFixed(decimals)}';
+    return '$code ${formatGroupedNumber(amount / divisor, decimals)}';
   }
 
   int _currencyMinorUnits(String code) {

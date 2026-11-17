@@ -150,6 +150,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/review-tasks/{task}/addon-check', [PackageAddonController::class, 'reviewEligibility'])->name('api.v1.review-tasks.addon-check');
         Route::post('/me/subscription-questionnaire', [SubscriptionController::class, 'submitQuestionnaire'])->name('api.v1.me.subscription-questionnaire');
         Route::get('/notifications', [NotificationController::class, 'index'])->name('api.v1.notifications.index');
+        Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('api.v1.notifications.unread-count');
         Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('api.v1.notifications.read');
         Route::post('/devices', [NotificationController::class, 'registerDevice'])->name('api.v1.devices.store');
         Route::delete('/devices/{device}', [NotificationController::class, 'revokeDevice'])->name('api.v1.devices.revoke');

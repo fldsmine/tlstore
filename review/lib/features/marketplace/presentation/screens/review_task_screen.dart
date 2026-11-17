@@ -263,7 +263,7 @@ Future<bool> _checkAddonBeforeSubmit() async {
         .take(6)
         .toList(growable: false);
 
-    final choice = await ProxyRequirementDialog.show<String>(
+    final choice = await ProxyAddonsDialog.show<String>(
       context: context,
       plan: ProxyPromptPlan(
         storeName: 'TrustLens Store',
@@ -279,13 +279,14 @@ Future<bool> _checkAddonBeforeSubmit() async {
         price: price,
         billingPeriod: getDuration(data),
         requiredLabel: 'Required',
-        purchaseLabel: 'CHOOSE PAYMENT',
+        purchaseLabel: 'ACTIVATE PROXY',
         trustLabel: 'Secure checkout',
         footerBrand: 'TrustLens Store',
         features: featured,
         reviewAction: true,
         reviewActionLabel: 'Submit review anyway',
       ),
+      
       // Keep the prompt route under explicit control. The shared prompt's
       // default behavior popped first and then the old callback popped the
       // review route, making both actions look like they simply closed.
@@ -535,9 +536,9 @@ class _AppOverviewCard extends StatelessWidget {
 
   String _money(dynamic minor, dynamic currency) {
     if (minor is! num) return 'Reward available';
-    final amount = minor / 100;
     final code = currency?.toString() ?? 'NGN';
-    return '$code ${amount.toStringAsFixed(2)}';
+    final digits = currencyPrecision(code);
+    return formatMajorMoney(minor / math.pow(10, digits), code);
   }
 
   @override

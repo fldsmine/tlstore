@@ -25,6 +25,13 @@ final class NotificationController
         return response()->json(['data' => $request->user()->notifications()->latest()->paginate(30)]);
     }
 
+    public function unreadCount(Request $request): JsonResponse
+    {
+        $count = $request->user()->notifications()->whereNull('read_at')->count();
+
+        return response()->json(['data' => ['unread_count' => $count]]);
+    }
+
     public function markRead(Request $request, Notification $notification): JsonResponse
     {
         abort_unless($notification->user_id === $request->user()->id, 404);

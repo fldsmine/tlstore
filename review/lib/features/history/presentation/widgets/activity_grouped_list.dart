@@ -64,35 +64,20 @@ class ActivityGroupedList extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(17),
-                  border: Border.all(
-                    color: colors.outlineVariant.withValues(alpha: .6),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    for (
-                      var itemIndex = 0;
-                      itemIndex < items.length;
-                      itemIndex++
-                    ) ...[
-                      if (itemIndex > 0)
-                        Divider(
-                          height: 1,
-                          indent: 15,
-                          endIndent: 15,
-                          color: colors.outlineVariant.withValues(alpha: .55),
-                        ),
-                      ActivityTransactionTile(
-                        transaction: items[itemIndex],
-                        displayAmount: displayAmount(items[itemIndex]),
-                      ),
-                    ],
+              Column(
+                children: [
+                  for (
+                    var itemIndex = 0;
+                    itemIndex < items.length;
+                    itemIndex++
+                  ) ...[
+                    if (itemIndex > 0) const SizedBox(height: 10),
+                    ActivityTransactionTile(
+                      transaction: items[itemIndex],
+                      displayAmount: displayAmount(items[itemIndex]),
+                    ),
                   ],
-                ),
+                ],
               ),
             ],
           ),

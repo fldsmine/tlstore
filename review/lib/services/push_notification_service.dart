@@ -28,6 +28,7 @@ class PushNotificationService {
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
   final StreamController<void> _opened = StreamController<void>.broadcast();
+  final StreamController<void> _received = StreamController<void>.broadcast();
 
   FirebaseMessaging? _messaging;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
@@ -41,6 +42,7 @@ class PushNotificationService {
   bool _initialized = false;
 
   Stream<void> get notificationOpened => _opened.stream;
+  Stream<void> get notificationReceived => _received.stream;
 
   bool consumePendingOpen() {
     final pending = _pendingOpen;
@@ -215,6 +217,7 @@ class PushNotificationService {
   }
 
   Future<void> _showForeground(RemoteMessage message) async {
+    _received.add(null);
     if (kIsWeb) return;
     final notification = message.notification;
     if (notification == null) return;

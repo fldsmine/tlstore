@@ -7,6 +7,7 @@ import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 import '../services/media_url.dart';
 import '../widgets/auth_components.dart';
+import '../widgets/withdrawal_pin_sheet.dart';
 import 'settings_screen.dart';
 import 'subscriptions_screen.dart';
 
@@ -79,7 +80,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Keep the session profile visible when the device is offline.
     }
   }
-
 
   Future<void> _openSubscriptions() async {
     await Navigator.of(context).push<void>(
@@ -195,83 +195,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _changePassword() async {
-    final current = TextEditingController();
-    final next = TextEditingController();
-    final confirm = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final submit = await showDialog<bool>(
+    final changed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('Change password'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: current,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Current password',
-                ),
-                validator: (value) => value == null || value.isEmpty
-                    ? 'Enter your current password'
-                    : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: next,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'New password'),
-                validator: (value) => value == null || value.length < 10
-                    ? 'Use at least 10 characters'
-                    : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: confirm,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm new password',
-                ),
-                validator: (value) =>
-                    value != next.text ? 'Passwords do not match' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(dialogContext, true);
-              }
-            },
-            child: const Text('Update password'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (_) =>
+          _ChangePasswordDialog(api: widget.api, token: widget.token),
     );
-    if (submit == true) {
-      try {
-        await widget.api.put('me/password', widget.token, {
-          'current_password': current.text,
-          'password': next.text,
-          'password_confirmation': confirm.text,
-        });
-        if (mounted) showAuthMessage(context, 'Password updated.');
-      } on AuthException catch (error) {
-        if (mounted) showAuthMessage(context, error.message);
-      }
+    if (changed == true && mounted) {
+      showAuthMessage(context, 'Password updated.');
     }
-    current.dispose();
-    next.dispose();
-    confirm.dispose();
   }
 
   Future<void> _manageSecurityPin() async {
@@ -279,21 +211,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final pinIsSet = _user['security_pin_set'] == true;
     setState(() => _securityBusy = true);
     try {
-      final response = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (_) => _SecurityPinDialog(
-          api: widget.api,
-          token: widget.token,
-          pinIsSet: pinIsSet,
-          hasPassword: _user['has_password'] == true,
-        ),
+      final saved = await showWithdrawalPinSheet(
+        context,
+        api: widget.api,
+        token: widget.token,
+        endpoint: 'me/security-pin',
+        requireCurrentPin: pinIsSet,
+        requireAccountPassword: !pinIsSet && _user['has_password'] == true,
+        title: pinIsSet
+            ? 'Choose a new withdrawal PIN'
+            : 'Create a withdrawal PIN',
+        onSuccess: (response) {
+          final data = response['data'];
+          if (mounted && data is Map) {
+            setState(() => _user.addAll(Map<String, dynamic>.from(data)));
+          }
+        },
       );
-      if (response?['data'] is Map<String, dynamic> && mounted) {
-        setState(() => _user.addAll(response!['data'] as Map<String, dynamic>));
-        showAuthMessage(
-          context,
-          response?['message']?.toString() ?? 'PIN updated.',
-        );
+      if (saved && mounted) {
+        showAuthMessage(context, pinIsSet ? 'PIN updated.' : 'PIN saved.');
       }
     } finally {
       if (mounted) setState(() => _securityBusy = false);
@@ -534,17 +470,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? Map<String, dynamic>.from(subscriptionContext['catalog'] as Map)
         : <String, dynamic>{};
     final plansById = <String, Map<String, dynamic>>{};
-    for (final group in (catalog['subscription_groups'] as List? ?? const [])
-        .whereType<Map>()) {
-      for (final plan in (group['plans'] as List? ?? const []).whereType<Map>()) {
+    for (final group
+        in (catalog['subscription_groups'] as List? ?? const [])
+            .whereType<Map>()) {
+      for (final plan
+          in (group['plans'] as List? ?? const []).whereType<Map>()) {
         final id = plan['id']?.toString();
         if (id != null) plansById[id] = Map<String, dynamic>.from(plan);
       }
     }
     final hasAddonSubscription = activeSubscriptions.any((subscription) {
-      final plan = plansById[
-        subscription['subscription_plan_id']?.toString()
-      ];
+      final plan = plansById[subscription['subscription_plan_id']?.toString()];
       return plan?['addons'] == true || plan?['addons'] == 1;
     });
 
@@ -585,7 +521,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         appBar: AppBar(
           title: Text(
             _editing ? 'Edit profile' : 'My profile',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
+              letterSpacing: -0.4,
+            ),
           ),
           backgroundColor: theme.scaffoldBackgroundColor,
           surfaceTintColor: Colors.transparent,
@@ -598,22 +538,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.settings_outlined),
               ),
             if (_editing)
-              TextButton(
-                onPressed: _saving
-                    ? null
-                    : () => setState(() {
-                        _editing = false;
-                        _fillControllers();
-                      }),
-                child: const Text('Cancel'),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton(
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() {
+                          _editing = false;
+                          _fillControllers();
+                        }),
+                  style: TextButton.styleFrom(
+                    foregroundColor: colors.onSurfaceVariant,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
               )
             else
               Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 10),
                 child: TextButton.icon(
                   onPressed: () => setState(() => _editing = true),
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('Edit'),
+                  style: TextButton.styleFrom(
+                    backgroundColor: colors.primary.withValues(alpha: 0.10),
+                    foregroundColor: colors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text(
+                    'Edit',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
           ],
@@ -626,331 +592,324 @@ class _ProfileScreenState extends State<ProfileScreen> {
               constraints: const BoxConstraints(maxWidth: 760),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 5, 16, 30),
-            children: [
-              _ProfileHero(
-                name: name.isEmpty ? 'Your profile' : name,
-                username: user['username']?.toString() ?? '',
-                email: email,
-                avatarUrl: avatar,
-                coverUrl: cover,
-                verified: user['email_verified'] == true,
-              ),
-              const SizedBox(height: 15),
-              if (_editing) ...[
-                if (_mediaBusy)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 10),
-                    child: LinearProgressIndicator(
-                      minHeight: 3,
-                      color: colors.primary,
+                padding: const EdgeInsets.fromLTRB(16, 5, 16, 30),
+                children: [
+                  _ProfileHero(
+                    name: name.isEmpty ? 'Your profile' : name,
+                    username: user['username']?.toString() ?? '',
+                    email: email,
+                    avatarUrl: avatar,
+                    coverUrl: cover,
+                    verified: user['email_verified'] == true,
+                    memberSince: _formatDate(
+                      user['created_at']?.toString(),
                     ),
+                    activePlans: activeSubscriptions.length,
                   ),
-                _SectionCard(
-                  title: 'Profile appearance',
-                  subtitle:
-                      'Add a photo and cover to personalize your profile.',
-                  child: Column(
-                    children: [
-                      _MediaRow(
-                        title: 'Profile photo',
-                        url: avatar,
-                        isAvatar: true,
-                        busy: _mediaBusy,
-                        onPick: () => _pickImage('avatar'),
-                        onRemove: avatar == null
-                            ? null
-                            : () => _removeImage('avatar'),
-                      ),
-                      const Divider(height: 22),
-                      _MediaRow(
-                        title: 'Cover image',
-                        url: cover,
-                        busy: _mediaBusy,
-                        onPick: () => _pickImage('cover'),
-                        onRemove: cover == null
-                            ? null
-                            : () => _removeImage('cover'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _SectionCard(
-                  title: 'Personal details',
-                  subtitle:
-                      'Keep your contact and account information current.',
-                  child: Column(
-                    children: [
-                      _EditField(
-                        controller: _name,
-                        label: 'Full name',
-                        icon: Icons.person_outline,
-                      ),
-                      _EditField(
-                        controller: _username,
-                        label: 'Username',
-                        icon: Icons.alternate_email,
-                      ),
-                      _EditField(
-                        controller: _email,
-                        label: 'Email address',
-                        icon: Icons.email_outlined,
-                        readOnly: true,
-                      ),
-                      _EditField(
-                        controller: _phone,
-                        label: 'Phone number',
-                        icon: Icons.phone_outlined,
-                        keyboard: TextInputType.phone,
-                      ),
-                      _EditField(
-                        controller: _country,
-                        label: 'Country',
-                        icon: Icons.public,
-                        readOnly: true,
-                      ),
-                      _EditField(
-                        controller: _currency,
-                        label: 'Preferred currency',
-                        icon: Icons.currency_exchange,
-                        capitalization: TextCapitalization.characters,
-                      ),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(13),
-                            ),
-                          ),
-                          icon: _saving
-                              ? SizedBox.square(
-                                  dimension: 17,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colors.onPrimary,
-                                  ),
-                                )
-                              : const Icon(Icons.check_rounded),
-                          label: Text(_saving ? 'Saving…' : 'Save changes'),
+                  const SizedBox(height: 15),
+                  if (_editing) ...[
+                    if (_mediaBusy)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 10),
+                        child: LinearProgressIndicator(
+                          minHeight: 3,
+                          color: colors.primary,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ] else ...[
-                _SectionCard(
-                  title: 'Personal details',
-                  subtitle: 'Your profile and contact information.',
-                  child: Column(
-                    children: [
-                      _DetailRow(
-                        icon: Icons.person_outline,
-                        label: 'Full name',
-                        value: name,
-                      ),
-                      _DetailRow(
-                        icon: Icons.alternate_email,
-                        label: 'Username',
-                        value: user['username']?.toString(),
-                      ),
-                      _DetailRow(
-                        icon: Icons.email_outlined,
-                        label: 'Email address',
-                        value: email,
-                        trailing: user['email_verified'] == true
-                            ? _TinyStatus(
-                                label: 'Verified',
-                                color: colors.primary,
-                              )
-                            : _TinyStatus(
-                                label: 'Unverified',
-                                color: colors.tertiary,
-                              ),
-                      ),
-                      _DetailRow(
-                        icon: Icons.phone_outlined,
-                        label: 'Phone number',
-                        value: user['phone']?.toString(),
-                      ),
-                      _DetailRow(
-                        icon: Icons.public,
-                        label: 'Country',
-                        value: country,
-                      ),
-                      _DetailRow(
-                        icon: Icons.currency_exchange,
-                        label: 'Preferred currency',
-                        value: user['preferred_currency']?.toString(),
-                        last: true,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                
-                _SectionCard(
-                  title: 'My subscriptions',
-                  subtitle: activeSubscriptions.isEmpty
-                      ? 'Your active packages will appear here.'
-                      : 'Your currently active earning packages and their terms.',
-                  child: activeSubscriptions.isEmpty
-                      ? _NoActiveSubscription(onBrowse: _openSubscriptions)
-                      : Column(
-                          children: [
-                            for (var index = 0;
-                                index < activeSubscriptions.length;
-                                index++) ...[
-                              _ActiveSubscriptionCard(
-                                subscription: activeSubscriptions[index],
-                                plan: plansById[
-                                  activeSubscriptions[index]
-                                          ['subscription_plan_id']
-                                      ?.toString()
-                                ],
-                                preferredCurrency:
-                                    user['preferred_currency']?.toString() ??
-                                    'USD',
-                                api: widget.api,
-                                formatDate: _formatDate,
-                              ),
-                              if (index < activeSubscriptions.length - 1)
-                                const SizedBox(height: 10),
-                            ],
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: _openSubscriptions,
-                                icon: const Icon(Icons.manage_accounts_outlined),
-                                label: const Text('Manage packages'),
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-                
-                const SizedBox(height: 12),
-                _SectionCard(
-                  title: 'Account overview',
-                  child: Column(
-                    children: [
-                      _DetailRow(
-                        icon: Icons.calendar_month_outlined,
-                        label: 'Member since',
-                        value: _formatDate(user['created_at']?.toString()),
-                      ),
-                      _DetailRow(
-                        icon: Icons.verified_user_outlined,
-                        label: 'Account status',
-                        value: _statusLabel(user['status']?.toString()),
-                        trailing: _StatusDot(
-                          active:
-                              user['status'] == null ||
-                              user['status'] == 'active',
-                        ),
-                        last: true,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _SectionCard(
-                  title: 'Security centre',
-                  subtitle: 'Manage the ways your account and earnings are protected.',
-                  child: Column(
-                    children: [
-                      _SecurityAction(
-                        icon: Icons.lock_reset_rounded,
-                        title: 'Password',
-                        subtitle: 'Change your account password',
-                        onTap: _changePassword,
-                      ),
-                      const Divider(height: 1),
-                      _SecurityAction(
-                        icon: Icons.pin_rounded,
-                        title: 'Withdrawal PIN',
-                        subtitle: user['security_pin_set'] == true
-                            ? 'A PIN is enabled for withdrawal requests'
-                            : 'Add a 4-digit PIN for withdrawals',
-                        trailing: Text(
-                          user['security_pin_set'] == true
-                              ? 'Manage'
-                              : 'Set up',
-                          style: TextStyle(
-                            color: colors.primary,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                          ),
-                        ),
-                        onTap: _securityBusy ? null : _manageSecurityPin,
-                      ),
-                      if (user['security_pin_set'] == true)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: _securityBusy
+                    _SectionCard(
+                      title: 'Profile appearance',
+                      icon: Icons.auto_awesome_outlined,
+                      subtitle:
+                          'Add a photo and cover to personalize your profile.',
+                      child: Column(
+                        children: [
+                          _MediaRow(
+                            title: 'Profile photo',
+                            url: avatar,
+                            isAvatar: true,
+                            busy: _mediaBusy,
+                            onPick: () => _pickImage('avatar'),
+                            onRemove: avatar == null
                                 ? null
-                                : _removeSecurityPin,
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              size: 17,
-                            ),
-                            label: const Text('Remove withdrawal PIN'),
+                                : () => _removeImage('avatar'),
                           ),
-                        ),
-                      const Divider(height: 1),
-                      SwitchListTile.adaptive(
-                        contentPadding: EdgeInsets.zero,
-                        secondary: _securityIcon(
-                          context,
-                          Icons.phonelink_lock_rounded,
-                        ),
-                        title: const Text(
-                          'Google Authenticator',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
+                          const Divider(height: 22),
+                          _MediaRow(
+                            title: 'Cover image',
+                            url: cover,
+                            busy: _mediaBusy,
+                            onPick: () => _pickImage('cover'),
+                            onRemove: cover == null
+                                ? null
+                                : () => _removeImage('cover'),
                           ),
-                        ),
-                        subtitle: Text(
-                          user['two_factor'] == true
-                              ? 'Extra sign-in verification is enabled'
-                              : 'Add a second verification step at sign in',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                        value: user['two_factor'] == true,
-                        activeColor: colors.primary,
-                        onChanged: _securityBusy
-                            ? null
-                            : (enabled) => enabled
-                                  ? _setupTwoFactor()
-                                  : _disableTwoFactor(),
+                        ],
                       ),
-                      if (_securityBusy)
-                        Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: LinearProgressIndicator(
-                            minHeight: 2,
-                            color: colors.primary,
+                    ),
+                    const SizedBox(height: 12),
+                    _SectionCard(
+                      title: 'Personal details',
+                      icon: Icons.badge_outlined,
+                      subtitle:
+                          'Keep your contact and account information current.',
+                      child: Column(
+                        children: [
+                          _EditField(
+                            controller: _name,
+                            label: 'Full name',
+                            icon: Icons.person_outline,
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-                
-              ],
-                const SizedBox(height: 13),
-                const _PrivacyNote(),
-              ],
+                          _EditField(
+                            controller: _username,
+                            label: 'Username',
+                            icon: Icons.alternate_email,
+                          ),
+                          _EditField(
+                            controller: _email,
+                            label: 'Email address',
+                            icon: Icons.email_outlined,
+                            readOnly: true,
+                          ),
+                          _EditField(
+                            controller: _phone,
+                            label: 'Phone number',
+                            icon: Icons.phone_outlined,
+                            keyboard: TextInputType.phone,
+                          ),
+                          _EditField(
+                            controller: _country,
+                            label: 'Country',
+                            icon: Icons.public,
+                            readOnly: true,
+                          ),
+                          _EditField(
+                            controller: _currency,
+                            label: 'Preferred currency',
+                            icon: Icons.currency_exchange,
+                            capitalization: TextCapitalization.characters,
+                          ),
+                          const SizedBox(height: 4),
+                          _GradientSaveButton(
+                            busy: _saving,
+                            onPressed: _save,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    _SectionCard(
+                      title: 'Personal details',
+                      icon: Icons.badge_outlined,
+                      subtitle: 'Your profile and contact information.',
+                      child: Column(
+                        children: [
+                          _DetailRow(
+                            icon: Icons.person_outline,
+                            label: 'Full name',
+                            value: name,
+                          ),
+                          _DetailRow(
+                            icon: Icons.alternate_email,
+                            label: 'Username',
+                            value: user['username']?.toString(),
+                          ),
+                          _DetailRow(
+                            icon: Icons.email_outlined,
+                            label: 'Email address',
+                            value: email,
+                            trailing: user['email_verified'] == true
+                                ? _TinyStatus(
+                                    label: 'Verified',
+                                    color: colors.primary,
+                                  )
+                                : _TinyStatus(
+                                    label: 'Unverified',
+                                    color: colors.tertiary,
+                                  ),
+                          ),
+                          _DetailRow(
+                            icon: Icons.phone_outlined,
+                            label: 'Phone number',
+                            value: user['phone']?.toString(),
+                          ),
+                          _DetailRow(
+                            icon: Icons.public,
+                            label: 'Country',
+                            value: country,
+                          ),
+                          _DetailRow(
+                            icon: Icons.currency_exchange,
+                            label: 'Preferred currency',
+                            value: user['preferred_currency']?.toString(),
+                            last: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    _SectionCard(
+                      title: 'My subscriptions',
+                      icon: Icons.workspace_premium_outlined,
+                      subtitle: activeSubscriptions.isEmpty
+                          ? 'Your active packages will appear here.'
+                          : 'Your currently active earning packages and their terms.',
+                      child: activeSubscriptions.isEmpty
+                          ? _NoActiveSubscription(onBrowse: _openSubscriptions)
+                          : Column(
+                              children: [
+                                for (
+                                  var index = 0;
+                                  index < activeSubscriptions.length;
+                                  index++
+                                ) ...[
+                                  _ActiveSubscriptionCard(
+                                    subscription: activeSubscriptions[index],
+                                    plan:
+                                        plansById[activeSubscriptions[index]['subscription_plan_id']
+                                            ?.toString()],
+                                    preferredCurrency:
+                                        user['preferred_currency']
+                                            ?.toString() ??
+                                        'USD',
+                                    api: widget.api,
+                                    formatDate: _formatDate,
+                                  ),
+                                  if (index < activeSubscriptions.length - 1)
+                                    const SizedBox(height: 10),
+                                ],
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: _openSubscriptions,
+                                    icon: const Icon(
+                                      Icons.manage_accounts_outlined,
+                                    ),
+                                    label: const Text('Manage packages'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+
+                    const SizedBox(height: 12),
+                    _SectionCard(
+                      title: 'Account overview',
+                      icon: Icons.insights_outlined,
+                      child: Column(
+                        children: [
+                          _DetailRow(
+                            icon: Icons.calendar_month_outlined,
+                            label: 'Member since',
+                            value: _formatDate(user['created_at']?.toString()),
+                          ),
+                          _DetailRow(
+                            icon: Icons.verified_user_outlined,
+                            label: 'Account status',
+                            value: _statusLabel(user['status']?.toString()),
+                            trailing: _StatusDot(
+                              active:
+                                  user['status'] == null ||
+                                  user['status'] == 'active',
+                            ),
+                            last: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _SectionCard(
+                      title: 'Security centre',
+                      icon: Icons.shield_outlined,
+                      subtitle: 'Manage the ways your account and earnings are protected.',
+                      child: Column(
+                        children: [
+                          _SecurityAction(
+                            icon: Icons.lock_reset_rounded,
+                            title: 'Password',
+                            subtitle: 'Change your account password',
+                            onTap: _changePassword,
+                          ),
+                          const Divider(height: 1),
+                          _SecurityAction(
+                            icon: Icons.pin_rounded,
+                            title: 'Withdrawal PIN',
+                            subtitle: user['security_pin_set'] == true
+                                ? 'A PIN is enabled for withdrawal requests'
+                                : 'Add a 4-digit PIN for withdrawals',
+                            trailing: Text(
+                              user['security_pin_set'] == true
+                                  ? 'Manage'
+                                  : 'Set up',
+                              style: TextStyle(
+                                color: colors.primary,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
+                            ),
+                            onTap: _securityBusy ? null : _manageSecurityPin,
+                          ),
+                          if (user['security_pin_set'] == true)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _securityBusy
+                                    ? null
+                                    : _removeSecurityPin,
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 17,
+                                ),
+                                label: const Text('Remove withdrawal PIN'),
+                              ),
+                            ),
+                          const Divider(height: 1),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            secondary: _securityIcon(
+                              context,
+                              Icons.phonelink_lock_rounded,
+                            ),
+                            title: const Text(
+                              'Google Authenticator',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
+                            ),
+                            subtitle: Text(
+                              user['two_factor'] == true
+                                  ? 'Extra sign-in verification is enabled'
+                                  : 'Add a second verification step at sign in',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            value: user['two_factor'] == true,
+                            activeColor: colors.primary,
+                            onChanged: _securityBusy
+                                ? null
+                                : (enabled) => enabled
+                                      ? _setupTwoFactor()
+                                      : _disableTwoFactor(),
+                          ),
+                          if (_securityBusy)
+                            Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: LinearProgressIndicator(
+                                minHeight: 2,
+                                color: colors.primary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 13),
+                  const _PrivacyNote(),
+                ],
               ),
             ),
           ),
@@ -988,176 +947,992 @@ class _ProfileScreenState extends State<ProfileScreen> {
   };
 }
 
-class _SecurityPinDialog extends StatefulWidget {
-  const _SecurityPinDialog({
-    required this.api,
-    required this.token,
-    required this.pinIsSet,
-    required this.hasPassword,
-  });
+// ---------------------------------------------------------------------------
+// Change password — three-step dialog
+// ---------------------------------------------------------------------------
+
+/// Password change flow: verify the current password, choose a new one, show a
+/// loading page and then the result with a close button.
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog({required this.api, required this.token});
 
   final AuthApi api;
   final String token;
-  final bool pinIsSet;
-  final bool hasPassword;
 
   @override
-  State<_SecurityPinDialog> createState() => _SecurityPinDialogState();
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
 }
 
-class _SecurityPinDialogState extends State<_SecurityPinDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _currentPin = TextEditingController();
-  final _newPin = TextEditingController();
-  final _confirmPin = TextEditingController();
-  final _password = TextEditingController();
-  bool _saving = false;
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _current = TextEditingController();
+  final _next = TextEditingController();
+  final _confirm = TextEditingController();
+  final _currentForm = GlobalKey<FormState>();
+  final _newForm = GlobalKey<FormState>();
+
+  /// 0 = current password, 1 = new password, 2 = working, 3 = result.
+  int _step = 0;
+  bool _done = false;
+  String? _error;
+
+  bool _showCurrent = false;
+  bool _showNext = false;
+  bool _showConfirm = false;
+
+  bool get _working => _step == 2;
+  bool get _finished => _step == 3;
 
   @override
   void dispose() {
-    _currentPin.dispose();
-    _newPin.dispose();
-    _confirmPin.dispose();
-    _password.dispose();
+    _current.dispose();
+    _next.dispose();
+    _confirm.dispose();
     super.dispose();
   }
 
+  void _goTo(int step) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _step = step;
+      _error = null;
+    });
+  }
+
+  void _proceed() {
+    if (_currentForm.currentState?.validate() != true) return;
+    _goTo(1);
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
+    if (_newForm.currentState?.validate() != true) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _step = 2;
+      _error = null;
+    });
+
     try {
-      final result = await widget.api.put('me/security-pin', widget.token, {
-        'pin': _newPin.text,
-        'pin_confirmation': _confirmPin.text,
-        if (widget.pinIsSet) 'current_pin': _currentPin.text,
-        if (!widget.pinIsSet && widget.hasPassword)
-          'current_password': _password.text,
+      await widget.api.put('me/password', widget.token, {
+        'current_password': _current.text,
+        'password': _next.text,
+        'password_confirmation': _confirm.text,
       });
-      if (mounted) Navigator.of(context).pop(result);
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _done = true;
+        _step = 3;
+      });
     } on AuthException catch (error) {
-      if (mounted) {
-        setState(() => _saving = false);
-        showAuthMessage(context, error.message);
-      }
+      if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _done = false;
+        _error = error.message;
+        _step = 3;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _done = false;
+        _error =
+            'Something went wrong while updating your password. Please try again.';
+        _step = 3;
+      });
     }
   }
 
-  Widget _pinInput(
-    TextEditingController controller,
-    String label, {
-    String? Function(String?)? validator,
-  }) => TextFormField(
-    controller: controller,
-    obscureText: true,
-    keyboardType: TextInputType.number,
-    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-    maxLength: 4,
-    textAlign: TextAlign.center,
-    decoration: InputDecoration(labelText: label, counterText: ''),
-    validator:
-        validator ??
-        (value) => value == null || value.length != 4
-            ? 'Enter exactly 4 digits.'
-            : null,
-  );
+  void _close() => Navigator.of(context).pop(_done);
+
+  static const int _minLength = 8;
+
+  bool get _hasLength => _next.text.length >= _minLength;
+  bool get _hasVariety {
+    final value = _next.text;
+    if (value.length < _minLength) return false;
+    final hasLetter = RegExp('[A-Za-z]').hasMatch(value);
+    final hasNumberOrSymbol = RegExp(r'[^A-Za-z]').hasMatch(value);
+    return hasLetter && hasNumberOrSymbol;
+  }
+
+  bool get _differsFromCurrent =>
+      _next.text.isNotEmpty && _next.text != _current.text;
+
+  bool get _matches => _confirm.text.isNotEmpty && _confirm.text == _next.text;
+
+  int get _strength {
+    var score = 0;
+    if (_hasLength) score++;
+    if (_hasVariety) score++;
+    if (_next.text.length >= 12) score++;
+    if (_differsFromCurrent) score++;
+    return score;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      child: SizedBox(
-        width: size.width < 432 ? size.width - 40 : 392,
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final media = MediaQuery.of(context);
+
+    // A Dialog is lifted by the keyboard inset itself, so the card has to stay
+    // inside what is left of the screen. Without this the fields overflow
+    // whenever the keypad is open, so cap the height and let the body scroll.
+    const insetPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 24);
+    final availableHeight =
+        media.size.height -
+        media.viewInsets.bottom -
+        insetPadding.vertical -
+        8;
+
+    return PopScope(
+      // Never let a tap outside throw away a request that is in flight, and make
+      // the user acknowledge the result with the close button.
+      canPop: !_working && !_finished,
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: insetPadding,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: size.height * .84),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    widget.pinIsSet
-                        ? 'Change withdrawal PIN'
-                        : 'Set withdrawal PIN',
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
+          constraints: BoxConstraints(
+            maxWidth: 460,
+            maxHeight: availableHeight > 320 ? availableHeight : 320,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: colors.outlineVariant.withValues(alpha: 0.7),
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: colors.shadow.withValues(alpha: 0.24),
+                  blurRadius: 42,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(26),
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                clipBehavior: Clip.none,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: Column(
+                    key: ValueKey<String>('step-$_step'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      _header(theme, colors),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          child: _body(theme, colors),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.pinIsSet
-                              ? 'Enter your current PIN, then choose a new 4-digit PIN.'
-                              : 'This 4-digit PIN will be required before every withdrawal request.',
-                        ),
-                        if (widget.pinIsSet) ...[
-                          const SizedBox(height: 14),
-                          _pinInput(_currentPin, 'Current PIN'),
-                        ] else if (widget.hasPassword) ...[
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            controller: _password,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Account password',
-                            ),
-                            validator: (value) => value == null || value.isEmpty
-                                ? 'Confirm your account password'
-                                : null,
-                          ),
-                        ],
-                        const SizedBox(height: 14),
-                        _pinInput(_newPin, 'New 4-digit PIN'),
-                        const SizedBox(height: 12),
-                        _pinInput(
-                          _confirmPin,
-                          'Confirm PIN',
-                          validator: (value) => value != _newPin.text
-                              ? 'The PINs do not match.'
-                              : null,
-                        ),
-                      ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _header(ThemeData theme, ColorScheme colors) {
+    final subtitle = switch (_step) {
+      0 => 'Step 1 of 3 · Confirm it is you',
+      1 => 'Step 2 of 3 · Choose a new password',
+      2 => 'Step 3 of 3 · Saving',
+      _ => _done ? 'All set' : 'Update failed',
+    };
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 10, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: _finished && !_done
+              ? <Color>[colors.error, colors.errorContainer]
+              : <Color>[colors.primary, colors.secondary],
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: colors.onPrimary.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: colors.onPrimary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Icon(
+              _finished && !_done
+                  ? Icons.priority_high_rounded
+                  : Icons.lock_reset_rounded,
+              color: colors.onPrimary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Change password',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.2,
+                    color: colors.onPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onPrimary.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!_working && !_finished)
+            IconButton(
+              tooltip: 'Cancel',
+              onPressed: () => Navigator.of(context).pop(false),
+              icon: const Icon(Icons.close_rounded, size: 20),
+              color: colors.onPrimary,
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(ThemeData theme, ColorScheme colors) {
+    switch (_step) {
+      case 0:
+        return _currentStep(theme, colors);
+      case 1:
+        return _newStep(theme, colors);
+      case 2:
+        return _workingStep(theme, colors);
+      default:
+        return _resultStep(theme, colors);
+    }
+  }
+
+  Widget _currentStep(ThemeData theme, ColorScheme colors) {
+    return Form(
+      key: _currentForm,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            "Confirm it's you",
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Enter the password you use today. We check it before letting you '
+            'choose a new one.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _PasswordField(
+            controller: _current,
+            label: 'Current password',
+            icon: Icons.password_rounded,
+            visible: _showCurrent,
+            onToggle: () => setState(() => _showCurrent = !_showCurrent),
+            onSubmitted: _proceed,
+            validator: (value) => value == null || value.isEmpty
+                ? 'Enter your current password'
+                : null,
+          ),
+          const SizedBox(height: 20),
+          _PrimaryAction(
+            label: 'Proceed',
+            icon: Icons.arrow_forward_rounded,
+            onPressed: _proceed,
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => Navigator.of(context).pop(false),
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: const Text('Cancel'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _newStep(ThemeData theme, ColorScheme colors) {
+    return Form(
+      key: _newForm,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            'Set a new password',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Use at least 8 characters. A mix of letters, numbers and symbols '
+            'keeps your earnings safe.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _PasswordField(
+            controller: _next,
+            label: 'New password',
+            icon: Icons.lock_outline_rounded,
+            visible: _showNext,
+            onToggle: () => setState(() => _showNext = !_showNext),
+            onChanged: (_) => setState(() {}),
+            validator: (value) {
+              if (value == null || value.length < _minLength) {
+                return 'Use at least 8 characters';
+              }
+              if (value == _current.text) {
+                return 'Choose a password different from your current one';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          _StrengthMeter(score: _strength),
+          const SizedBox(height: 14),
+          _PasswordField(
+            controller: _confirm,
+            label: 'Confirm new password',
+            icon: Icons.lock_reset_rounded,
+            visible: _showConfirm,
+            onToggle: () => setState(() => _showConfirm = !_showConfirm),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: _submit,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Re-enter your new password';
+              }
+              if (value != _next.text) return 'Passwords do not match';
+              return null;
+            },
+          ),
+          const SizedBox(height: 14),
+          _RuleRow(ok: _hasLength, label: 'At least 8 characters'),
+          _RuleRow(ok: _hasVariety, label: 'Letters with numbers or symbols'),
+          _RuleRow(ok: _differsFromCurrent, label: 'Different from your password'),
+          _RuleRow(ok: _matches, label: 'Both passwords match'),
+          const SizedBox(height: 18),
+          _PrimaryAction(
+            label: 'Update now',
+            icon: Icons.check_rounded,
+            onPressed: _submit,
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _goTo(0),
+              icon: const Icon(Icons.arrow_back_rounded, size: 16),
+              label: const Text('Back'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _workingStep(ThemeData theme, ColorScheme colors) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const _PulsingLock(),
+          const SizedBox(height: 22),
+          Text(
+            'Updating your password…',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Hang tight, this only takes a moment.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _resultStep(ThemeData theme, ColorScheme colors) {
+    final accent = _done ? colors.primary : colors.error;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            if (_done) _SuccessRings(color: colors.primary),
+            Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: <Color>[accent, accent.withValues(alpha: 0.72)],
+                ),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.32),
+                    blurRadius: 26,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Icon(
+                _done
+                    ? Icons.check_rounded
+                    : Icons.close_rounded,
+                size: 46,
+                color: colors.onPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text(
+          _done ? 'Password updated' : 'Could not update',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _done
+              ? 'Your new password is active. Use it the next time you sign in.'
+              : (_error ?? 'Please try again.'),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colors.onSurfaceVariant,
+            height: 1.55,
+          ),
+        ),
+        const SizedBox(height: 22),
+        if (_done)
+          _PrimaryAction(
+            label: 'Close',
+            icon: Icons.done_all_rounded,
+            onPressed: _close,
+          )
+        else ...<Widget>[
+          _PrimaryAction(
+            label: 'Try again',
+            icon: Icons.refresh_rounded,
+            onPressed: () => _goTo(1),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _close,
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: const Text('Close'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PasswordField extends StatelessWidget {
+  const _PasswordField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.visible,
+    required this.onToggle,
+    this.validator,
+    this.onChanged,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final bool visible;
+  final VoidCallback onToggle;
+  final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return TextFormField(
+      controller: controller,
+      obscureText: !visible,
+      validator: validator,
+      onChanged: onChanged,
+      autofillHints: const <String>[AutofillHints.password],
+      textInputAction: onSubmitted == null
+          ? TextInputAction.next
+          : TextInputAction.done,
+      onFieldSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 19),
+        suffixIcon: IconButton(
+          tooltip: visible ? 'Hide password' : 'Show password',
+          onPressed: onToggle,
+          icon: Icon(
+            visible
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            size: 19,
+          ),
+        ),
+        filled: true,
+        fillColor: colors.surfaceContainerLow,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: colors.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: colors.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: colors.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: colors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: colors.error, width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryAction extends StatelessWidget {
+  const _PrimaryAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(16);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[colors.primary, colors.secondary],
+        ),
+        borderRadius: radius,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.primary.withValues(alpha: 0.26),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: SizedBox(
+            height: 52,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(icon, size: 18, color: colors.onPrimary),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: colors.onPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GradientSaveButton extends StatelessWidget {
+  const _GradientSaveButton({required this.busy, required this.onPressed});
+
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(15);
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: busy ? 0.72 : 1,
+      child: Container(
+        height: 52,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[colors.primary, colors.secondary],
+          ),
+          borderRadius: radius,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: colors.primary.withValues(alpha: 0.28),
+              blurRadius: 20,
+              offset: const Offset(0, 9),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: busy ? null : onPressed,
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  if (busy)
+                    SizedBox.square(
+                      dimension: 17,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colors.onPrimary,
+                      ),
+                    )
+                  else
+                    Icon(Icons.check_rounded, size: 19, color: colors.onPrimary),
+                  const SizedBox(width: 8),
+                  Text(
+                    busy ? 'Saving…' : 'Save changes',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: colors.onPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RuleRow extends StatelessWidget {
+  const _RuleRow({required this.ok, required this.label});
+
+  final bool ok;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final color = ok ? colors.primary : colors.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: <Widget>[
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: ok ? colors.primary.withValues(alpha: 0.12) : null,
+              border: Border.all(
+                color: ok
+                    ? colors.primary
+                    : colors.outlineVariant.withValues(alpha: 0.9),
+                width: 1.4,
+              ),
+            ),
+            child: ok
+                ? Icon(Icons.check_rounded, size: 12, color: colors.primary)
+                : null,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                color: color,
+                fontWeight: ok ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StrengthMeter extends StatelessWidget {
+  const _StrengthMeter({required this.score});
+
+  /// 0-4, produced by the dialog from length, variety and uniqueness.
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    const labels = <String>['Very weak', 'Weak', 'Fair', 'Good', 'Strong'];
+    final index = score < 0 ? 0 : (score > 4 ? 4 : score);
+    final label = labels[index];
+    final color = score >= 4
+        ? colors.primary
+        : score == 3
+        ? colors.tertiary
+        : colors.error;
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Row(
+            children: <Widget>[
+              for (var index = 0; index < 4; index++) ...<Widget>[
+                if (index > 0) const SizedBox(width: 4),
+                Expanded(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: index < score
+                          ? color
+                          : colors.outlineVariant.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: _saving ? null : () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    FilledButton(
-                      onPressed: _saving ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                      ),
-                      child: Text(
-                        _saving
-                            ? 'Saving…'
-                            : widget.pinIsSet
-                            ? 'Update PIN'
-                            : 'Set PIN',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PulsingLock extends StatefulWidget {
+  const _PulsingLock();
+
+  @override
+  State<_PulsingLock> createState() => _PulsingLockState();
+}
+
+class _PulsingLockState extends State<_PulsingLock>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ScaleTransition(
+      scale: Tween<double>(begin: 0.96, end: 1.05).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[colors.primary, colors.secondary],
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: colors.primary.withValues(alpha: 0.3),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.lock_outline_rounded,
+              color: colors.onPrimary,
+              size: 34,
+            ),
+          ),
+          SizedBox(
+            width: 108,
+            height: 108,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: colors.primary.withValues(alpha: 0.45),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuccessRings extends StatefulWidget {
+  const _SuccessRings({required this.color});
+
+  final Color color;
+
+  @override
+  State<_SuccessRings> createState() => _SuccessRingsState();
+}
+
+class _SuccessRingsState extends State<_SuccessRings>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 92,
+      height: 92,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              for (final offset in <double>[0.0, 0.28])
+                _ring(_progress(offset)),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  double _progress(double offset) {
+    final span = 1 - offset;
+    final raw = span <= 0 ? 1.0 : (_controller.value - offset) / span;
+    if (raw < 0) return 0;
+    return raw > 1 ? 1 : raw;
+  }
+
+  Widget _ring(double t) {
+    return Transform.scale(
+      scale: 1 + t,
+      child: Container(
+        width: 92,
+        height: 92,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: widget.color.withValues(alpha: 0.5 * (1 - t)),
+            width: 2,
           ),
         ),
       ),
@@ -1254,7 +2029,9 @@ class _TwoFactorSetupDialogState extends State<_TwoFactorSetupDialog> {
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
                         ),
                         child: SizedBox.square(
                           dimension: 190,
@@ -1346,6 +2123,8 @@ class _ProfileHero extends StatelessWidget {
     required this.avatarUrl,
     required this.coverUrl,
     required this.verified,
+    this.memberSince,
+    this.activePlans,
   });
 
   final String name;
@@ -1354,6 +2133,11 @@ class _ProfileHero extends StatelessWidget {
   final String? avatarUrl;
   final String? coverUrl;
   final bool verified;
+  final String? memberSince;
+  final int? activePlans;
+
+  static const double _coverHeight = 152;
+  static const double _avatarSize = 92;
 
   @override
   Widget build(BuildContext context) {
@@ -1364,203 +2148,321 @@ class _ProfileHero extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: [
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.8)),
+        boxShadow: <BoxShadow>[
           BoxShadow(
-            color: scheme.shadow.withValues(alpha: .07),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
+            color: scheme.shadow.withValues(alpha: 0.10),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Cover area. The gradient provides a polished fallback when no
-          // custom cover image has been uploaded.
+        children: <Widget>[
           SizedBox(
-            height: 148,
-            width: double.infinity,
+            height: _coverHeight + 46,
             child: Stack(
-              fit: StackFit.expand,
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        scheme.primary,
-                        scheme.primaryContainer,
-                        scheme.secondary,
-                      ],
-                    ),
-                    image: coverUrl == null
-                        ? null
-                        : DecorationImage(
-                            image: NetworkImage(coverUrl!),
-                            fit: BoxFit.cover,
-                          ),
-                  ),
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: _coverHeight,
+                  child: _cover(scheme),
                 ),
-                if (coverUrl == null) ...[
-                  Positioned(
-                    right: -24,
-                    top: -58,
-                    child: Container(
-                      width: 190,
-                      height: 190,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: scheme.onPrimary.withValues(alpha: .16),
-                          width: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 42,
-                    bottom: -64,
-                    child: Container(
-                      width: 150,
-                      height: 150,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: scheme.onPrimary.withValues(alpha: .08),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 18,
-                    top: 18,
-                    child: Icon(
-                      Icons.person_pin_circle_outlined,
-                      size: 42,
-                      color: scheme.onPrimary.withValues(alpha: .30),
-                    ),
-                  ),
-                ],
-                if (coverUrl != null)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          scheme.scrim.withValues(alpha: .04),
-                          scheme.scrim.withValues(alpha: .28),
-                        ],
-                      ),
-                    ),
-                  ),
+                Positioned(
+                  left: 20,
+                  bottom: 0,
+                  child: _avatar(scheme),
+                ),
+                Positioned(
+                  right: 18,
+                  top: 16,
+                  child: verified
+                      ? _VerifiedChip(color: scheme.onPrimary)
+                      : const SizedBox.shrink(),
+                ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 1),
-            child: Transform.translate(
-              offset: const Offset(0, -39),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                    height: 1.1,
+                  ),
+                ),
+                if (username.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: scheme.surface,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: scheme.shadow.withValues(alpha: .13),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                    child: CircleAvatar(
-                      radius: 37,
-                      backgroundColor: scheme.secondaryContainer,
-                      backgroundImage: avatarUrl == null
-                          ? null
-                          : NetworkImage(avatarUrl!),
-                      child: avatarUrl == null
-                          ? Icon(
-                              Icons.person_outline_rounded,
-                              size: 39,
-                              color: scheme.onSecondaryContainer,
-                            )
-                          : null,
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: scheme.primary.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Text(
+                      '@$username',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
+                ],
+                if (email.isNotEmpty) ...<Widget>[
                   const SizedBox(height: 10),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
+                    children: <Widget>[
+                      Icon(
+                        Icons.mail_outline_rounded,
+                        size: 15,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 7),
                       Expanded(
                         child: Text(
-                          name,
-                          maxLines: 2,
+                          email,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            color: scheme.onSurface,
-                            fontWeight: FontWeight.w900,
-                            height: 1.12,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
                       ),
-                      if (verified) ...[
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.verified_rounded,
-                          size: 21,
-                          color: scheme.primary,
-                        ),
-                      ],
                     ],
                   ),
-                  if (username.isNotEmpty) ...[
-                    const SizedBox(height: 5),
-                    Text(
-                      '@$username',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                  if (email.isNotEmpty) ...[
-                    const SizedBox(height: 7),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.mail_outline_rounded,
-                          size: 15,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 7),
-                        Expanded(
-                          child: Text(
-                            email,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (verified) ...[
-                    const SizedBox(height: 12),
-                    _TinyStatus(
-                      label: 'Email verified',
-                      color: scheme.primary,
-                    ),
-                  ],
                 ],
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: scheme.outlineVariant.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: _HeroStat(
+                          icon: Icons.calendar_month_outlined,
+                          label: 'Member since',
+                          value: (memberSince == null || memberSince!.isEmpty)
+                              ? '—'
+                              : memberSince!,
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 34,
+                        color: scheme.outlineVariant,
+                      ),
+                      Expanded(
+                        child: _HeroStat(
+                          icon: Icons.workspace_premium_outlined,
+                          label: 'Active packs',
+                          value: activePlans == null ? '—' : '$activePlans',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cover(ColorScheme scheme) {
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                scheme.primary,
+                Color.lerp(scheme.primary, scheme.secondary, 0.6)!,
+                scheme.secondary,
+              ],
+            ),
+          ),
+        ),
+        if (coverUrl != null)
+          Positioned.fill(
+            child: Image.network(
+              coverUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+            ),
+          ),
+        if (coverUrl == null) ...<Widget>[
+          Positioned(
+            right: -40,
+            top: -70,
+            child: Container(
+              width: 210,
+              height: 210,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: scheme.onPrimary.withValues(alpha: 0.14),
+                  width: 24,
+                ),
               ),
+            ),
+          ),
+          Positioned(
+            right: 56,
+            bottom: -70,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: scheme.onPrimary.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -30,
+            bottom: -60,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: scheme.onPrimary.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+        ],
+        // Depth for the avatar and text that sit on top of the cover.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: <Color>[
+                scheme.scrim.withValues(alpha: 0.02),
+                scheme.scrim.withValues(alpha: coverUrl == null ? 0.16 : 0.34),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _avatar(ColorScheme scheme) {
+    return Container(
+      width: _avatarSize + 8,
+      height: _avatarSize + 8,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[scheme.primary, scheme.secondary],
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.20),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: scheme.surface,
+        ),
+        child: ClipOval(
+          child: avatarUrl == null
+              ? Container(
+                  color: scheme.secondaryContainer,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.person_rounded,
+                    size: 44,
+                    color: scheme.onSecondaryContainer,
+                  ),
+                )
+              : Image.network(
+                  avatarUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stack) => Container(
+                    color: scheme.secondaryContainer,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.person_rounded,
+                      size: 44,
+                      color: scheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small verified pill used on the hero cover.
+class _VerifiedChip extends StatelessWidget {
+  const _VerifiedChip({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.26),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: color.withValues(alpha: 0.38)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(Icons.verified_rounded, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            'Verified',
+            style: TextStyle(
+              color: color,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
             ),
           ),
         ],
@@ -1569,52 +2471,149 @@ class _ProfileHero extends StatelessWidget {
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child, this.subtitle});
-  final String title;
-  final String? subtitle;
-  final Widget child;
+/// Label/value pair used inside the hero summary strip.
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(icon, size: 13, color: colors.onSurfaceVariant),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9,
+                  letterSpacing: 0.7,
+                  fontWeight: FontWeight.w800,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: colors.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.title,
+    required this.child,
+    this.subtitle,
+    this.icon,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget child;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final accent = icon;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: colors.outlineVariant),
-        boxShadow: [
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.8)),
+        boxShadow: <BoxShadow>[
           BoxShadow(
-            color: colors.shadow.withValues(alpha: .02),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: colors.shadow.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: colors.onSurface,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              subtitle!,
-              style: TextStyle(
-                color: colors.onSurfaceVariant,
-                fontSize: 12,
-                height: 1.4,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              if (accent != null) ...<Widget>[
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: <Color>[
+                        colors.primary.withValues(alpha: 0.16),
+                        colors.secondary.withValues(alpha: 0.10),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(
+                      color: colors.primary.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Icon(accent, size: 20, color: colors.primary),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: colors.onSurface,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    if (subtitle != null) ...<Widget>[
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          ],
-          const SizedBox(height: 13),
+            ],
+          ),
+          const SizedBox(height: 14),
           child,
         ],
       ),
@@ -1632,46 +2631,87 @@ class _NoActiveSubscription extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(15),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            colors.primary.withValues(alpha: 0.07),
+            colors.secondary.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: <Widget>[
           Row(
-            children: [
-              Icon(Icons.layers_outlined, color: colors.primary),
-              const SizedBox(width: 9),
+            children: <Widget>[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.layers_outlined,
+                  color: colors.primary,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 11),
               Expanded(
                 child: Text(
                   'No active package',
                   style: TextStyle(
                     color: colors.onSurface,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 9),
           Text(
             'Join a package to unlock its app review or ad sharing tasks.',
-            style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
+            style: TextStyle(
+              color: colors.onSurfaceVariant,
+              fontSize: 12.5,
+              height: 1.45,
+            ),
           ),
-          const SizedBox(height: 10),
-          TextButton.icon(
-            onPressed: onBrowse,
-            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-            label: const Text('Browse packages'),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onBrowse,
+              style: TextButton.styleFrom(
+                backgroundColor: colors.primary,
+                foregroundColor: colors.onPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+              label: const Text(
+                'Browse packages',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
-
 
 class _ActiveSubscriptionCard extends StatelessWidget {
   const _ActiveSubscriptionCard({
@@ -1692,10 +2732,12 @@ class _ActiveSubscriptionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final source = plan ?? const <String, dynamic>{};
-    final groupKey = subscription['group_key']?.toString() ??
+    final groupKey =
+        subscription['group_key']?.toString() ??
         source['group_key']?.toString() ??
         '';
-    final planName = source['name']?.toString() ??
+    final planName =
+        source['name']?.toString() ??
         subscription['plan_name']?.toString() ??
         'Marketplace package';
     final sourceCurrency = source['currency']?.toString() ?? 'USD';
@@ -1727,11 +2769,18 @@ class _ActiveSubscriptionCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outlineVariant),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.8)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1740,17 +2789,28 @@ class _ActiveSubscriptionCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(13),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[
+                      colors.primary.withValues(alpha: 0.16),
+                      colors.secondary.withValues(alpha: 0.10),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.18),
+                  ),
                 ),
                 child: Icon(
                   groupKey == 'group_a'
                       ? Icons.campaign_outlined
                       : Icons.rate_review_outlined,
-                  color: colors.onPrimaryContainer,
+                  color: colors.primary,
+                  size: 21,
                 ),
               ),
               const SizedBox(width: 11),
@@ -1781,19 +2841,39 @@ class _ActiveSubscriptionCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(30),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
                 ),
-                child: Text(
-                  'ACTIVE',
-                  style: TextStyle(
-                    color: colors.onPrimaryContainer,
-                    fontSize: 9,
-                    letterSpacing: .5,
-                    fontWeight: FontWeight.w900,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.26),
                   ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: colors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: colors.primary,
+                        fontSize: 9,
+                        letterSpacing: .6,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1840,18 +2920,33 @@ class _ActiveSubscriptionCard extends StatelessWidget {
                 planName,
                 [
                   if (startsAt.isNotEmpty)
-                    const MapEntry(Icons.play_circle_outline_rounded, 'Started'),
+                    const MapEntry(
+                      Icons.play_circle_outline_rounded,
+                      'Started',
+                    ),
                   if (endsAt.isNotEmpty)
-                    const MapEntry(Icons.event_available_outlined, 'Valid until'),
+                    const MapEntry(
+                      Icons.event_available_outlined,
+                      'Valid until',
+                    ),
                   if (source['max_review_tasks'] is num &&
                       (source['max_review_tasks'] as num).toInt() > 0)
-                    MapEntry(Icons.rate_review_outlined, '${source['max_review_tasks']} reviews'),
+                    MapEntry(
+                      Icons.rate_review_outlined,
+                      '${source['max_review_tasks']} reviews',
+                    ),
                   if (source['max_ad_shares'] is num &&
                       (source['max_ad_shares'] as num).toInt() > 0)
-                    MapEntry(Icons.campaign_outlined, '${source['max_ad_shares']} ad shares'),
+                    MapEntry(
+                      Icons.campaign_outlined,
+                      '${source['max_ad_shares']} ad shares',
+                    ),
                   if (source['daily_task_limit'] is num &&
                       (source['daily_task_limit'] as num).toInt() > 0)
-                    MapEntry(Icons.today_outlined, '${source['daily_task_limit']} tasks daily'),
+                    MapEntry(
+                      Icons.today_outlined,
+                      '${source['daily_task_limit']} tasks daily',
+                    ),
                   if (source['daily_revenue_minor'] is num &&
                       (source['daily_revenue_minor'] as num).toInt() > 0)
                     MapEntry(
@@ -1865,7 +2960,10 @@ class _ActiveSubscriptionCard extends StatelessWidget {
                       'Minimum withdrawal: ${moneyConverted(api, source['minimum_withdrawal_minor'], sourceCurrency, source['currency_minor_units'], preferredCurrency, isMinor: true)}',
                     ),
                   if (withdrawalDays.isNotEmpty)
-                    MapEntry(Icons.calendar_month_outlined, 'Withdrawal days: ${withdrawalDays.join(' & ')}'),
+                    MapEntry(
+                      Icons.calendar_month_outlined,
+                      'Withdrawal days: ${withdrawalDays.join(' & ')}',
+                    ),
                 ],
                 startedAt: startsAt,
                 validUntil: endsAt,
@@ -1893,8 +2991,11 @@ void _showSubscriptionFeatures(
       MapEntry(Icons.play_circle_outline_rounded, 'Started: $startedAt'),
     if (validUntil.isNotEmpty)
       MapEntry(Icons.event_available_outlined, 'Valid until: $validUntil'),
-    ...features.where((item) => item.key != Icons.play_circle_outline_rounded &&
-        item.key != Icons.event_available_outlined),
+    ...features.where(
+      (item) =>
+          item.key != Icons.play_circle_outline_rounded &&
+          item.key != Icons.event_available_outlined,
+    ),
   ];
 
   showDialog<void>(
@@ -1904,14 +3005,14 @@ void _showSubscriptionFeatures(
       content: SizedBox(
         width: 420,
         child: items.isEmpty
-            ? const Text('No additional feature details are available for this package.')
+            ? const Text(
+                'No additional feature details are available for this package.',
+              )
             : ListView.separated(
                 shrinkWrap: true,
                 itemCount: items.length,
-                separatorBuilder: (_, __) => Divider(
-                  height: 1,
-                  color: colors.outlineVariant,
-                ),
+                separatorBuilder: (_, __) =>
+                    Divider(height: 1, color: colors.outlineVariant),
                 itemBuilder: (context, index) {
                   final item = items[index];
                   return Padding(
@@ -1977,7 +3078,6 @@ class _SubscriptionInfoPill extends StatelessWidget {
   }
 }
 
-
 class _DetailRow extends StatelessWidget {
   const _DetailRow({
     required this.icon,
@@ -1986,6 +3086,7 @@ class _DetailRow extends StatelessWidget {
     this.trailing,
     this.last = false,
   });
+
   final IconData icon;
   final String label;
   final String? value;
@@ -1994,51 +3095,78 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final hasValue = value != null && value!.isNotEmpty;
+
     return Column(
-      children: [
+      children: <Widget>[
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 11),
           child: Row(
-            children: [
+            children: <Widget>[
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(11),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[
+                      colors.primary.withValues(alpha: 0.14),
+                      colors.secondary.withValues(alpha: 0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color: colors.primary.withValues(alpha: 0.14),
+                  ),
                 ),
-                child: Icon(icon, size: 18, color: colors.onPrimaryContainer),
+                child: Icon(icon, size: 19, color: colors.primary),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  children: <Widget>[
                     Text(
-                      label,
+                      label.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colors.onSurfaceVariant,
-                        fontSize: 11,
+                        fontSize: 9.5,
+                        letterSpacing: 0.7,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      value == null || value!.isEmpty ? 'Not added' : value!,
-                      style: TextStyle(
-                        color: colors.onSurface,
-                        fontSize: 13,
+                      hasValue ? value! : 'Not added',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: hasValue
+                            ? colors.onSurface
+                            : colors.onSurfaceVariant,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (trailing != null) trailing!,
+              if (trailing != null) ...<Widget>[
+                const SizedBox(width: 8),
+                trailing!,
+              ],
             ],
           ),
         ),
-        if (!last) Divider(height: 1, color: colors.outlineVariant),
+        if (!last)
+          Divider(
+            height: 1,
+            color: colors.outlineVariant.withValues(alpha: 0.6),
+          ),
       ],
     );
   }
@@ -2068,9 +3196,31 @@ class _EditField extends StatelessWidget {
       readOnly: readOnly,
       keyboardType: keyboard,
       textCapitalization: capitalization,
+      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 19),
+        filled: true,
+        fillColor: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerLow.withValues(alpha: 0.7),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
+            width: 1.6,
+          ),
+        ),
         helperText: label == 'Country'
             ? 'Country is fixed from registration.'
             : null,
@@ -2098,54 +3248,86 @@ class _MediaRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final preview = isAvatar
-        ? CircleAvatar(
-            radius: 25,
-            backgroundColor: colors.primaryContainer,
-            backgroundImage: url == null ? null : NetworkImage(url!),
-            child: url == null
-                ? Icon(Icons.person_outline, color: colors.onPrimaryContainer)
-                : null,
-          )
-        : ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: SizedBox(
-              width: 76,
-              height: 48,
+    final preview = Container(
+      decoration: BoxDecoration(
+        shape: isAvatar ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: isAvatar ? null : BorderRadius.circular(12),
+        border: Border.all(
+          color: colors.primary.withValues(alpha: 0.22),
+          width: 1.4,
+        ),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: isAvatar
+          ? CircleAvatar(
+              radius: 24,
+              backgroundColor: colors.primaryContainer,
+              backgroundImage: url == null ? null : NetworkImage(url!),
               child: url == null
-                  ? ColoredBox(
-                      color: colors.primaryContainer,
-                      child: Icon(
-                        Icons.panorama_outlined,
-                        color: colors.onPrimaryContainer,
-                      ),
+                  ? Icon(
+                      Icons.person_outline,
+                      color: colors.onPrimaryContainer,
                     )
-                  : Image.network(url!, fit: BoxFit.cover),
+                  : null,
+            )
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 74,
+                height: 46,
+                child: url == null
+                    ? ColoredBox(
+                        color: colors.primaryContainer,
+                        child: Icon(
+                          Icons.panorama_outlined,
+                          color: colors.onPrimaryContainer,
+                        ),
+                      )
+                    : Image.network(url!, fit: BoxFit.cover),
+              ),
             ),
-          );
+    );
     return Row(
       children: [
         preview,
-        const SizedBox(width: 12),
+        const SizedBox(width: 13),
         Expanded(
           child: Text(
             title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: colors.onSurface,
-              fontSize: 13,
+              fontSize: 13.5,
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
         TextButton(
           onPressed: busy ? null : onPick,
-          child: Text(url == null ? 'Add' : 'Change'),
+          style: TextButton.styleFrom(
+            backgroundColor: colors.primary.withValues(alpha: 0.10),
+            foregroundColor: colors.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+          ),
+          child: Text(
+            url == null ? 'Add' : 'Change',
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+          ),
         ),
         if (onRemove != null)
           IconButton(
             onPressed: busy ? null : onRemove,
             tooltip: 'Remove $title',
-            icon: const Icon(Icons.delete_outline_rounded, size: 19),
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              size: 19,
+              color: colors.onSurfaceVariant,
+            ),
           ),
       ],
     );
@@ -2160,6 +3342,7 @@ class _SecurityAction extends StatelessWidget {
     required this.onTap,
     this.trailing,
   });
+
   final IconData icon;
   final String title;
   final String subtitle;
@@ -2167,47 +3350,97 @@ class _SecurityAction extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    leading: _securityIcon(context, icon),
-    title: Text(
-      title,
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.onSurface,
-        fontWeight: FontWeight.w800,
-        fontSize: 14,
-      ),
-    ),
-    subtitle: Text(
-      subtitle,
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-        fontSize: 11,
-      ),
-    ),
-    trailing:
-        trailing ??
-        Icon(
-          Icons.chevron_right_rounded,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final radius = BorderRadius.circular(16);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
+          child: Row(
+            children: <Widget>[
+              _securityIcon(context, icon),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: colors.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              trailing ?? _Chevron(color: colors.onSurfaceVariant),
+            ],
+          ),
         ),
-    onTap: onTap,
-  );
+      ),
+    );
+  }
 }
 
-Widget _securityIcon(BuildContext context, IconData icon) => Container(
-  width: 42,
-  height: 42,
-  decoration: BoxDecoration(
-    color: Theme.of(context).colorScheme.primaryContainer,
-    borderRadius: BorderRadius.circular(13),
-  ),
-  child: Icon(
-    icon,
-    color: Theme.of(context).colorScheme.onPrimaryContainer,
-    size: 21,
-  ),
-);
+class _Chevron extends StatelessWidget {
+  const _Chevron({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.10),
+      ),
+      child: Icon(Icons.chevron_right_rounded, size: 19, color: color),
+    );
+  }
+}
+
+Widget _securityIcon(BuildContext context, IconData icon) {
+  final colors = Theme.of(context).colorScheme;
+  return Container(
+    width: 45,
+    height: 45,
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: <Color>[
+          colors.primary.withValues(alpha: 0.18),
+          colors.secondary.withValues(alpha: 0.10),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: colors.primary.withValues(alpha: 0.18)),
+    ),
+    child: Icon(icon, color: colors.primary, size: 21),
+  );
+}
 
 class _TinyStatus extends StatelessWidget {
   const _TinyStatus({required this.label, required this.color});
@@ -2216,14 +3449,30 @@ class _TinyStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
     decoration: BoxDecoration(
       color: color.withValues(alpha: .10),
       borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: color.withValues(alpha: .22)),
     ),
-    child: Text(
-      label,
-      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     ),
   );
 }

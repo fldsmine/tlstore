@@ -400,7 +400,7 @@ class _CurrencyPickerContentState
 
 class StoreInfo {
   final String name;
-  final IconData icon;
+  final String icon;
   final Color color;
 
   const StoreInfo({
@@ -414,7 +414,7 @@ StoreInfo getStoreInfo(String? store) {
   if (store == null || store.isEmpty) {
     return const StoreInfo(
       name: 'App Store',
-      icon: Icons.shop_rounded,
+      icon: 'app_store',
       color: Colors.blueGrey,
     );
   }
@@ -424,7 +424,7 @@ StoreInfo getStoreInfo(String? store) {
   if (normalized.contains('google') || normalized.contains('play')) {
     return const StoreInfo(
       name: 'Google Play',
-      icon: Icons.play_arrow_rounded,
+      icon: 'play_store',
       color: Color(0xFF34A853),
     );
   }
@@ -432,7 +432,7 @@ StoreInfo getStoreInfo(String? store) {
   if (normalized.contains('apple') || normalized.contains('ios')) {
     return const StoreInfo(
       name: 'App Store',
-      icon: Icons.apple,
+      icon: 'app_store',
       color: Color(0xFF555555),
     );
   }
@@ -440,14 +440,14 @@ StoreInfo getStoreInfo(String? store) {
   if (normalized.contains('samsung') || normalized.contains('galaxy')) {
     return const StoreInfo(
       name: 'Galaxy Store',
-      icon: Icons.storefront_rounded,
+      icon: 'galaxy_store',
       color: Color(0xFF1428A0),
     );
   }
 
   return StoreInfo(
     name: store,
-    icon: Icons.shop_rounded,
+    icon: 'app_store',
     color: Colors.blueGrey,
   );
 }

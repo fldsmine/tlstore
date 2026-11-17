@@ -28,6 +28,7 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     'me/ad-share-tasks',
     'me/ad-share-events',
   ];
+  
   final List<List<Map<String, dynamic>>> _sources = [[], [], [], []];
   final List<int> _pages = [1, 1, 1, 1];
   final List<int> _lastPages = [1, 1, 1, 1];
@@ -285,14 +286,14 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
   String _statusLabel(String value) {
     switch (value.toLowerCase()) {
       case 'reserved':
-        return 'Proof not submitted';
+        return 'Submit Proof';
       case 'pending_validation':
       case 'submitted':
       case 'under_review':
       case 'pending_review':
         return 'Pending review';
       case 'needs_information':
-        return 'More information needed';
+        return 'Add More inf';
       case 'approved':
       case 'validated':
       case 'completed':
@@ -306,7 +307,7 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
       case 'in_progress':
         return 'In progress';
       default:
-        return 'Proof not submitted';
+        return 'Submit Proof';
     }
   }
 

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:review/core/theme/app_colors.dart';
 
 import '../../../../core/currency/money.dart';
 import '../../../../services/auth_api.dart';
@@ -121,9 +122,9 @@ _Brand _brandFor(String key) {
   switch (key) {
     case 'airtime':
       return const _Brand(
-        Color(0xFFFFB020),
-        Color(0xFFF4511E),
-        Color(0xFFE8590C),
+        Color(0xFFF44735),
+        Color(0xFFB64B30),
+        Color(0xFF145A3D),
         Icons.phone_iphone_rounded,
       );
     case 'data':
@@ -142,7 +143,7 @@ _Brand _brandFor(String key) {
       );
     case 'electricity':
       return const _Brand(
-        Color(0xFFFBBF24),
+        Color(0xFF145A3D),
         Color(0xFFF97316),
         Color(0xFFDE8600),
         Icons.bolt_rounded,
@@ -323,6 +324,15 @@ const _quickSlides = <QuickySlide>[
     subtitle: 'WAEC, NECO and JAMB pins, delivered fast.',
     ctaLabel: 'Buy exam pin',
   ),
+];
+
+const _quickRechargePicks = <(String, String)>[
+  ('airtime', 'mtn'),
+  ('data', 'glo'),
+  ('data', 'airtel'),
+  ('tv', 'dstv'),
+  ('electricity', 'ikeja'),
+  ('education', 'waec'),
 ];
 
 class _ArtImage extends StatelessWidget {
@@ -1004,19 +1014,23 @@ class _VasHomeScreenState extends State<VasHomeScreen> {
     return null;
   }
 
-  Map<String, dynamic>? get _quickService {
-    final airtime = _firstWhereOrNull(
-      _services,
-      (service) => '${service['key']}' == 'airtime',
-    );
-    final candidate =
-        airtime ??
-        _firstWhereOrNull(_services, (service) {
-          final key = '${service['key']}';
-          return key == 'data' || key == 'foreign-airtime';
-        });
-    if (candidate == null) return null;
-    return _rows(candidate['providers']).isEmpty ? null : candidate;
+  List<Map<String, dynamic>> get _quickServices {
+    final picks = <Map<String, dynamic>>[];
+    for (final (serviceKey, providerKey) in _quickRechargePicks) {
+      final service = _firstWhereOrNull(
+        _services,
+        (item) => '${item['key']}' == serviceKey,
+      );
+      final providers = service == null ? <Map<String, dynamic>>[] : _rows(service['providers']);
+      final provider = _matchProvider(providers, providerKey) ??
+          (providers.isEmpty ? null : providers.first);
+      picks.add({
+        'service_key': serviceKey,
+        'service': service ?? <String, dynamic>{'key': serviceKey},
+        'provider': provider ?? <String, dynamic>{'id': providerKey, 'label': _label(providerKey)},
+      });
+    }
+    return picks;
   }
 
   @override
@@ -1072,13 +1086,30 @@ class _VasHomeScreenState extends State<VasHomeScreen> {
                       color: scheme.tertiary,
                     )
                   else ...[
-                    if (_quickService != null) ...[
+                    if (_quickServices.isNotEmpty) ...[
                       _QuickRecharge(
-                        service: _quickService!,
-                        onSelected: (provider) => _openService(
-                          _quickService!,
-                          providerId: '${provider['id']}',
-                        ),
+                        services: _quickServices,
+                        onSelected: (selection) {
+                          final serviceKey = selection['service_key']?.toString();
+                          final service = _firstWhereOrNull(
+                            _services,
+                            (item) => '${item['key']}' == serviceKey,
+                          );
+                          if (service == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('${_label(serviceKey ?? 'Service')} is unavailable right now.')),
+                            );
+                            return;
+                          }
+                          final provider = _matchProvider(
+                            _rows(service['providers']),
+                            '${(selection['provider'] as Map)['id'] ?? ''}',
+                          );
+                          _openService(
+                            service,
+                            providerId: provider == null ? null : '${provider['id']}',
+                          );
+                        },
                       ),
                       const SizedBox(height: 18),
                     ],
@@ -1158,30 +1189,50 @@ class _VasHomeScreenState extends State<VasHomeScreen> {
         text: 'There are no active VAS services right now.',
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth > 700
-            ? 4
-            : (constraints.maxWidth > 480 ? 3 : 2);
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: columns == 2 ? 0.86 : 1.0,
-          ),
-          itemCount: _services.length,
-          itemBuilder: (context, index) {
-            final service = _services[index];
-            return _ServiceCard(
-              service: service,
-              onTap: () => _openService(service),
+    final wideService = _firstWhereOrNull(
+          _services,
+          (service) => '${service['key']}' == 'education',
+        ) ??
+        (_services.length > 4 ? _services[4] : null);
+    final gridServices = _services
+        .where((service) => !identical(service, wideService))
+        .toList(growable: false);
+
+    return Column(
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth > 700
+                ? 4
+                : (constraints.maxWidth > 480 ? 3 : 2);
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: columns == 2 ? 0.86 : 1.0,
+              ),
+              itemCount: gridServices.length,
+              itemBuilder: (context, index) {
+                final service = gridServices[index];
+                return _ServiceCard(
+                  service: service,
+                  onTap: () => _openService(service),
+                );
+              },
             );
           },
-        );
-      },
+        ),
+        if (wideService != null) ...[
+          const SizedBox(height: 12),
+          _ServiceListCard(
+            service: wideService,
+            onTap: () => _openService(wideService),
+          ),
+        ],
+      ],
     );
   }
 
@@ -1309,25 +1360,26 @@ class _HeroPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .17),
+        color: scheme.onPrimary.withValues(alpha: .17),
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: Colors.white.withValues(alpha: .14)),
+        border: Border.all(color: scheme.onPrimary.withValues(alpha: .14)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 14, color: scheme.onPrimary),
           const SizedBox(width: 5),
           Flexible(
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: scheme.onPrimary,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -1354,18 +1406,24 @@ class _VasHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(0),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFDB2777)],
+          colors: [
+            Color(AppColors.gradientStart),
+            Color(AppColors.gradientCenter),
+            Color(AppColors.gradientMiddel),
+            Color(AppColors.gradientEnd),
+          ],
         ),
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6D28D9).withValues(alpha: .32),
+            color: scheme.primary.withValues(alpha: .28),
             blurRadius: 26,
             offset: const Offset(0, 14),
           ),
@@ -1379,105 +1437,108 @@ class _VasHero extends StatelessWidget {
             bottom: -46,
             child: _Glow(size: 120, opacity: .1),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .18),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 9),
-                  const Text(
-                    'TOP-UP FUND',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (refreshing)
-                    const SizedBox(
-                      width: 15,
-                      height: 15,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  balanceText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 36,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1.2,
-                    height: 1,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                'Ready for airtime, data and bills',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: .8),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onHistory,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.white.withValues(alpha: .12),
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: .38),
+          Padding(
+            padding: const EdgeInsets.all(15),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: scheme.onPrimary.withValues(alpha: .18),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: scheme.onPrimary,
+                            size: 18,
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                        const SizedBox(width: 9),
+                        Text(
+                          'TOP-UP FUND',
+                          style: TextStyle(
+                            color: scheme.onPrimary.withValues(alpha: .78),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (refreshing)
+                          SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: scheme.onPrimary,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        balanceText,
+                        style: TextStyle(
+                          color: scheme.onPrimary,
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1.2,
+                          height: 1,
                         ),
                       ),
-                      icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                      label: const Text(
-                        'My purchases',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      'Ready for airtime, data and bills',
+                      style: TextStyle(
+                        color: scheme.onPrimary.withValues(alpha: .82),
+                        fontSize: 12,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .16),
-                      borderRadius: BorderRadius.circular(14),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: onHistory,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: scheme.onPrimary,
+                              backgroundColor: scheme.onPrimary.withValues(alpha: .12),
+                              side: BorderSide(
+                                color: scheme.onPrimary.withValues(alpha: .38),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                            label: const Text(
+                              'My purchases',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: scheme.onPrimary.withValues(alpha: .16),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(Icons.bolt_rounded, color: scheme.onPrimary),
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.bolt_rounded, color: Colors.white),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
           ),
         ],
       ),
@@ -1486,34 +1547,42 @@ class _VasHero extends StatelessWidget {
 }
 
 class _QuickRecharge extends StatelessWidget {
-  const _QuickRecharge({required this.service, required this.onSelected});
+  const _QuickRecharge({required this.services, required this.onSelected});
 
-  final Map<String, dynamic> service;
+  final List<Map<String, dynamic>> services;
   final ValueChanged<Map<String, dynamic>> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final providers = _rows(service['providers']);
-    final brand = _brandFor('${service['key']}');
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeading(
           title: 'Quick recharge',
-          subtitle: 'Jump straight to a network',
-          action: Icon(Icons.bolt_rounded, color: brand.accent),
+          subtitle: 'Your everyday services, ready to go',
+          action: Icon(Icons.bolt_rounded, color: scheme.primary),
         ),
         SizedBox(
           height: 90,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: providers.length,
+            itemCount: services.length,
             separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (context, index) => _QuickNetworkTile(
-              provider: providers[index],
-              serviceKey: '${service['key']}',
-              onTap: () => onSelected(providers[index]),
-            ),
+            itemBuilder: (context, index) {
+              final selection = services[index];
+              final service = Map<String, dynamic>.from(
+                selection['service'] as Map,
+              );
+              final provider = Map<String, dynamic>.from(
+                selection['provider'] as Map,
+              );
+              return _QuickNetworkTile(
+                provider: provider,
+                serviceKey: '${service['key']}',
+                onTap: () => onSelected(selection),
+              );
+            },
           ),
         ),
       ],
@@ -1696,6 +1765,91 @@ class _ServiceCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceListCard extends StatelessWidget {
+  const _ServiceListCard({required this.service, required this.onTap});
+
+  final Map<String, dynamic> service;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final key = '${service['key'] ?? ''}';
+    final brand = _brandFor(key);
+    final providers = _rows(service['providers']);
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [brand.start.withValues(alpha: .16), scheme.surface],
+            ),
+            border: Border.all(color: brand.accent.withValues(alpha: .2)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                _ServiceArt(
+                  serviceKey: key,
+                  imageUrl: _remoteImage(service),
+                  size: 58,
+                  radius: 17,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${service['label'] ?? _label(key)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _serviceTagline(key),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        providers.isEmpty
+                            ? 'Available'
+                            : '${providers.length} providers',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: brand.accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.arrow_forward_rounded, color: brand.accent),
+              ],
             ),
           ),
         ),
@@ -2388,14 +2542,19 @@ class _PurchaseHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brand = _brandFor(serviceKey);
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: brand.gradient,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primary, scheme.secondary],
+        ),
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: brand.accent.withValues(alpha: .3),
+            color: scheme.primary.withValues(alpha: .28),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -2409,7 +2568,7 @@ class _PurchaseHeader extends StatelessWidget {
             child: Icon(
               brand.icon,
               size: 138,
-              color: Colors.white.withValues(alpha: .13),
+              color: scheme.onPrimary.withValues(alpha: .13),
             ),
           ),
           Column(
@@ -2430,8 +2589,8 @@ class _PurchaseHeader extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: scheme.onPrimary,
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.3,
@@ -2443,7 +2602,7 @@ class _PurchaseHeader extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: .85),
+                            color: scheme.onPrimary.withValues(alpha: .85),
                             fontSize: 12,
                             height: 1.3,
                           ),
@@ -2460,24 +2619,24 @@ class _PurchaseHeader extends StatelessWidget {
                   vertical: 9,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .17),
+                  color: scheme.onPrimary.withValues(alpha: .17),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: .16),
+                    color: scheme.onPrimary.withValues(alpha: .16),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.account_balance_wallet_rounded,
-                      color: Colors.white,
+                      color: scheme.onPrimary,
                       size: 17,
                     ),
                     const SizedBox(width: 7),
                     Text(
                       'Wallet balance',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: .82),
+                        color: scheme.onPrimary.withValues(alpha: .82),
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2485,8 +2644,8 @@ class _PurchaseHeader extends StatelessWidget {
                     const Spacer(),
                     Text(
                       balance,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: scheme.onPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),

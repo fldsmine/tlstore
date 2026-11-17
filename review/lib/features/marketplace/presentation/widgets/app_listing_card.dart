@@ -122,7 +122,7 @@ class AppListingCard extends StatelessWidget {
                   _StoreDiv(
                     icon: storeInfo.icon,
                     label: storeInfo.name,
-					color: storeInfo.color,
+          					color: storeInfo.color,
                   ),
                   if (location != null && location.isNotEmpty)
                     _Pill(
@@ -260,7 +260,7 @@ class _StoreDiv extends StatelessWidget {
     required this.color,
   });
 
-  final IconData icon;
+  final String icon;
   final String label;
   final Color color;
 
@@ -283,7 +283,12 @@ class _StoreDiv extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          Image.asset(
+            'assets/others/$icon.png',
+            width: 18,
+            height: 18,
+            fit: BoxFit.contain,
+          ),
           const SizedBox(width: 4),
           Text(
             label,

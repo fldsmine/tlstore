@@ -112,5 +112,5 @@ String _formatMinor(int amount, String currency, int digits) {
       : digits == 3
       ? 1000
       : 100;
-  return '${symbols[currency] ?? '$currency '}${(amount / factor).toStringAsFixed(digits)}';
+  return '${symbols[currency] ?? '$currency '}${formatGroupedNumber(amount / factor, digits)}';
 }

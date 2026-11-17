@@ -119,7 +119,9 @@ class _SocialAccountsSetupScreenState extends State<SocialAccountsSetupScreen> {
       if (!mounted) return;
 
       setState(() {
-        _accounts = accounts;
+        // AuthApi may return an unmodifiable response map. Keep a mutable
+        // screen-owned copy because successful saves update this map locally.
+        _accounts = Map<String, String>.of(accounts);
         _loading = false;
       });
     } on AuthException catch (error) {

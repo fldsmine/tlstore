@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 
 class AdminSubscriptionPlansScreen extends StatefulWidget {
@@ -239,7 +240,7 @@ class _AdminSubscriptionPlansScreenState
         ? precision.toInt().clamp(0, 4).toInt()
         : _precision(currency);
     final divisor = switch (decimals) { 0 => 1, 1 => 10, 2 => 100, 3 => 1000, _ => 10000 };
-    return '${currency.toUpperCase()} ${(amount / divisor).toStringAsFixed(decimals)}';
+    return '${currency.toUpperCase()} ${formatGroupedNumber(amount / divisor, decimals)}';
   }
 
   String _groupName(Map<String, dynamic> plan) {

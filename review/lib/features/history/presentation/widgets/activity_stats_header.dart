@@ -56,7 +56,7 @@ class ActivityStatsHeader extends StatelessWidget {
           _divider(),
           Expanded(
             child: _Stat(
-              label: 'Spent',
+              label: 'Withdrawn',
               value: spent,
               icon: Icons.trending_down_rounded,
             ),

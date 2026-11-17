@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 
 // ---------------------------------------------------------------------------
@@ -164,7 +165,7 @@ class _AdminUserRankingsScreenState extends State<AdminUserRankingsScreen> {
       ? value.toDouble()
       : double.tryParse(value?.toString() ?? '') ?? 0;
 
-  String _money(dynamic value) => '\$${_amount(value).toStringAsFixed(2)}';
+  String _money(dynamic value) => '\$${formatGroupedNumber(_amount(value), 2)}';
 
   int get _activeCount =>
       _levels.where((Map<String, dynamic> level) => level['is_active'] == true)
@@ -1573,9 +1574,9 @@ class _RankLevelSheetState extends State<_RankLevelSheet> {
           ),
           const SizedBox(height: 8),
           Text(
-            '\$${monthly.toStringAsFixed(2)} × $months month'
+            '\$${formatGroupedNumber(monthly, 2)} × $months month'
             '${months == 1 ? '' : 's'} = '
-            '\$${total.toStringAsFixed(2)} per qualifying user.',
+            '\$${formatGroupedNumber(total, 2)} per qualifying user.',
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
               height: 1.35,

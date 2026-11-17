@@ -47,8 +47,28 @@ class StoreFilterChips extends StatelessWidget {
         itemBuilder: (context, index) {
           final option = options[index];
           final isSelected = selected == option.$1;
+          final iconAsset = switch (option.$1) {
+            'play_store' => 'assets/others/play_store.png',
+            'app_store' => 'assets/others/app_store.png',
+            'galaxy_store' => 'assets/others/galaxy_store.png',
+            _ => null,
+          };
           return ChoiceChip(
-            label: Text(option.$2),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (iconAsset != null) ...[
+                  Image.asset(
+                    iconAsset,
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(option.$2),
+              ],
+            ),
             selected: isSelected,
             showCheckmark: false,
             onSelected: (_) => onSelected(option.$1),

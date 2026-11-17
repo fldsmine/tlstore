@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/currency/money.dart';
 import '../core/utils/helper.dart';
 import '../services/auth_api.dart';
-import 'subscription_questionnaire_screen.dart';
+import 'questionnaire_screen.dart';
 import 'topup_screen.dart';
 
 class SubscriptionsScreen extends StatefulWidget {
@@ -130,15 +130,14 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 
   Future<bool> _showQuestionnaire(String groupKey) async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => SubscriptionQuestionnaireScreen(
-          api: widget.api,
-          token: widget.token,
-          groupKey: groupKey,
-          user: _user,
-        ),
-      ),
+    // Presented as a dialog over the plans list (parent page blurred) instead
+    // of pushing a separate page.
+    final result = await showQuestionnaireDialog(
+      context,
+      api: widget.api,
+      token: widget.token,
+      groupKey: groupKey,
+      user: _user,
     );
     if (!mounted || result != true) return false;
     final refreshed = await widget.api.refreshUser(widget.token);
@@ -1615,7 +1614,7 @@ String _humanize(String key) => key
 String _money(int minor, String currency, int digits) {
   final value = minor / math.pow(10, digits);
   const symbols = {'USD': r'$', 'NGN': '₦', 'GBP': '£', 'EUR': '€', 'GHS': '₵'};
-  return '${symbols[currency.toUpperCase()] ?? '$currency '}${value.toStringAsFixed(digits)}';
+  return '${symbols[currency.toUpperCase()] ?? '$currency '}${formatGroupedNumber(value, digits)}';
 }
 
 String _formatDate(Object? value) {

@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 
 // ---------------------------------------------------------------------------
@@ -1039,7 +1040,7 @@ class _AdminAdsScreenState extends State<AdminAdsScreen> {
                     items: <_TileSpec>[
                       _TileSpec(
                         'Reward',
-                        '$currency ${reward.toStringAsFixed(2)}',
+                        '$currency ${formatGroupedNumber(reward, 2)}',
                         Icons.card_giftcard_rounded,
                         _Palette.green,
                       ),
@@ -1053,7 +1054,7 @@ class _AdminAdsScreenState extends State<AdminAdsScreen> {
                         'Payout cap',
                         maxShare <= 0
                             ? '—'
-                            : '$currency ${(reward * maxShare).toStringAsFixed(2)}',
+                            : '$currency ${formatGroupedNumber(reward * maxShare, 2)}',
                         Icons.savings_rounded,
                         _Palette.violet,
                       ),
@@ -1353,7 +1354,7 @@ class _AdEditorState extends State<_AdEditor> {
       setState(
         () => _error =
             'Reward pool must cover reward per share × maximum shares '
-            '($_currency ${(reward * maximum).toStringAsFixed(2)}).',
+            '($_currency ${formatGroupedNumber(reward * maximum, 2)}).',
       );
       return;
     }
@@ -1948,7 +1949,7 @@ class _AdEditorState extends State<_AdEditor> {
             items: <_TileSpec>[
               _TileSpec(
                 'Per share',
-                '$_currency ${_reward.toStringAsFixed(units)}',
+                '$_currency ${formatGroupedNumber(_reward, units)}',
                 Icons.card_giftcard_rounded,
                 _Palette.green,
               ),
@@ -1960,7 +1961,7 @@ class _AdEditorState extends State<_AdEditor> {
               ),
               _TileSpec(
                 'Cap',
-                '$_currency ${_cap.toStringAsFixed(units)}',
+                '$_currency ${formatGroupedNumber(_cap, units)}',
                 Icons.savings_rounded,
                 _Palette.violet,
               ),

@@ -60,5 +60,22 @@ String formatMajorMoney(double amount, String currency) {
     'INR': '₹',
     'JPY': '¥',
   };
-  return '${symbols[code] ?? '$code '}${amount.toStringAsFixed(currencyPrecision(code))}';
+  return '${symbols[code] ?? '$code '}'
+      '${formatGroupedNumber(amount, currencyPrecision(code))}';
+}
+
+/// Formats a number using comma group separators and a fixed decimal count.
+/// Keep this dependency-free so all amount displays use the same grouping.
+String formatGroupedNumber(num value, int fractionDigits) {
+  final fixed = value.toStringAsFixed(fractionDigits);
+  final negative = fixed.startsWith('-');
+  final unsigned = negative ? fixed.substring(1) : fixed;
+  final parts = unsigned.split('.');
+  final digits = parts.first;
+  final grouped = StringBuffer();
+  for (var index = 0; index < digits.length; index++) {
+    if (index > 0 && (digits.length - index) % 3 == 0) grouped.write(',');
+    grouped.write(digits[index]);
+  }
+  return '${negative ? '-' : ''}$grouped${parts.length > 1 ? '.${parts[1]}' : ''}';
 }

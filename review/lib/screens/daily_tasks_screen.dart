@@ -5,12 +5,12 @@ import '../core/currency/money.dart';
 import '../features/ads/presentation/screens/ad_evidence_screen.dart';
 import '../features/ads/presentation/screens/social_ad_task_screen.dart';
 import '../features/marketplace/presentation/screens/review_task_screen.dart';
-import '../features/marketplace/presentation/widgets/app_review_details_sheet.dart';
 import '../features/marketplace/presentation/widgets/app_report_dialog.dart';
+import '../features/marketplace/presentation/widgets/app_review_details_sheet.dart';
 import '../services/media_url.dart';
 import 'my_tasks_screen.dart';
 import 'subscriptions_screen.dart';
-import 'subscription_questionnaire_screen.dart';
+import 'questionnaire_screen.dart';
 import 'social_accounts_setup_screen.dart';
 import '../services/auth_api.dart';
 import '../widgets/store_filter_chips.dart';
@@ -38,6 +38,10 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
   late final TabController _tabs;
   final _search = TextEditingController();
   final _items = <String, List<Map<String, dynamic>>>{'apps': [], 'ads': []};
+  final _activeItems = <String, List<Map<String, dynamic>>>{
+    'apps': [],
+    'ads': [],
+  };
   final _meta = <String, Map<String, dynamic>>{};
   Map<String, String> _socialAccounts = {};
   bool _loadingApps = true;
@@ -83,15 +87,14 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
   }
 
   Future<void> _answerPackageQuestions(String groupKey) async {
-    final answered = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => SubscriptionQuestionnaireScreen(
-          api: widget.api,
-          token: widget.token,
-          groupKey: groupKey,
-          user: widget.user,
-        ),
-      ),
+    // The questionnaire floats over this page with the list blurred behind it,
+    // so the user never loses their place.
+    final answered = await showQuestionnaireDialog(
+      context,
+      api: widget.api,
+      token: widget.token,
+      groupKey: groupKey,
+      user: widget.user,
     );
     if (answered == true && mounted) {
       try {
@@ -204,6 +207,14 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               .dailyTasks(widget.token, taskType, search: query)
               .then((response) => (taskType, response));
         }),
+        ...selected.map((taskType) async {
+          final path = taskType == 'apps'
+              ? 'me/review-tasks'
+              : 'me/ad-share-tasks';
+          return widget.api
+              .get('$path?per_page=50', widget.token)
+              .then((response) => ('active_$taskType', response));
+        }),
         if (type == null || _socialAccounts.isEmpty)
           widget.api
               .socialAccounts(widget.token)
@@ -222,6 +233,19 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                   (key, value) => MapEntry(key.toString(), value.toString()),
                 )
               : {};
+          continue;
+        }
+        if (taskType.startsWith('active_')) {
+          final activeType = taskType.substring('active_'.length);
+          final page = response['data'];
+          final activeRows = page is Map ? page['data'] : page;
+          _activeItems[activeType] = activeRows is List
+              ? activeRows
+                    .whereType<Map>()
+                    .map((item) => Map<String, dynamic>.from(item))
+                    .where((item) => item['status']?.toString() == 'reserved')
+                    .toList()
+              : [];
           continue;
         }
         final rows = response['data'];
@@ -306,6 +330,51 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                   user: widget.user,
                 )
               : adType == 'others'
+              ? AdEvidenceScreen(
+                  api: widget.api,
+                  token: widget.token,
+                  task: task,
+                  user: widget.user,
+                )
+              : SocialAdTaskScreen(
+                  api: widget.api,
+                  token: widget.token,
+                  task: task,
+                  user: widget.user,
+                ),
+        ),
+      );
+      if (mounted) await _load(type: type);
+    } on AuthException catch (error) {
+      if (mounted) showAuthMessage(context, error.message);
+    } finally {
+      if (mounted) setState(() => _starting.remove(busyKey));
+    }
+  }
+
+  Future<void> _resumeActiveTask(
+    String type,
+    Map<String, dynamic> task,
+  ) async {
+    final id = task['id'];
+    if (id == null) return;
+    final busyKey = 'active:$type:$id';
+    setState(() => _starting.add(busyKey));
+    try {
+      final ad = task['ad'] is Map
+          ? Map<String, dynamic>.from(task['ad'] as Map)
+          : <String, dynamic>{};
+      final platform = type == 'ads' ? _platform(ad['type']?.toString()) : '';
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => type == 'apps'
+              ? ReviewTaskScreen(
+                  api: widget.api,
+                  token: widget.token,
+                  task: task,
+                  user: widget.user,
+                )
+              : platform == 'others'
               ? AdEvidenceScreen(
                   api: widget.api,
                   token: widget.token,
@@ -646,6 +715,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
     final loading = type == 'apps' ? _loadingApps : _loadingAds;
     final error = type == 'apps' ? _appsError : _adsError;
     final rows = _items[type] ?? const [];
+    final activeTasks = _activeItems[type] ?? const <Map<String, dynamic>>[];
     final visibleRows = type == 'apps'
         ? rows
               .where(
@@ -663,7 +733,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    if (loading && rows.isEmpty) {
+    if (loading && rows.isEmpty && activeTasks.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -681,7 +751,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
       );
     }
 
-    if (error != null && rows.isEmpty) {
+    if (error != null && rows.isEmpty && activeTasks.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(28),
@@ -737,9 +807,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
             children: [
               Expanded(
                 child: Text(
-                  type == 'apps'
-                      ? 'Available app reviews'
-                      : 'Available ad tasks',
+                  type == 'apps' ? 'App review tasks' : 'Ad tasks',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -756,7 +824,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                 )
               else
                 Text(
-                  '${visibleRows.length} found',
+                  '${visibleRows.length + activeTasks.length} found',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
@@ -765,7 +833,8 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
             ],
           ),
           const SizedBox(height: 12),
-          if (type == 'apps' &&
+          if (activeTasks.isEmpty &&
+              type == 'apps' &&
               visibleRows.isEmpty &&
               meta['reason'] == 'subscription_questionnaire_required' &&
               _pendingQuestionnaireGroup() != null)
@@ -778,7 +847,8 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               onPressed: () =>
                   _answerPackageQuestions(_pendingQuestionnaireGroup()!),
             )
-          else if (type == 'apps' &&
+          else if (activeTasks.isEmpty &&
+              type == 'apps' &&
               visibleRows.isEmpty &&
               _pendingQuestionnaireGroup() != null)
             _taskEmptyPromotion(
@@ -789,7 +859,8 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               onPressed: () =>
                   _answerPackageQuestions(_pendingQuestionnaireGroup()!),
             )
-          else if (meta['reason'] == 'marketplace_plan_required')
+          else if (activeTasks.isEmpty &&
+              meta['reason'] == 'marketplace_plan_required')
             _taskEmptyPromotion(
               title: 'Choose a package to get started',
               message: 'Join a package to unlock eligible tasks. You can add another package later to access more earning options.',
@@ -797,7 +868,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               actionLabel: 'Explore packages',
               onPressed: _openPackages,
             )
-          else if (meta['reason'] == 'daily_limit_reached')
+          else if (activeTasks.isEmpty && meta['reason'] == 'daily_limit_reached')
             _taskEmptyPromotion(
               title: 'Today’s task limit is reached',
               message: 'Your current package has no more tasks available today. Explore other packages for additional task access.',
@@ -805,7 +876,8 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               actionLabel: 'Explore more packages',
               onPressed: _openPackages,
             )
-          else if (meta['reason'] == 'daily_revenue_limit_reached')
+          else if (activeTasks.isEmpty &&
+              meta['reason'] == 'daily_revenue_limit_reached')
             _taskEmptyPromotion(
               title: 'Daily ad earnings goal reached',
               message: 'You have reached today’s earning limit for this package. Review other packages to find another way to keep earning.',
@@ -813,7 +885,8 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               actionLabel: 'Explore more packages',
               onPressed: _openPackages,
             )
-          else if (meta['reason'] == 'daily_revenue_unavailable')
+          else if (activeTasks.isEmpty &&
+              meta['reason'] == 'daily_revenue_unavailable')
             _taskEmptyPromotion(
               title: 'Earning limit is temporarily unavailable',
               message: 'Refresh to check again, or explore packages with other task options.',
@@ -824,7 +897,8 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                 _openPackages();
               },
             )
-          else if (meta['reason'] == 'package_task_type_not_included')
+          else if (activeTasks.isEmpty &&
+              meta['reason'] == 'package_task_type_not_included')
             _taskEmptyPromotion(
               title:
                   'Add a package for ${type == 'apps' ? 'app reviews' : 'ad shares'}',
@@ -834,7 +908,8 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               actionLabel: 'See eligible packages',
               onPressed: _openPackages,
             )
-          else if (meta['reason'] == 'package_limit_reached')
+          else if (activeTasks.isEmpty &&
+              meta['reason'] == 'package_limit_reached')
             _taskEmptyPromotion(
               title: 'Package task allowance used',
               message:
@@ -843,7 +918,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
               actionLabel: 'Explore more packages',
               onPressed: _openPackages,
             )
-          else if (visibleRows.isEmpty)
+          else if (visibleRows.isEmpty && activeTasks.isEmpty)
             _taskEmptyPromotion(
               title:
                   type == 'apps' &&
@@ -855,13 +930,14 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                   type == 'apps' &&
                       _selectedAppStore != 'all' &&
                       rows.isNotEmpty
-                  ? 'There are no app reviews for this store at the moment. Explore packages for other supported stores or ad sharing.'
+                  ? 'You do not have any app reviews for this store. Explore packages for other supported stores or ad sharing.'
                   : 'There are no eligible ${type == 'apps' ? 'app reviews' : 'ad shares'} right now. Explore packages to see additional ways to earn.',
               icon: Icons.inbox_outlined,
               actionLabel: 'Explore packages',
               onPressed: _openPackages,
-            )
-          else if (type == 'apps')
+            ),
+          ...activeTasks.map((task) => _activeTaskCard(type, task)),
+          if (type == 'apps')
             ...visibleRows.map((item) => _taskAppCard(type, item))
           else if (type == 'ads')
             ...visibleRows.map((item) => _taskAdsCard(type, item)),
@@ -878,14 +954,52 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
     );
   }
 
-  Widget _taskAppCard(String type, Map<String, dynamic> item) {
+  Widget _activeTaskCard(String type, Map<String, dynamic> task) {
+    // Render active reservations with the same card design as available tasks.
+    // Keep the original reservation payload for the Continue action.
+    if (type == 'apps') {
+      final campaign = task['campaign'] is Map
+          ? Map<String, dynamic>.from(task['campaign'] as Map)
+          : <String, dynamic>{};
+      final app = campaign['app'] is Map
+          ? Map<String, dynamic>.from(campaign['app'] as Map)
+          : <String, dynamic>{};
+      final item = <String, dynamic>{
+        ...campaign,
+        'id': task['id'],
+        'app': app,
+        'slots_remaining':
+            task['slots_remaining'] ?? campaign['slots_remaining'],
+      };
+      return _taskAppCard(type, item, activeTask: task);
+    }
+
+    final ad = task['ad'] is Map
+        ? Map<String, dynamic>.from(task['ad'] as Map)
+        : <String, dynamic>{};
+    final item = <String, dynamic>{
+      ...ad,
+      'id': task['id'],
+      'type': ad['type'] ?? task['type'],
+      'slots_remaining': task['slots_remaining'] ?? ad['slots_remaining'],
+    };
+    return _taskAdsCard(type, item, activeTask: task);
+  }
+
+  Widget _taskAppCard(
+    String type,
+    Map<String, dynamic> item, {
+    Map<String, dynamic>? activeTask,
+  }) {
     final app = Map<String, dynamic>.from(item['app']);
     final isApp = true;
     final platform = (app['store']?.toString() ?? 'App store');
     final title = (app['name']?.toString() ?? 'App review');
     final subtitle = (app['developer']?.toString() ?? '');
     final slots = item['slots_remaining'];
-    final id = '$type:${item['id']}';
+    final id = activeTask == null
+        ? '$type:${item['id']}'
+        : 'active:$type:${activeTask['id']}';
     final busy = _starting.contains(id);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -1028,7 +1142,11 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: busy ? null : () => _reviewDetailsThenStart(item),
+                onPressed: busy
+                    ? null
+                    : activeTask == null
+                    ? () => _reviewDetailsThenStart(item)
+                    : () => _resumeActiveTask(type, activeTask),
                 icon: busy
                     ? const SizedBox(
                         height: 17,
@@ -1036,7 +1154,11 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(Icons.rate_review_outlined, size: 19),
-                label: Text(busy ? 'Preparing task...' : 'View app & review'),
+                label: Text(
+                  busy
+                      ? (activeTask == null ? 'Preparing task...' : 'Opening task...')
+                      : (activeTask == null ? 'View app & review' : 'Continue review'),
+                ),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(49),
                   shape: RoundedRectangleBorder(
@@ -1051,14 +1173,24 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
     );
   }
 
-  Widget _taskAdsCard(String type, Map<String, dynamic> item) {
+  Widget _taskAdsCard(
+    String type,
+    Map<String, dynamic> item, {
+    Map<String, dynamic>? activeTask,
+  }) {
     final platform = _platformName(_platform(item['type']));
     final title = (item['title']?.toString() ?? 'Sponsored task');
     final subtitle = (item['description']?.toString() ?? '');
     final slots = item['slots_remaining'];
-    final id = '$type:${item['id']}';
+    final id = activeTask == null
+        ? '$type:${item['id']}'
+        : 'active:$type:${activeTask['id']}';
     final busy = _starting.contains(id);
     final theme = Theme.of(context);
+
+    final image = MediaUrl.resolve(item['creative_path']?.toString() );
+    final brandColor = platformColor(platform);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 11),
       clipBehavior: Clip.antiAlias,
@@ -1151,7 +1283,11 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                       borderRadius: BorderRadius.circular(15),
                     ),
                   ),
-                  onPressed: busy ? null : () => _start(type, item),
+                  onPressed: busy
+                      ? null
+                      : activeTask == null
+                      ? () => _start(type, item)
+                      : () => _resumeActiveTask(type, activeTask),
                   child: busy
                       ? const SizedBox(
                           height: 18,
@@ -1161,7 +1297,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Start task'),
+                      : Text(activeTask == null ? 'Start task' : 'Continue'),
                 ),
               ],
             ),
@@ -1172,18 +1308,24 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
   }
 
   Widget _buildPlatformIcon(String platform) {
-    final brandColor = platformColor(platform);
 
     return Container(
       width: 58,
       height: 58,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: brandColor.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(14),
       ),
-      alignment: Alignment.center,
-      child: Icon(platformIcon(platform), color: brandColor, size: 30),
-    );
+      child: Image.asset(
+          'assets/platform/$platform.png',
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Icon(
+            Icons.campaign_outlined,
+            color: brandGreen,
+            size: 27,
+          ),
+        )
+      );
   }
 
   Widget _pill(IconData icon, String label) => _InfoPill(

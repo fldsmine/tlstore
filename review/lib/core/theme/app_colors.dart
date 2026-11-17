@@ -5,7 +5,7 @@ class AppColors {
   static const primary = Color(0xFF145A3D);
   static const primaryLight = Color(0xFF28704F);
   static const accent = Color(0xFFE8B449);
-  static const danger = Color(0xFFB34537);
+  static const danger = Color(0xFFFF0000);
   static const lightSurface = Color(0xFFF4F6F3);
   static const darkSurface = Color(0xFF101814);
   static const darkCard = Color(0xFF18211C);

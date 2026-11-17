@@ -18,6 +18,7 @@ import '../features/wallets/presentation/wallet_detail_screens.dart';
 import '../services/auth_api.dart';
 import '../widgets/auth_components.dart';
 import '../widgets/advanced_app_drawer.dart';
+import '../widgets/withdrawal_pin_sheet.dart';
 import 'history_screen.dart';
 import 'daily_tasks_screen.dart';
 import 'faq_screen.dart';
@@ -51,7 +52,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const _earningsVisibilityKey = 'tlstore.hide_total_earnings';
   static const _deviceStorage = FlutterSecureStorage();
 
@@ -59,6 +60,8 @@ class _HomeScreenState extends State<HomeScreen>
   late final Animation<double> _drawerProgress;
   Future<void>? _earningsVisibilityReady;
   bool _hideTotalEarnings = false;
+  bool _openingWithdrawalPin = false;
+  int _unreadNotificationCount = 0;
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _wallets = const [];
@@ -77,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen>
   int _selectedNav = 0;
   AppDrawerDestination? _activeDrawerDestination;
   StreamSubscription<void>? _notificationTapSubscription;
+  StreamSubscription<void>? _notificationReceivedSubscription;
 
   String get _displayName {
     final name =
@@ -115,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _earningsVisibilityReady = _restoreEarningsVisibility();
     _sessionUser = widget.result.user;
     _drawerController = AnimationController(
@@ -126,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen>
       curve: Curves.easeOutCubic,
     );
     _loadDashboard();
+    _loadUnreadNotificationCount();
     _loadFeatured();
     _loadAnnouncements();
     _notificationTapSubscription = PushNotificationService
@@ -137,6 +143,10 @@ class _HomeScreenState extends State<HomeScreen>
             _openNotifications();
           }
         });
+    _notificationReceivedSubscription = PushNotificationService
+        .instance
+        .notificationReceived
+        .listen((_) => unawaited(_loadUnreadNotificationCount()));
     unawaited(
       PushNotificationService.instance.connect(widget.api, widget.result.token),
     );
@@ -182,18 +192,44 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notificationTapSubscription?.cancel();
+    _notificationReceivedSubscription?.cancel();
     _drawerController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_loadUnreadNotificationCount());
+    }
+  }
+
   void _openNotifications() {
-    unawaited(
-      _pushPage(
-        NotificationsScreen(api: widget.api, token: widget.result.token),
-        0,
-      ),
+    unawaited(_openNotificationsAndRefreshCount());
+  }
+
+  Future<void> _openNotificationsAndRefreshCount() async {
+    await _pushPage(
+      NotificationsScreen(api: widget.api, token: widget.result.token),
+      0,
     );
+    await _loadUnreadNotificationCount();
+  }
+
+  Future<void> _loadUnreadNotificationCount() async {
+    try {
+      final response = await widget.api.unreadNotificationCount(
+        widget.result.token,
+      );
+      final data = response['data'];
+      final count = data is Map ? data['unread_count'] : null;
+      if (!mounted || count is! num) return;
+      setState(() => _unreadNotificationCount = count.toInt().clamp(0, 9999));
+    } on AuthException {
+      // Keep the last known badge count if the count endpoint is unavailable.
+    }
   }
 
   Future<void> _choosePreferredCurrency() async {
@@ -651,6 +687,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _refreshHome() async {
     await Future.wait([
       _loadDashboard(),
+      _loadUnreadNotificationCount(),
       _loadFeatured(),
       _loadAnnouncements(),
     ]);
@@ -1251,10 +1288,10 @@ class _HomeScreenState extends State<HomeScreen>
                 );
               },
               child: Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 1),
                 child: Container(
-                  width: 43,
-                  height: 43,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
@@ -1262,7 +1299,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   padding: const EdgeInsets.all(5),
                   child: Icon(
-                    Icons.shield_outlined,
+                    Icons.verified_user_outlined,
                     color: brandGreen,
                     size: 26,
                   ),
@@ -1271,21 +1308,55 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ],
 
-          IconButton(
-            onPressed: () => _pushPage(
-              NotificationsScreen(api: widget.api, token: widget.result.token),
-              0,
-            ),
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: Color(0xFF18563D),
-              size: 26,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7),
+            child: _HeaderCircleButton(
+              tooltip: 'Notifications',
+              onTap: _openNotifications,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(
+                    Icons.notifications_none_rounded,
+                    color: brandGreen,
+                    size: 26,
+                  ),
+                  Positioned(
+                    top: -8,
+                    right: -10,
+                    child: _unreadNotificationCount == 0
+                        ? const SizedBox.shrink()
+                        : Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 20,
+                              minHeight: 20,
+                            ),
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF24B3D),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              _unreadNotificationCount > 99
+                                  ? '99+'
+                                  : '$_unreadNotificationCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
 
           // Clickable avatar container
           Padding(
-            padding: const EdgeInsets.only(right: 18),
+            padding: const EdgeInsets.only(left: 1, right: 15),
             child: GestureDetector(
               onTap: () {
                 _pushPage(
@@ -1300,14 +1371,29 @@ class _HomeScreenState extends State<HomeScreen>
                 );
               },
               child: Container(
-                width: 43,
-                height: 43,
-                decoration: BoxDecoration(
-                  color: Colors.white,
+                width: 54,
+                height: 54,
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: brandGreen, width: 1.5),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFF28A18),
+                      Color(0xFFE4C344),
+                      Color(0xFF24784C),
+                      Color(0xFFEF553F),
+                    ],
+                  ),
                 ),
-                child: _avatar(),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: brandGreen,
+                    shape: BoxShape.circle,
+                  ),
+                  child: ClipOval(child: _avatar()),
+                ),
               ),
             ),
           ),
@@ -1323,12 +1409,23 @@ class _HomeScreenState extends State<HomeScreen>
           ? Image.network(
               avatar,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  const Icon(Icons.verified_user_rounded, color: brandGreen),
+              errorBuilder: (_, _, _) => _avatarPlaceholder(),
             )
-          : const Icon(Icons.verified_user_rounded, color: brandGreen),
+          : _avatarPlaceholder(),
     );
   }
+
+  Widget _avatarPlaceholder() => const Center(
+    child: Text(
+      'TL',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 19,
+        fontWeight: FontWeight.w800,
+        letterSpacing: .2,
+      ),
+    ),
+  );
 
   Widget _buildEarningsActions() {
     final scheme = Theme.of(context).colorScheme;
@@ -1482,6 +1579,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildEarningsCard() {
     final total = _formatMajor(_totalEarningsMajor, _currency);
+    final totalDisplay = _hideTotalEarnings
+        ? '${_currencySymbol(_currency)}●●●●●'
+        : total;
     final username = _sessionUser['username']?.toString() ?? _displayName;
 
     return SizedBox(
@@ -1502,8 +1602,8 @@ class _HomeScreenState extends State<HomeScreen>
                   Color(AppColors.gradientMiddel),
                   Color(AppColors.gradientEnd),
                 ],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
               boxShadow: const [
                 BoxShadow(
@@ -1577,7 +1677,7 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           )
                         : Text(
-                            _hideTotalEarnings ? '••••••••' : total,
+                            totalDisplay,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 32,
@@ -1691,16 +1791,7 @@ class _HomeScreenState extends State<HomeScreen>
           0,
         );
       } else if (!hasPin) {
-        _pushPage(
-          ProfileScreen(
-            api: widget.api,
-            token: widget.result.token,
-            user: _sessionUser,
-            onLogout: _logout,
-            onDeleted: _accountDeleted,
-          ),
-          2,
-        );
+        unawaited(_openWithdrawalPinSetup());
       } else {
         _pushPage(
           PaymentDetailsSetupScreen(
@@ -1876,6 +1967,29 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  Future<void> _openWithdrawalPinSetup() async {
+    if (_openingWithdrawalPin) return;
+    _openingWithdrawalPin = true;
+    try {
+      final saved = await showWithdrawalPinSheet(
+        context,
+        api: widget.api,
+        token: widget.result.token,
+        endpoint: 'me/security-pin',
+        title: 'Create a withdrawal PIN',
+        requireAccountPassword: _sessionUser['has_password'] == true,
+        onSuccess: (response) {
+          final data = response['data'];
+          if (!mounted || data is! Map) return;
+          setState(() => _sessionUser.addAll(Map<String, dynamic>.from(data)));
+        },
+      );
+      if (saved && mounted) showAuthMessage(context, 'Withdrawal PIN saved.');
+    } finally {
+      _openingWithdrawalPin = false;
+    }
+  }
+
   Widget _heroMeta(String label, String value) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -1943,8 +2057,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             0,
           );
-        } else if (index == 3) {
-          setState(() => _selectedTab = index);
+        } else if (index == 3) { 
           _pushPage(
             DailyTasksScreen(
               api: widget.api,
@@ -2101,18 +2214,17 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    '',
+                    'Users Wallets [${wallets.length}]',
                     style: TextStyle(
-                      color: mutedInk,
-                      fontSize: 10,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
                 Text(
-                  'Users Wallets [${wallets.length}]',
+                  '',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
               ],
@@ -2259,7 +2371,7 @@ class _HomeScreenState extends State<HomeScreen>
     children: [
       const Text(
         'Recent Transactions',
-        style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
       ),
       if (_transactions.length >= 5)
         TextButton.icon(
@@ -2268,11 +2380,11 @@ class _HomeScreenState extends State<HomeScreen>
           icon: const Icon(
             Icons.arrow_forward_rounded,
             color: Color(0xFFE84D3F),
-            size: 17,
+            size: 15,
           ),
           label: const Text(
             'View more',
-            style: TextStyle(color: brandGreen, fontWeight: FontWeight.w800),
+            style: TextStyle(color: brandGreen, fontSize: 12, fontWeight: FontWeight.w800),
           ),
         ),
     ],
@@ -2305,32 +2417,18 @@ class _HomeScreenState extends State<HomeScreen>
           .map(
             (entry) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color:
-                        entry['direction']?.toString().toLowerCase() == 'credit'
-                        ? Theme.of(context).colorScheme.outlineVariant
-                              .withValues(alpha: .55)
-                        : Theme.of(context).colorScheme.error
-                              .withValues(alpha: .55),
-                  ),
+              child: ActivityTransactionTile(
+                transaction: entry,
+                displayAmount: moneyConverted(
+                  widget.api,
+                  entry['amount_minor'],
+                  entry['currency']?.toString() ?? _currency,
+                  entry['currency_minor_units'],
+                  _currency,
+                  isMinor: true,
                 ),
-                child: ActivityTransactionTile(
-                  transaction: entry,
-                  displayAmount: moneyConverted(
-                    widget.api,
-                    entry['amount_minor'],
-                    entry['currency']?.toString() ?? _currency,
-                    entry['currency_minor_units'],
-                    _currency,
-                    isMinor: true,
-                  ),
-                  compact: true,
-                  preferDescriptionTitle: true,
-                ),
+                compact: true,
+                preferDescriptionTitle: true,
               ),
             ),
           )
@@ -2810,7 +2908,11 @@ int _currencyPrecision(String currency) {
 
 String _formatMajor(double amount, String currency) {
   final digits = _currencyPrecision(currency);
-  final symbols = {
+  return '${_currencySymbol(currency)}${formatGroupedNumber(amount, digits)}';
+}
+
+String _currencySymbol(String currency) {
+  const symbols = {
     'USD': r'$',
     'NGN': '₦',
     'GBP': '£',
@@ -2822,5 +2924,34 @@ String _formatMajor(double amount, String currency) {
     'AUD': r'$',
     'INR': '₹',
   };
-  return '${symbols[currency.toUpperCase()] ?? '${currency.toUpperCase()} '}${amount.toStringAsFixed(digits)}';
+  final code = currency.toUpperCase();
+  return symbols[code] ?? '$code ';
+}
+
+class _HeaderCircleButton extends StatelessWidget {
+  const _HeaderCircleButton({
+    required this.tooltip,
+    required this.onTap,
+    required this.child,
+  });
+
+  final String tooltip;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Material(
+      color: Colors.white,
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: .12),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(width: 44, height: 44, child: Center(child: child)),
+      ),
+    ),
+  );
 }

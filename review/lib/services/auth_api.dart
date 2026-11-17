@@ -747,6 +747,9 @@ class AuthApi {
     return _asJsonObject(value);
   }
 
+  Future<Map<String, dynamic>> unreadNotificationCount(String token) =>
+      get('notifications/unread-count', token);
+
   /// Plans for a service/provider pair, cached for an hour per provider.
   Future<Map<String, dynamic>> vasPlans(
     String token, {
@@ -1315,9 +1318,8 @@ class AuthApi {
   }
 }
 
-Map<String, dynamic> _asJsonObject(Object? value) => value is Map
-    ? Map<String, dynamic>.from(value)
-    : <String, dynamic>{};
+Map<String, dynamic> _asJsonObject(Object? value) =>
+    value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
 
 List<Map<String, dynamic>> _asJsonRows(Object? value) => value is List
     ? value

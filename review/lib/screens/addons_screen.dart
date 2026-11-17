@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/currency/money.dart';
 import '../core/utils/helper.dart';
+import '../widgets/proxy_info_dialog.dart';
 import '../widgets/proxy_prompt_dialog.dart';
 import '../services/auth_api.dart';
 import '../widgets/proxy_connection_dialog.dart';
@@ -168,7 +169,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
       return values.whereType<Map>().map(_stringMap).toList(growable: false);
     }
     final legacy = context['active_marketplace'];
-    return legacy is Map ? <Map<String, dynamic>>[_stringMap(legacy)] : const [];
+    return legacy is Map
+        ? <Map<String, dynamic>>[_stringMap(legacy)]
+        : const [];
   }
 
   Map<String, Map<String, dynamic>> get _plansById {
@@ -197,7 +200,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
     final addon = _addon(record);
     final nested = _map(addon['plan']);
     final id = (addon['subscription_plan_id'] ?? nested['id'])?.toString();
-    final catalogPlan = id == null ? const <String, dynamic>{} : (_plansById[id] ?? const {});
+    final catalogPlan = id == null
+        ? const <String, dynamic>{}
+        : (_plansById[id] ?? const {});
     return {...catalogPlan, ...nested};
   }
 
@@ -210,7 +215,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
 
   bool _recordIsActive(Map<String, dynamic> record) {
     final active = _map(record['active_entitlement']);
-    final status = (active['status'] ?? record['status'])?.toString().toLowerCase();
+    final status = (active['status'] ?? record['status'])
+        ?.toString()
+        .toLowerCase();
     if (status != 'active' && !(status == null && active.isNotEmpty)) {
       return false;
     }
@@ -222,7 +229,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
 
   bool _recordIsPending(Map<String, dynamic> record) {
     final latest = _map(record['latest_entitlement']);
-    final status = (latest['status'] ?? record['status'])?.toString().toLowerCase();
+    final status = (latest['status'] ?? record['status'])
+        ?.toString()
+        .toLowerCase();
     return status == 'pending' || status == 'processing';
   }
 
@@ -255,8 +264,18 @@ class _AddonsScreenState extends State<AddonsScreen> {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
     if (date == null) return '—';
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
@@ -271,7 +290,8 @@ class _AddonsScreenState extends State<AddonsScreen> {
       if (contextWallets is List)
         ...contextWallets.whereType<Map>().map(_stringMap),
     ];
-    final currency = _profile['wallet_currency']?.toString().toUpperCase() ??
+    final currency =
+        _profile['wallet_currency']?.toString().toUpperCase() ??
         _preferredCurrency;
     for (final wallet in candidates) {
       if (wallet['type']?.toString() == 'topup_fund' ||
@@ -294,7 +314,11 @@ class _AddonsScreenState extends State<AddonsScreen> {
   List<_CheckoutOption> _checkoutOptions(Map<String, dynamic> record) {
     final addon = _addon(record);
     final plan = _planFor(record);
-    final sources = [record['checkout_options'], addon['checkout_options'], plan['checkout_options']];
+    final sources = [
+      record['checkout_options'],
+      addon['checkout_options'],
+      plan['checkout_options'],
+    ];
     final options = <_CheckoutOption>[];
     final seen = <String>{};
     for (final source in sources) {
@@ -302,7 +326,8 @@ class _AddonsScreenState extends State<AddonsScreen> {
       for (final value in source.whereType<Map>()) {
         final item = _map(value);
         final gateway = item['gateway']?.toString().trim().toLowerCase() ?? '';
-        final currency = item['currency']?.toString().trim().toUpperCase() ?? '';
+        final currency =
+            item['currency']?.toString().trim().toUpperCase() ?? '';
         if (gateway.isEmpty || currency.isEmpty) continue;
         final key = '$gateway.$currency';
         if (seen.add(key)) {
@@ -329,15 +354,14 @@ class _AddonsScreenState extends State<AddonsScreen> {
 
   String _providerName(String gateway) => gateway
       .split(RegExp(r'[_\-\s]+'))
-      .map((part) => part.isEmpty
-          ? part
-          : '${part[0].toUpperCase()}${part.substring(1)}')
+      .map(
+        (part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1)}',
+      )
       .join(' ');
 
-  String _checkoutAmount(
-    Map<String, dynamic> record,
-    _CheckoutOption option,
-  ) {
+  String _checkoutAmount(Map<String, dynamic> record, _CheckoutOption option) {
     final amount = formatMajorMoney(
       _integer(option.amountMinor) /
           math.pow(
@@ -405,13 +429,15 @@ class _AddonsScreenState extends State<AddonsScreen> {
           return Scaffold(
             appBar: AppBar(
               title: const Text(
-                'Add-ons Proxy',
+                'TLsotre Proxy',
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               foregroundColor: Colors.white,
               backgroundColor: _AddonColors.greenDark,
               flexibleSpace: const DecoratedBox(
-                decoration: BoxDecoration(gradient: _AddonColors.headerGradient),
+                decoration: BoxDecoration(
+                  gradient: _AddonColors.headerGradient,
+                ),
               ),
               actions: [
                 IconButton(
@@ -422,14 +448,18 @@ class _AddonsScreenState extends State<AddonsScreen> {
                 Container(
                   width: 40, // Container size
                   height: 40,
-                  clipBehavior: Clip.antiAlias, // Crucial for clipping the image
+                  clipBehavior:
+                      Clip.antiAlias, // Crucial for clipping the image
                   decoration: BoxDecoration(
                     color: Colors.grey[200], // Optional background color
-                    borderRadius: BorderRadius.circular(12), // Rounded corners radius
+                    borderRadius: BorderRadius.circular(
+                      12,
+                    ), // Rounded corners radius
                   ),
                   child: Image.asset(
                     'assets/logo.jpg',
-                    fit: BoxFit.cover, // Ensures the image fills the container space
+                    fit: BoxFit
+                        .cover, // Ensures the image fills the container space
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -442,14 +472,19 @@ class _AddonsScreenState extends State<AddonsScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                 children: [
-                  const _ProxyBenefits(imageLink : 'assets/cards/header.jpg'),
+                  const _ProxyBenefits(imageLink: 'assets/cards/header.jpg'),
                   _AccountHeader(
-                    country: [
-                      _profile['country_name']?.toString(),
-                      _profile['country_code']?.toString(),
-                    ].whereType<String>().where((part) => part.isNotEmpty).join(' · '),
+                    country:
+                        [
+                              _profile['country_name']?.toString(),
+                              _profile['country_code']?.toString(),
+                            ]
+                            .whereType<String>()
+                            .where((part) => part.isNotEmpty)
+                            .join(' · '),
                     initials: _initials(name),
-                    emailVerified: _profile['email_verified'] == true ||
+                    emailVerified:
+                        _profile['email_verified'] == true ||
                         _profile['email_verified'] == 1,
                     activePackageCount: activeSubscriptions.length,
                     preferredCurrency: preferredCurrency,
@@ -460,91 +495,72 @@ class _AddonsScreenState extends State<AddonsScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
-                  const SizedBox(height: 14),
-                  _SummaryRow(
-                    activeAddons: activeAddonCount,
-                    activePackages: activeSubscriptions.length,
-                    walletBalance: walletBalance,
-                    walletCurrency: walletCurrency,
-                  ),
-                  if (_profileError != null) ...[
-                    const SizedBox(height: 12),
-                    _InlineNotice(
-                      message: _profileError!,
-                      icon: Icons.cloud_off_outlined,
-                      onRetry: _refresh,
-                    ),
-                  ],
-                  if (_pendingIntentId != null) ...[
-                    const SizedBox(height: 12),
-                    _PendingPaymentCard(
-                      addonName: _pendingAddonName,
-                      onCheck: _checkPendingPayment,
-                      loading: _paying,
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  _SectionHeading(
-                    eyebrow: 'SECURE ACCESS',
-                    title: 'Your proxy add-ons',
-                    subtitle:
-                        'Review proxies, locations access, IP addresses and security features attached to your app packages.',
-                  ),
-                  const SizedBox(height: 11),
-                  if (_refreshing && !_hasLoadedAddons)
-                    const _AddonsLoading()
-                  else if (_addonsError != null && _addonRecords.isEmpty)
-                    _InlineNotice(
-                      message: _addonsError!,
-                      icon: Icons.cloud_off_outlined,
-                      onRetry: _refresh,
-                    )
-                  else if (_addonRecords.isEmpty)
-                    const _EmptyAddons()
-                  else
-                    for (final record in _addonRecords) ...[
-                      _addonCard(context, record),
-                      const SizedBox(height: 11),
-                    ],
-                  if (_addonRecords.isNotEmpty && _addonsError != null) ...[
-                    const SizedBox(height: 2),
-                    _InlineNotice(
-                      message: _addonsError!,
-                      icon: Icons.info_outline_rounded,
-                      onRetry: _refresh,
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  _SectionHeading(
-                    eyebrow: 'PACKAGE COVERAGE',
-                    title: 'Active packages',
-                    subtitle: 'Proxy add-ons are tied to an active review package.',
-                  ),
-                  const SizedBox(height: 11),
-                  if (activeSubscriptions.isEmpty)
-                    const _NoPackagesCard()
-                  else
-                    for (final subscription in activeSubscriptions) ...[
-                      _MarketplaceCard(
-                        subscription: subscription,
-                        plan: _subscriptionPlan(subscription),
-                        dateFormatter: _date,
-                      ),
-                      const SizedBox(height: 9),
-                    ],
-                  const SizedBox(height: 4),
+                        const SizedBox(height: 14),
+                        _SummaryRow(
+                          activeAddons: activeAddonCount,
+                          activePackages: activeSubscriptions.length,
+                          walletBalance: walletBalance,
+                          walletCurrency: walletCurrency,
+                        ),
+                        if (_profileError != null) ...[
+                          const SizedBox(height: 12),
+                          _InlineNotice(
+                            message: _profileError!,
+                            icon: Icons.cloud_off_outlined,
+                            onRetry: _refresh,
+                          ),
+                        ],
+                        if (_pendingIntentId != null) ...[
+                          const SizedBox(height: 12),
+                          _PendingPaymentCard(
+                            addonName: _pendingAddonName,
+                            onCheck: _checkPendingPayment,
+                            loading: _paying,
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        _SectionHeading(
+                          eyebrow: 'SECURE ACCESS',
+                          title: 'Your proxy add-ons',
+                          subtitle: 'Review proxies, locations access, IP addresses and security features attached to your app packages.',
+                        ),
+                        const SizedBox(height: 11),
+                        if (_refreshing && !_hasLoadedAddons)
+                          const _AddonsLoading()
+                        else if (_addonsError != null && _addonRecords.isEmpty)
+                          _InlineNotice(
+                            message: _addonsError!,
+                            icon: Icons.cloud_off_outlined,
+                            onRetry: _refresh,
+                          )
+                        else if (_addonRecords.isEmpty)
+                          const _EmptyAddons()
+                        else
+                          for (final record in _addonRecords) ...[
+                            _addonCard(context, record),
+                            const SizedBox(height: 11),
+                          ],
+                        if (_addonRecords.isNotEmpty &&
+                            _addonsError != null) ...[
+                          const SizedBox(height: 2),
+                          _InlineNotice(
+                            message: _addonsError!,
+                            icon: Icons.info_outline_rounded,
+                            onRetry: _refresh,
+                          ),
+                        ],
+                        const SizedBox(height: 11),
                       ],
                     ),
                   ),
                   const _PrivacyFootnote(),
                   const SizedBox(height: 10),
-                  const _ProxyBenefits(imageLink : 'assets/cards/benefits.png'),
+                  const _ProxyBenefits(imageLink: 'assets/cards/benefits.png'),
                 ],
               ),
             ),
-            floatingActionButton:FloatingActionButton(
-              onPressed: () => _showProxyInformation(),
+            floatingActionButton: FloatingActionButton(
+              onPressed: () => showProxyInformation(context),
               tooltip: 'Why do you need TLstore Proxy?',
               backgroundColor: Colors.transparent,
               elevation: 4,
@@ -586,230 +602,32 @@ class _AddonsScreenState extends State<AddonsScreen> {
     return null;
   }
 
-
-  Future<void> _showProxyInformation() => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        showDragHandle: true,
-        builder: (sheetContext) {
-          final theme = Theme.of(sheetContext);
-          final colors = theme.colorScheme;
-          return FractionallySizedBox(
-            heightFactor: .9,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 12, 12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.shield_outlined, color: colors.primary, size: 27),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Why do you need a TLstore Proxy?',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                    children: [
-                      Text(
-                        'Your security. Your privacy. Your connection reliability.',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: colors.primary,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'At TLstore, we take the security, integrity, and reliability of our review environment seriously. Eligible reviewers need an active proxy add-on before they can submit reviews for packages that require it. A proxy routes eligible network traffic through a designated server and can provide a more consistent connection while you work.',
-                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        'Why purchasing a proxy matters',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _proxyInfoPoint(
-                        sheetContext,
-                        number: '1',
-                        title: 'Enhanced network privacy',
-                        body: 'A proxy can show its public IP address to a destination service instead of your network’s public IP. The proxy provider may still be able to see connection information, so choose a trusted service.',
-                        icon: Icons.visibility_off_outlined,
-                      ),
-                      _proxyInfoPoint(
-                        sheetContext,
-                        number: '2',
-                        title: 'Secure data transmission',
-                        body: 'A proxy by itself does not encrypt traffic. HTTPS or another encrypted connection protects data in transit between your device and the destination; use secure websites and networks.',
-                        icon: Icons.lock_outline_rounded,
-                      ),
-                      _proxyInfoPoint(
-                        sheetContext,
-                        number: '3',
-                        title: 'Reliable working environment',
-                        body: 'A dedicated IP can provide a more consistent network identity during review sessions and help reduce unexpected changes in connection details.',
-                        icon: Icons.wifi_tethering_rounded,
-                      ),
-                      _proxyInfoPoint(
-                        sheetContext,
-                        number: '4',
-                        title: 'Regional compatibility',
-                        body: 'Where supported, proxy locations such as the US or UK can help with legitimate region-specific app testing and compatibility checks.',
-                        icon: Icons.public_rounded,
-                      ),
-                      _proxyInfoPoint(
-                        sheetContext,
-                        number: '5',
-                        title: 'More consistent account access',
-                        body: 'Keeping a stable connection environment may reduce unusual network changes that can prompt additional security checks. It cannot guarantee that a service will not request verification.',
-                        icon: Icons.verified_user_outlined,
-                      ),
-                      _proxyInfoPoint(
-                        sheetContext,
-                        number: '6',
-                        title: 'Reviewer eligibility',
-                        body: 'An active proxy add-on is part of the eligibility requirements for review packages that require it. Without an active add-on, submission may be unavailable or your work may be rejected.',
-                        icon: Icons.fact_check_outlined,
-                      ),
-                      const SizedBox(height: 16),
-                      Card(
-                        color: colors.secondaryContainer,
-                        child: Padding(
-                          padding: const EdgeInsets.all(15),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Why is it mandatory?',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  color: colors.onSecondaryContainer,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'TLstore requires proxy activation for eligible review-submission activities on packages that specify this requirement. Activate the matching add-on before submitting, or use the available option to submit without it if shown; that submission may not qualify for approval.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: colors.onSecondaryContainer,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Your work deserves a reliable connection. Review the add-on details and locations available to your package before activating proxy access.',
-                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
-                      ),
-                    ],
-                  ),
-                ),
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        child: const Text('Continue to proxy add-ons'),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-
-  Widget _proxyInfoPoint(
-    BuildContext context, {
-    required String number,
-    required String title,
-    required String body,
-    required IconData icon,
-  }) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(13),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: colors.primaryContainer,
-                foregroundColor: colors.onPrimaryContainer,
-                child: Text(number, style: const TextStyle(fontWeight: FontWeight.w800)),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Icon(icon, size: 18, color: colors.primary),
-                      const SizedBox(width: 7),
-                      Expanded(child: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800))),
-                    ]),
-                    const SizedBox(height: 5),
-                    Text(body, style: theme.textTheme.bodySmall?.copyWith(height: 1.45, color: colors.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _addonCard(BuildContext context, Map<String, dynamic> record) {
     final addon = _addon(record);
     final plan = _planFor(record);
     final isActive = _recordIsActive(record);
     final pending = _recordIsPending(record);
-    final available = addon['is_active'] != false &&
+    final available =
+        addon['is_active'] != false &&
         addon['is_active'] != 0 &&
         addon['is_active'] != '0';
     final colors = Theme.of(context).colorScheme;
     final name = addon['name']?.toString() ?? 'Proxy';
     final entitlement = _effectiveEntitlement(record);
-    final currency = (entitlement['currency'] ??
-            record['currency'] ??
-            addon['currency'] ??
-            'USD')
-        .toString()
-        .toUpperCase();
-    final amount = entitlement['price_minor'] ??
+    final currency =
+        (entitlement['currency'] ??
+                record['currency'] ??
+                addon['currency'] ??
+                'USD')
+            .toString()
+            .toUpperCase();
+    final amount =
+        entitlement['price_minor'] ??
         record['price_minor'] ??
         record['payable_price_minor'] ??
         addon['price_minor'];
-    final units = entitlement['currency_minor_units'] ??
+    final units =
+        entitlement['currency_minor_units'] ??
         record['currency_minor_units'] ??
         addon['currency_minor_units'] ??
         plan['currency_minor_units'];
@@ -822,8 +640,8 @@ class _AddonsScreenState extends State<AddonsScreen> {
         : !available
         ? 'UNAVAILABLE'
         : (record['status']?.toString().toLowerCase() == 'expired'
-            ? 'EXPIRED'
-            : 'READY TO ACTIVATE');
+              ? 'EXPIRED'
+              : 'READY TO ACTIVATE');
     final statusColor = isActive
         ? _AddonColors.green
         : pending
@@ -850,16 +668,18 @@ class _AddonsScreenState extends State<AddonsScreen> {
         ? 'Check payment'
         : !available
         ? 'Unavailable'
-        : 'View features & pay';
+        : 'Purchase Proxy';
 
     final nestedActive = _map(record['active_entitlement']);
-    final isDirectActive = const ['active', 'trialing']
-        .contains(record['status']?.toString().toLowerCase());
+    final isDirectActive = const [
+      'active',
+      'trialing',
+    ].contains(record['status']?.toString().toLowerCase());
     final active = nestedActive.isNotEmpty
         ? nestedActive
         : isDirectActive
-            ? record
-            : const <String, dynamic>{};
+        ? record
+        : const <String, dynamic>{};
 
     final proxy_features = <String, dynamic>{
       ..._map(addon['features']),
@@ -867,7 +687,8 @@ class _AddonsScreenState extends State<AddonsScreen> {
       ..._map(record['features']),
     };
 
-    final hasConnection = proxy_features.containsKey('location') ||
+    final hasConnection =
+        proxy_features.containsKey('location') ||
         proxy_features.containsKey('locations') ||
         proxy_features.containsKey('ip_addresses') ||
         proxy_features['encrypted_tunnel'] == true ||
@@ -910,7 +731,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
-                      isActive ? Icons.verified_user_rounded : Icons.shield_outlined,
+                      isActive
+                          ? Icons.verified_user_rounded
+                          : Icons.shield_outlined,
                       color: Colors.white,
                       size: 25,
                     ),
@@ -924,20 +747,24 @@ class _AddonsScreenState extends State<AddonsScreen> {
                           '$name proxy',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: _AddonColors.ink,
-                            fontWeight: FontWeight.w900,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: _AddonColors.ink,
+                                fontWeight: FontWeight.w900,
+                              ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          subtitle.isEmpty ? 'Protected package access' : subtitle,
+                          subtitle.isEmpty
+                              ? 'Protected package access'
+                              : subtitle,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            height: 1.35,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: colors.onSurfaceVariant,
+                                height: 1.35,
+                              ),
                         ),
                       ],
                     ),
@@ -950,10 +777,15 @@ class _AddonsScreenState extends State<AddonsScreen> {
               Wrap(
                 spacing: 7,
                 runSpacing: 7,
-                children: features.take(4).map((feature) => _FeaturePill(
-                  label: feature.label,
-                  icon: feature.icon,
-                )).toList(),
+                children: features
+                    .take(4)
+                    .map(
+                      (feature) => _FeaturePill(
+                        label: feature.label,
+                        icon: feature.icon,
+                      ),
+                    )
+                    .toList(),
               ),
               const SizedBox(height: 14),
               Row(
@@ -961,53 +793,83 @@ class _AddonsScreenState extends State<AddonsScreen> {
                   Expanded(
                     child: Text(
                       price == null
-                          ? (isActive ? 'Active coverage' : 'Pricing shown at checkout')
+                          ? (isActive
+                                ? 'Active coverage'
+                                : 'Pricing shown at checkout')
                           : '$price ${isActive ? 'paid' : getDuration(addon)}',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: isActive ? _AddonColors.greenDark : _AddonColors.ink,
+                        color: isActive
+                            ? _AddonColors.greenDark
+                            : _AddonColors.ink,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
 
-                    if (isActive && hasConnection) ...[
-                      const SizedBox(height: 5),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: () => _openProxyConnection(record),
-                          style: TextButton.styleFrom(
-                            foregroundColor: colors.primary,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            minimumSize: const Size(0, 32),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
+                  if (isActive && hasConnection) ...[
+                    const SizedBox(height: 5),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => _openProxyConnection(record),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
                           ),
-                          icon: const Icon(Icons.vpn_key_rounded, size: 15),
-                          label: const Text(
-                            'View connection',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
+                          minimumSize: const Size(0, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.vpn_key_rounded, size: 15),
+                        label: const Text(
+                          'View connection',
+                          style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
-                    ] else TextButton.icon(
-                    onPressed: isActive || available || pending
-                        ? () => _openAddon(record)
-                        : null,
-                    icon: Icon(
-                      isActive
-                          ? Icons.manage_search_rounded
-                          : pending
-                          ? Icons.fact_check_outlined
-                          : Icons.arrow_forward_rounded,
-                      size: 18,
                     ),
-                    label: Text(actionLabel),
-                  ),
+                  ] else
+                    TextButton.icon(
+                      onPressed: isActive || available || pending
+                          ? () => _openAddon(record)
+                          : null,
+                      icon: Icon(
+                        isActive
+                            ? Icons.manage_search_rounded
+                            : pending
+                            ? Icons.fact_check_outlined
+                            : Icons.arrow_forward_rounded,
+                        size: 18,
+                      ),
+                      label: Text(actionLabel),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _AddonColors.green, // Icon and text color
+                        side: BorderSide(
+                          color: _AddonColors.green.withValues(alpha: .25), // Border color
+                          width: 1.5,         // Border thickness
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8), // Rounded corners
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      ),
+                    ),
+
                 ],
+              ),
+
+              TextButton.icon(
+                onPressed: () => showProxyInformation(context),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: Icon(Icons.help_outline, size: 18, color: Colors.red),
+                label: Text('Why purchase proxy', 
+                  style: TextStyle(color: Colors.red,  fontWeight: FontWeight.w800),
+                ),
               ),
             ],
           ),
@@ -1023,7 +885,8 @@ class _AddonsScreenState extends State<AddonsScreen> {
       return;
     }
     if (_recordIsPending(record)) {
-      final intent = record['payment_intent_id'] ??
+      final intent =
+          record['payment_intent_id'] ??
           _map(record['latest_entitlement'])['payment_intent_id'];
       if (intent != null) {
         _pendingIntentId = intent;
@@ -1040,15 +903,16 @@ class _AddonsScreenState extends State<AddonsScreen> {
         .toString()
         .toUpperCase();
     final amount = record['payable_price_minor'] ?? addon['price_minor'];
-    final units = record['currency_minor_units'] ??
+    final units =
+        record['currency_minor_units'] ??
         addon['currency_minor_units'] ??
         plan['currency_minor_units'];
-    final price = amount == null ? 'Price at checkout' : _money(amount, currency, units);
+    final price = amount == null
+        ? 'Price at checkout'
+        : _money(amount, currency, units);
     final featureList = proxyFeatures(record);
-    final featured = featureList
-        .take(6)
-        .toList(growable: false);
-    await ProxyRequirementDialog.show<void>(
+    final featured = featureList.take(6).toList(growable: false);
+    await ProxyAddonsDialog.show<void>(
       context: context,
       plan: ProxyPromptPlan(
         storeName: 'TrustLens Store',
@@ -1064,7 +928,7 @@ class _AddonsScreenState extends State<AddonsScreen> {
         price: price,
         billingPeriod: getDuration(addon),
         requiredLabel: 'Required',
-        purchaseLabel: 'CHOOSE PAYMENT',
+        purchaseLabel: 'ACTIVATE PROXY',
         trustLabel: 'Secure checkout',
         footerBrand: 'TrustLens Store',
         features: featured,
@@ -1111,16 +975,26 @@ class _AddonsScreenState extends State<AddonsScreen> {
                       gradient: _AddonColors.greenTile,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.verified_user_rounded, color: Colors.white),
+                    child: const Icon(
+                      Icons.verified_user_rounded,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('$name proxy', style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+                        Text(
+                          '$name proxy',
+                          style: Theme.of(sheetContext).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w900),
+                        ),
                         const SizedBox(height: 3),
-                        const _StatusBadge(label: 'ACTIVE', color: _AddonColors.green),
+                        const _StatusBadge(
+                          label: 'ACTIVE',
+                          color: _AddonColors.green,
+                        ),
                       ],
                     ),
                   ),
@@ -1137,8 +1011,10 @@ class _AddonsScreenState extends State<AddonsScreen> {
                 label: 'Last payment',
                 value: _money(
                   entitlement['price_minor'] ?? record['price_minor'],
-                  (entitlement['currency'] ?? record['currency'] ?? 'USD').toString(),
-                  entitlement['currency_minor_units'] ?? record['currency_minor_units'],
+                  (entitlement['currency'] ?? record['currency'] ?? 'USD')
+                      .toString(),
+                  entitlement['currency_minor_units'] ??
+                      record['currency_minor_units'],
                 ),
               ),
               if (locations is List && locations.isNotEmpty)
@@ -1158,16 +1034,21 @@ class _AddonsScreenState extends State<AddonsScreen> {
               const SizedBox(height: 9),
               Text(
                 'Included features',
-                style: Theme.of(sheetContext).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                style: Theme.of(sheetContext).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: featureList.map((feature) => _FeaturePill(
-                  label: feature.label,
-                  icon: feature.icon,
-                )).toList(),
+                children: featureList
+                    .map(
+                      (feature) => _FeaturePill(
+                        label: feature.label,
+                        icon: feature.icon,
+                      ),
+                    )
+                    .toList(),
               ),
               const SizedBox(height: 18),
               SizedBox(
@@ -1197,7 +1078,6 @@ class _AddonsScreenState extends State<AddonsScreen> {
       wallet['currency_minor_units'],
     );
 
-
     final choice = await showModalBottomSheet<_PaymentChoice>(
       context: context,
       isScrollControlled: true,
@@ -1215,18 +1095,24 @@ class _AddonsScreenState extends State<AddonsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Choose payment method', style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+            Text(
+              'Choose payment method',
+              style: Theme.of(sheetContext).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 5),
             Text(
               'Pay for $name securely. Your selected plan features are shown before this step.',
-              style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(color: _AddonColors.muted),
+              style: Theme.of(sheetContext).textTheme.bodyMedium
+                  ?.copyWith(color: _AddonColors.muted),
             ),
             const SizedBox(height: 15),
             _PaymentMethodTile(
               icon: Icons.account_balance_wallet_outlined,
               title: 'Use account funds',
               subtitle: 'Available balance · $walletAmount',
-              onTap: () => Navigator.of(sheetContext).pop(_PaymentChoice.wallet()),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(_PaymentChoice.wallet()),
               type: false,
             ),
             if (options.isNotEmpty) ...[
@@ -1234,22 +1120,25 @@ class _AddonsScreenState extends State<AddonsScreen> {
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: _OrDivider(),
               ),
-              for (final option in options)...[
+              for (final option in options) ...[
                 _PaymentMethodTile(
                   type: true,
                   flag: _currencyInfo(option.currency)?.flag ?? '🌐',
-                  title: '${_providerName(option.gateway)} · ${option.currency}',
-                  subtitle: 'Amount to pay · ${_checkoutAmount(record, option)}',
-                  onTap: () => Navigator.of(sheetContext).pop(
-                    _PaymentChoice.online(option),
-                  ),
+                  title:
+                      '${_providerName(option.gateway)} · ${option.currency}',
+                  subtitle:
+                      'Amount to pay · ${_checkoutAmount(record, option)}',
+                  onTap: () =>
+                      Navigator.of(sheetContext)
+                          .pop(_PaymentChoice.online(option)),
                 ),
               ],
             ] else ...[
               const SizedBox(height: 10),
               Text(
                 'Online checkout options are not available for this package right now.',
-                style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(color: _AddonColors.muted),
+                style: Theme.of(sheetContext).textTheme.bodySmall
+                    ?.copyWith(color: _AddonColors.muted),
               ),
             ],
             const SizedBox(height: 9),
@@ -1265,18 +1154,13 @@ class _AddonsScreenState extends State<AddonsScreen> {
     }
   }
 
-  IconData _gatewayIcon(String gateway) => switch (gateway.toLowerCase()) {
-    'paystack' => Icons.credit_card_rounded,
-    'flutterwave' => Icons.bolt_rounded,
-    'korapay' => Icons.account_balance_rounded,
-    'bachs' => Icons.payment_rounded,
-    _ => Icons.lock_outline_rounded,
-  };
-
   Future<void> _payWithWallet(Map<String, dynamic> record) async {
     final addonId = _addonId(record);
     if (addonId == null) {
-      _message('This add-on is missing its package ID. Please refresh.', error: true);
+      _message(
+        'This add-on is missing its package ID. Please refresh.',
+        error: true,
+      );
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
@@ -1309,7 +1193,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Wallet payment could not be completed. Try an online method.'),
+          content: Text(
+            'Wallet payment could not be completed. Try an online method.',
+          ),
           backgroundColor: _AddonColors.danger,
         ),
       );
@@ -1324,7 +1210,10 @@ class _AddonsScreenState extends State<AddonsScreen> {
   ) async {
     final addonId = _addonId(record);
     if (addonId == null) {
-      _message('This add-on is missing its package ID. Please refresh.', error: true);
+      _message(
+        'This add-on is missing its package ID. Please refresh.',
+        error: true,
+      );
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
@@ -1339,9 +1228,8 @@ class _AddonsScreenState extends State<AddonsScreen> {
       );
       if (!mounted) return;
       final payload = _map(response['data']);
-      final intent = payload['payment_intent_id'] ??
-          payload['intent_id'] ??
-          payload['id'];
+      final intent =
+          payload['payment_intent_id'] ?? payload['intent_id'] ?? payload['id'];
       final checkoutUrl = _checkoutUrl(payload);
       if (intent != null) {
         setState(() {
@@ -1358,7 +1246,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
         if (!launched) {
           messenger.showSnackBar(
             const SnackBar(
-              content: Text('Could not open the payment page. Use Check payment after retrying.'),
+              content: Text(
+                'Could not open the payment page. Use Check payment after retrying.',
+              ),
               backgroundColor: _AddonColors.danger,
             ),
           );
@@ -1366,26 +1256,36 @@ class _AddonsScreenState extends State<AddonsScreen> {
         }
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Checkout opened. Return here and tap Check payment when finished.'),
+            content: Text(
+              'Checkout opened. Return here and tap Check payment when finished.',
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else if (_isPaid(response)) {
         await _refresh();
-        if (mounted) messenger.showSnackBar(
-          const SnackBar(content: Text('Proxy add-on activated successfully.')),
-        );
+        if (mounted)
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Proxy add-on activated successfully.'),
+            ),
+          );
       } else if (intent != null) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Payment started. Tap Check payment when you finish.'),
+            content: Text(
+              'Payment started. Tap Check payment when you finish.',
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
       } else {
         messenger.showSnackBar(
           SnackBar(
-            content: Text(response['message']?.toString() ?? 'Checkout response was incomplete.'),
+            content: Text(
+              response['message']?.toString() ??
+                  'Checkout response was incomplete.',
+            ),
             backgroundColor: _AddonColors.danger,
           ),
         );
@@ -1403,7 +1303,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Secure checkout could not be started. Please try again.'),
+          content: Text(
+            'Secure checkout could not be started. Please try again.',
+          ),
           backgroundColor: _AddonColors.danger,
         ),
       );
@@ -1413,7 +1315,8 @@ class _AddonsScreenState extends State<AddonsScreen> {
   }
 
   Uri? _checkoutUrl(Map<String, dynamic> payload) {
-    final raw = payload['checkout_url'] ??
+    final raw =
+        payload['checkout_url'] ??
         payload['payment_url'] ??
         payload['authorization_url'] ??
         payload['url'];
@@ -1424,7 +1327,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
 
   bool _isPaid(Map<String, dynamic> response) {
     final data = _map(response['data']);
-    final status = (data['status'] ?? response['status'])?.toString().toLowerCase();
+    final status = (data['status'] ?? response['status'])
+        ?.toString()
+        .toLowerCase();
     return status == 'active' || status == 'paid' || status == 'success';
   }
 
@@ -1450,19 +1355,26 @@ class _AddonsScreenState extends State<AddonsScreen> {
         await _refresh();
         if (!mounted) return;
         messenger.showSnackBar(
-          const SnackBar(content: Text('Payment confirmed. Proxy access is active.')),
+          const SnackBar(
+            content: Text('Payment confirmed. Proxy access is active.'),
+          ),
         );
       } else {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Payment is still processing. Check again in a moment.'),
+            content: Text(
+              'Payment is still processing. Check again in a moment.',
+            ),
           ),
         );
       }
     } on AuthException catch (error) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text(error.message), backgroundColor: _AddonColors.danger),
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: _AddonColors.danger,
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -1489,10 +1401,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
     return null;
   }
 
-int _integer(Object? value, {int fallback = 0}) =>
-    value is num
-        ? value.toInt()
-        : int.tryParse(value?.toString() ?? '') ?? fallback;
+  int _integer(Object? value, {int fallback = 0}) => value is num
+      ? value.toInt()
+      : int.tryParse(value?.toString() ?? '') ?? fallback;
 }
 
 class _ApiOutcome {
@@ -1612,7 +1523,7 @@ class _AccountHeader extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'ADD-ON CONTROL CENTER',
+                          'TLSTORE CONTROL CENTER',
                           style: TextStyle(
                             color: Colors.black.withValues(alpha: .78),
                             fontSize: 10,
@@ -1625,19 +1536,15 @@ class _AccountHeader extends StatelessWidget {
                   ),
                   if (emailVerified) ...[
                     const SizedBox(width: 5),
-                    const Icon(Icons.verified_rounded, size: 20, color: Colors.black),
+                    const Icon(
+                      Icons.verified_rounded,
+                      size: 20,
+                      color: Colors.black,
+                    ),
                   ],
                 ],
               ),
               const SizedBox(height: 17),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _HeaderTag(icon: Icons.public_rounded, label: country.isEmpty ? 'Location not set' : country),
-                  _HeaderTag(icon: Icons.inventory_2_outlined, label: '$activePackageCount Packages'),
-                ],
-              ),
               const SizedBox(height: 15),
               Text(
                 'Manage your account proxies, assigned IP Address, Phone numbers and package-linked proxy access.',
@@ -1704,14 +1611,26 @@ class _SummaryRow extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 380;
     final values = [
-      _SummaryMetric('Active proxies', '$activeAddons', Icons.shield_rounded, _AddonColors.green),
-      _SummaryMetric('Wallet · $walletCurrency', walletBalance, Icons.account_balance_wallet_outlined, _AddonColors.amber),
+      _SummaryMetric(
+        'Active proxies',
+        '$activeAddons',
+        Icons.shield_rounded,
+        _AddonColors.green,
+      ),
+      _SummaryMetric(
+        'Wallet · $walletCurrency',
+        walletBalance,
+        Icons.account_balance_wallet_outlined,
+        _AddonColors.amber,
+      ),
     ];
     return Row(
       children: [
         for (var index = 0; index < values.length; index++) ...[
           if (index > 0) const SizedBox(width: 8),
-          Expanded(child: _MetricCard(metric: values[index], compact: compact)),
+          Expanded(
+            child: _MetricCard(metric: values[index], compact: compact),
+          ),
         ],
       ],
     );
@@ -1781,7 +1700,11 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _SectionHeading extends StatelessWidget {
-  const _SectionHeading({required this.eyebrow, required this.title, required this.subtitle});
+  const _SectionHeading({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+  });
   final String eyebrow;
   final String title;
   final String subtitle;
@@ -1802,18 +1725,14 @@ class _SectionHeading extends StatelessWidget {
       const SizedBox(height: 4),
       Text(
         title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: _AddonColors.ink,
-          fontWeight: FontWeight.w900,
-        ),
+        style: Theme.of(context).textTheme.titleLarge
+            ?.copyWith(color: _AddonColors.ink, fontWeight: FontWeight.w900),
       ),
       const SizedBox(height: 4),
       Text(
         subtitle,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: _AddonColors.muted,
-          height: 1.45,
-        ),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: _AddonColors.muted, height: 1.45),
       ),
     ],
   );
@@ -1883,7 +1802,11 @@ class _FeaturePill extends StatelessWidget {
 }
 
 class _InlineNotice extends StatelessWidget {
-  const _InlineNotice({required this.message, required this.icon, this.onRetry});
+  const _InlineNotice({
+    required this.message,
+    required this.icon,
+    this.onRetry,
+  });
   final String message;
   final IconData icon;
   final VoidCallback? onRetry;
@@ -1944,13 +1867,20 @@ class _EmptyAddons extends StatelessWidget {
         const SizedBox(height: 11),
         const Text(
           'No proxy add-ons yet',
-          style: TextStyle(color: _AddonColors.ink, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            color: _AddonColors.ink,
+            fontWeight: FontWeight.w900,
+          ),
         ),
         const SizedBox(height: 5),
         const Text(
           'Once a proxy add-on is attached to one of your review packages, its locations, IPs, and renewal dates will appear here.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: _AddonColors.muted, height: 1.45, fontSize: 12),
+          style: TextStyle(
+            color: _AddonColors.muted,
+            height: 1.45,
+            fontSize: 12,
+          ),
         ),
       ],
     ),
@@ -1970,7 +1900,11 @@ class _AddonsLoading extends StatelessWidget {
 }
 
 class _MarketplaceCard extends StatelessWidget {
-  const _MarketplaceCard({required this.subscription, required this.plan, required this.dateFormatter});
+  const _MarketplaceCard({
+    required this.subscription,
+    required this.plan,
+    required this.dateFormatter,
+  });
   final Map<String, dynamic> subscription;
   final Map<String, dynamic> plan;
   final String Function(Object?) dateFormatter;
@@ -1984,7 +1918,8 @@ class _MarketplaceCard extends StatelessWidget {
       'group_c' => 'iOS app reviews',
       _ => 'Marketplace package',
     };
-    final name = plan['name']?.toString() ??
+    final name =
+        plan['name']?.toString() ??
         subscription['plan_name']?.toString() ??
         'Active package';
     final endDate = dateFormatter(subscription['ends_at']);
@@ -2005,7 +1940,9 @@ class _MarketplaceCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
-              groupKey == 'group_a' ? Icons.campaign_outlined : Icons.rate_review_outlined,
+              groupKey == 'group_a'
+                  ? Icons.campaign_outlined
+                  : Icons.rate_review_outlined,
               color: _AddonColors.green,
               size: 20,
             ),
@@ -2015,9 +1952,25 @@ class _MarketplaceCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, color: _AddonColors.ink)),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: _AddonColors.ink,
+                  ),
+                ),
                 const SizedBox(height: 3),
-                Text('$groupName · Valid until $endDate', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _AddonColors.muted, fontSize: 11)),
+                Text(
+                  '$groupName · Valid until $endDate',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _AddonColors.muted,
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),
@@ -2047,7 +2000,11 @@ class _NoPackagesCard extends StatelessWidget {
         Expanded(
           child: Text(
             'No active app review package is linked to this account.',
-            style: TextStyle(color: _AddonColors.muted, height: 1.4, fontSize: 12),
+            style: TextStyle(
+              color: _AddonColors.muted,
+              height: 1.4,
+              fontSize: 12,
+            ),
           ),
         ),
       ],
@@ -2056,7 +2013,11 @@ class _NoPackagesCard extends StatelessWidget {
 }
 
 class _PendingPaymentCard extends StatelessWidget {
-  const _PendingPaymentCard({required this.addonName, required this.onCheck, required this.loading});
+  const _PendingPaymentCard({
+    required this.addonName,
+    required this.onCheck,
+    required this.loading,
+  });
   final String? addonName;
   final VoidCallback onCheck;
   final bool loading;
@@ -2076,14 +2037,22 @@ class _PendingPaymentCard extends StatelessWidget {
         Expanded(
           child: Text(
             '${addonName ?? 'Proxy'} payment is awaiting confirmation.',
-            style: const TextStyle(color: _AddonColors.ink, fontSize: 12, height: 1.35),
+            style: const TextStyle(
+              color: _AddonColors.ink,
+              fontSize: 12,
+              height: 1.35,
+            ),
           ),
         ),
         const SizedBox(width: 6),
         TextButton(
           onPressed: loading ? null : onCheck,
           child: loading
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Check'),
         ),
       ],
@@ -2092,7 +2061,14 @@ class _PendingPaymentCard extends StatelessWidget {
 }
 
 class _PaymentMethodTile extends StatelessWidget {
-  const _PaymentMethodTile({this.icon, required this.title, required this.subtitle, required this.onTap, required this.type, this.flag});
+  const _PaymentMethodTile({
+    this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.type,
+    this.flag,
+  });
   final IconData? icon;
   final String title;
   final String subtitle;
@@ -2111,11 +2087,8 @@ class _PaymentMethodTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(13),
       ),
       child: type
-        ? Text(
-            flag ?? '',
-            style: const TextStyle(fontSize: 26),
-          )
-        : Icon(icon, color: _AddonColors.greenDark),
+          ? Text(flag ?? '', style: const TextStyle(fontSize: 26))
+          : Icon(icon, color: _AddonColors.greenDark),
     ),
     title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
     subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
@@ -2133,7 +2106,13 @@ class _OrDivider extends StatelessWidget {
       const Expanded(child: Divider()),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Text('OR', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: _AddonColors.muted, fontWeight: FontWeight.w800)),
+        child: Text(
+          'OR',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: _AddonColors.muted,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
       const Expanded(child: Divider()),
     ],
@@ -2141,7 +2120,12 @@ class _OrDivider extends StatelessWidget {
 }
 
 class _DetailLine extends StatelessWidget {
-  const _DetailLine({required this.icon, required this.label, required this.value, this.selectable = false});
+  const _DetailLine({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.selectable = false,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -2157,12 +2141,29 @@ class _DetailLine extends StatelessWidget {
         const SizedBox(width: 10),
         SizedBox(
           width: 100,
-          child: Text(label, style: const TextStyle(color: _AddonColors.muted, fontSize: 12)),
+          child: Text(
+            label,
+            style: const TextStyle(color: _AddonColors.muted, fontSize: 12),
+          ),
         ),
         Expanded(
           child: selectable
-              ? SelectableText(value, style: const TextStyle(color: _AddonColors.ink, fontSize: 12, fontWeight: FontWeight.w700))
-              : Text(value, style: const TextStyle(color: _AddonColors.ink, fontSize: 12, fontWeight: FontWeight.w700)),
+              ? SelectableText(
+                  value,
+                  style: const TextStyle(
+                    color: _AddonColors.ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              : Text(
+                  value,
+                  style: const TextStyle(
+                    color: _AddonColors.ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
         ),
       ],
     ),
