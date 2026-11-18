@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../core/currency/money.dart';
 import '../services/auth_api.dart';
+import '../utils/receipt_delivery.dart';
 import '../widgets/auth_components.dart';
+import '../widgets/withdrawal_receipt_dialog.dart';
 
 class PayoutScreen extends StatefulWidget {
   const PayoutScreen({
@@ -440,6 +442,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
                             child: _PayoutRow(
                               request: r,
                               api: widget.api,
+                              token: widget.token,
                               preferredCurrency: _preferredCurrency,
                             ),
                           ),
@@ -1218,11 +1221,27 @@ class _PayoutRow extends StatelessWidget {
   const _PayoutRow({
     required this.request,
     required this.api,
+    required this.token,
     required this.preferredCurrency,
   });
   final Map<String, dynamic> request;
   final AuthApi api;
+  final String token;
   final String preferredCurrency;
+
+  Future<void> _openReceipt(BuildContext context) async {
+    await showWithdrawalReceiptDialog(
+      context,
+      withdrawal: request,
+      appName: 'Receipt',
+      logoAsset: 'assets/others/logolong.png',
+      api: api,
+      token: token,
+      receiptPath: (receipt) => 'withdrawals/${receipt.id}/receipt',
+      onReceiptReady: (receipt, bytes, fileName) =>
+          deliverPdfReceipt(bytes, fileName),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1242,10 +1261,15 @@ class _PayoutRow extends StatelessWidget {
         request['requested_at']?.toString() ??
         request['created_at']?.toString();
     final color = _statusColor(context, status.toLowerCase());
-    return Container(
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(17),
+      child: InkWell(
+        onTap: () => _openReceipt(context),
+        borderRadius: BorderRadius.circular(17),
+        child: Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(17),
       border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
@@ -1374,6 +1398,8 @@ class _PayoutRow extends StatelessWidget {
             ),
           ],
         ],
+      ),
+      ),
       ),
     );
   }

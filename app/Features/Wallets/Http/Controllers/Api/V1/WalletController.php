@@ -4,6 +4,7 @@ namespace App\Features\Wallets\Http\Controllers\Api\V1;
 
 use App\Application\Actions\Wallets\RequestWithdrawal;
 use App\Application\Actions\Wallets\TransferTopupFunds;
+use App\Application\Receipts\WithdrawalReceiptPdf;
 use App\Application\Security\SecurityPinHasher;
 use App\Models\LedgerEntry;
 use App\Models\Wallet;
@@ -96,7 +97,23 @@ final class WalletController
 
     public function withdrawals(Request $request): JsonResponse
     {
-        return response()->json(['data' => $request->user()->withdrawalRequests()->with(['option', 'userSubscription.plan.group'])->latest()->paginate(30)]);
+        return response()->json(['data' => $request->user()->withdrawalRequests()->with(['option', 'wallet', 'userSubscription.plan.group'])->latest()->paginate(30)]);
+    }
+
+    public function withdrawalReceipt(Request $request, int $withdrawal, WithdrawalReceiptPdf $receiptPdf)
+    {
+        $item = $request->user()->withdrawalRequests()
+            ->with(['option', 'wallet', 'user:id,full_name', 'userSubscription.plan.group'])
+            ->findOrFail($withdrawal);
+
+        $filename = $receiptPdf->fileName($item);
+
+        return response($receiptPdf->render($item), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
 }

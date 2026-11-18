@@ -137,6 +137,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/wallets/topup-transfer', [WalletController::class, 'transfer'])->name('api.v1.wallets.topup-transfer');
         Route::get('/withdrawal-options', [WalletController::class, 'withdrawalOptions'])->name('api.v1.withdrawal-options.index');
         Route::get('/withdrawals', [WalletController::class, 'withdrawals'])->name('api.v1.withdrawals.index');
+        Route::get('/withdrawals/{withdrawal}/receipt', [WalletController::class, 'withdrawalReceipt'])->name('api.v1.withdrawals.receipt');
         Route::post('/withdrawals', [WalletController::class, 'requestWithdrawal'])->middleware('throttle:withdrawal-request')->name('api.v1.withdrawals.store');
         Route::post('/subscriptions', [SubscriptionController::class, 'purchase'])->name('api.v1.subscriptions.purchase');
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout'])->name('api.v1.subscriptions.checkout');
