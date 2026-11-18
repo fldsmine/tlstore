@@ -128,4 +128,7 @@ others.
   rule; that is the validator doing its job. Lowering `require_images` to `false` keeps the
   remote URLs instead of the run failing.
 - The command never edits existing entries. New campaigns are activated with a reward pool of
-  `review_reward × maximum_review`, tied to the latest published questionnaire version.
+  `review_reward × maximum_review` and assigned to the least-used published questionnaire
+  template. If a template has multiple published versions, its latest published version is used.
+  Counts include previous AI-generated campaigns, so assignments stay balanced across batches
+  and daily runs; ties are resolved by template ID for predictable selection.

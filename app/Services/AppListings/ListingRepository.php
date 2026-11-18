@@ -8,6 +8,7 @@ use App\Application\Money\CurrencyMinorUnits;
 use App\Models\App as StoreApp;
 use App\Models\AppReviewCampaign;
 use App\Models\ReviewTemplateVersion;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -23,15 +24,20 @@ class ListingRepository
             ->all();
     }
 
-    public function publishedTemplateVersion(): ?ReviewTemplateVersion
+    /** @return Collection<int, ReviewTemplateVersion> */
+    public function publishedTemplateVersions(): Collection
     {
-        return ReviewTemplateVersion::query()
+        $versions = ReviewTemplateVersion::query()
+            ->with('template:id,name')
             ->where('status', 'published')
             ->whereNotNull('published_at')
             ->whereHas('questions')
-            ->orderByDesc('published_at')
-            ->orderByDesc('id')
-            ->first();
+            ->get();
+
+        return $versions->groupBy('review_template_id')
+            ->map(static fn (Collection $items): ReviewTemplateVersion => $items->sortByDesc('version')->first())
+            ->sortBy('review_template_id')
+            ->values();
     }
 
     /**
@@ -39,28 +45,55 @@ class ListingRepository
      * makes it visible and claimable through the current marketplace API.
      *
      * @param  array<int, array<string, mixed>>  $listings
-     * @return array<int, array{app_id:int,campaign_id:int,name:string}>
+     * @return array<int, array{app_id:int,campaign_id:int,name:string,template_version_id:int,template_version:int,template_name:string}>
      */
-    public function store(array $listings, ReviewTemplateVersion $templateVersion): array
+    public function store(array $listings): array
     {
         if ($listings === []) {
             return [];
         }
 
-        $created = DB::transaction(function () use ($listings, $templateVersion): array {
-            $template = ReviewTemplateVersion::query()
-                ->whereKey($templateVersion->id)
+        $created = DB::transaction(function () use ($listings): array {
+            $publishedVersions = ReviewTemplateVersion::query()
+                ->with('template:id,name')
                 ->where('status', 'published')
                 ->whereNotNull('published_at')
                 ->whereHas('questions')
-                ->first();
+                ->lockForUpdate()
+                ->get();
+            $templates = $publishedVersions->groupBy('review_template_id')
+                ->map(static fn (Collection $items): ReviewTemplateVersion => $items->sortByDesc('version')->first())
+                ->sortBy('review_template_id')
+                ->values();
 
-            if (! $template) {
-                throw new RuntimeException('The selected published review-question template is no longer available.');
+            if ($templates->isEmpty()) {
+                throw new RuntimeException('No published review-question templates are available.');
             }
+
+            $templateIds = $templates->pluck('review_template_id')->all();
+            $generatedCounts = DB::table('app_review_campaigns')
+                ->join('review_template_versions', 'app_review_campaigns.review_template_version_id', '=', 'review_template_versions.id')
+                ->where('app_review_campaigns.campaign_key', 'like', 'ai-review-%')
+                ->whereIn('review_template_versions.review_template_id', $templateIds)
+                ->selectRaw('review_template_versions.review_template_id, COUNT(*) as campaign_count')
+                ->groupBy('review_template_versions.review_template_id')
+                ->pluck('campaign_count', 'review_template_versions.review_template_id')
+                ->map(static fn ($count): int => (int) $count)
+                ->all();
 
             $result = [];
             foreach ($listings as $listing) {
+                $template = $templates->sort(static function (ReviewTemplateVersion $left, ReviewTemplateVersion $right) use ($generatedCounts): int {
+                    $leftCount = $generatedCounts[$left->review_template_id] ?? 0;
+                    $rightCount = $generatedCounts[$right->review_template_id] ?? 0;
+
+                    return $leftCount <=> $rightCount ?: $left->review_template_id <=> $right->review_template_id;
+                })->first();
+
+                if (! $template) {
+                    throw new RuntimeException('Could not choose a published review-question template.');
+                }
+
                 $currency = strtoupper((string) $listing['currency']);
                 $rewardMinor = CurrencyMinorUnits::toMinor((string) $listing['review_reward'], $currency);
                 $maximum = (int) $listing['maximum_review'];
@@ -120,11 +153,15 @@ class ListingRepository
                     'starts_at' => now(),
                     'ends_at' => null,
                 ]);
+                $generatedCounts[$template->review_template_id] = ($generatedCounts[$template->review_template_id] ?? 0) + 1;
 
                 $result[] = [
                     'app_id' => $app->id,
                     'campaign_id' => $campaign->id,
                     'name' => $app->name,
+                    'template_version_id' => $template->id,
+                    'template_version' => (int) $template->version,
+                    'template_name' => $template->template?->name ?? 'Review template',
                 ];
             }
 

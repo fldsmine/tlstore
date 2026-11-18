@@ -33,10 +33,10 @@ class GenerateAppListingsCommand extends Command
         $requireImages = (bool) $this->option('require-images')
             || (bool) config('ai-listings.require_images', true);
         $existing = $repository->existing();
-        $templateVersion = $repository->publishedTemplateVersion();
+        $templateVersions = $repository->publishedTemplateVersions();
 
-        if (! $templateVersion) {
-            $this->error('Cannot generate listings: create and publish a review questionnaire with at least one question first.');
+        if ($templateVersions->isEmpty()) {
+            $this->error('Cannot generate listings: publish at least one review-question template with questions first.');
 
             return self::FAILURE;
         }
@@ -107,7 +107,7 @@ class GenerateAppListingsCommand extends Command
         }
 
         try {
-            $created = $repository->store($listings, $templateVersion);
+            $created = $repository->store($listings);
         } catch (Throwable $error) {
             $this->error('Could not save the listings to the database: '.AgentClient::describe($error));
 
@@ -120,11 +120,12 @@ class GenerateAppListingsCommand extends Command
         ));
 
         $this->table(
-            ['App ID', 'Campaign ID', 'Name'],
+            ['App ID', 'Campaign ID', 'Name', 'Question template'],
             array_map(static fn (array $record): array => [
                 $record['app_id'],
                 $record['campaign_id'],
                 $record['name'],
+                $record['template_name'].' (v'.$record['template_version'].')',
             ], $created),
         );
 

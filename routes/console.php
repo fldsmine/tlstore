@@ -19,9 +19,9 @@ Schedule::command('demo:generate-listings')
     ->dailyAt('00:20')
     ->environments(['local', 'testing', 'staging'])
     ->withoutOverlapping();
+	
 Schedule::command('app:auto-approve-ad-shares')
     ->everyMinute()
-    ->environments(['local', 'testing', 'staging'])
     ->withoutOverlapping();
 Schedule::command('app:auto-approve-app-reviews')
     ->everyMinute()
