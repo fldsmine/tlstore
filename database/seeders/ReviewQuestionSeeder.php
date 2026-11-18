@@ -104,7 +104,7 @@ class ReviewQuestionSeeder extends Seeder
     }
 
     /**
-     * Models without a "template" block (the demo set) are seeded elsewhere,
+     * Models without a "template" block are seeded elsewhere,
      * so they are skipped here.
      */
     private function seedTemplate(array $model): void

@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  *   2026_11_05_090000_create_user_ranking_tables                   (setting only)
  *   2026_11_09_090000_seed_account_validation_provider_setting
  *
- * About-page copy is owned by AboutPageSettingsSeeder; demo values for the
+ * About-page copy is owned by AboutPageSettingsSeeder; values for the
  * payment settings are applied afterwards by DemoAdminSeeder (local only).
  *
  * Only DB is used (no models), so this runs on a fresh install. Every insert is
@@ -94,9 +94,14 @@ class SystemSettingSeeder extends Seeder
             'rewards.social_follow_active' => [true, false],
             'rewards.user_ranking_active' => [true, true],
 
+            // Referral withdrawals are available every day by default;
+            // bonus-wallet withdrawals remain closed until an admin enables them.
+            'withdrawal.wallet.referral' => [['active' => true], false],
+            'withdrawal.wallet.bonus' => [['active' => false], false],
+
             // --- app auto-approval delays (minutes) ----------------------
-            'app.auto_approve_ads.delay_minutes' => [2, false],
-            'app.auto_approve_reviews.delay_minutes' => [5, false],
+            'app.auto_approve_ads.delay_minutes' => [4, false],
+            'app.auto_approve_reviews.delay_minutes' => [7, false],
 
             // --- user campaign order pricing (amounts are NGN per action) --
             'campaign.services' => [[

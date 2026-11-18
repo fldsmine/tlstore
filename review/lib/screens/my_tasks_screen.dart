@@ -125,7 +125,9 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     }
 
     final entries = <Map<String, dynamic>>[];
+    final representedReviewTasks = <String>{};
     for (final task in _sources[0]) {
+      representedReviewTasks.add(_id(task['id']));
       final status = byTask['review:${_id(task['id'])}'];
       final campaign = _map(task['campaign']);
       final app = _map(campaign?['app']);
@@ -148,6 +150,30 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
           decision: _lastDecision(status),
           task: task,
           canResume: _canResumeReview(task, status),
+        ),
+      );
+    }
+    // Submitted reviews are excluded from /me/review-tasks by the API, so
+    // include them from /me/review-submissions in this same activity list.
+    for (final submission in _sources[1]) {
+      final taskId = _id(submission['review_task_id'] ?? submission['task_id']);
+      if (taskId.isEmpty || representedReviewTasks.contains(taskId)) continue;
+      final task = _map(submission['task']);
+      if (task == null) continue;
+      final campaign = _map(task['campaign']);
+      final app = _map(campaign?['app']);
+      entries.add(
+        _entry(
+          id: 'review:$taskId',
+          title:
+              app?['name']?.toString() ??
+              campaign?['title']?.toString() ??
+              'App review',
+          kind: 'App review',
+          status: submission['status']?.toString() ?? 'pending_review',
+          date: submission['submitted_at'] ?? task['completed_at'] ?? task['claimed_at'],
+          decision: _lastDecision(submission),
+          task: task,
         ),
       );
     }

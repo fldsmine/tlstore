@@ -4,6 +4,7 @@ namespace App\Features\Wallets\Http\Controllers\Api\V1;
 
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\Transaction;
+use App\Models\WithdrawalRequest;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
@@ -56,19 +57,30 @@ final class AccountHistoryController
             : "COALESCE(json_extract(meta, '$.currency'), 'USD')";
         $successRows = (clone $userTransactions)
             ->whereIn('status', ['posted', 'completed', 'success', 'successful', 'approved'])
-            ->selectRaw("{$currencyExpression} as currency, direction, SUM(amount) as total_amount")
-            ->groupBy('currency', 'direction')
+            ->where('direction', 'credit')
+            ->whereIn('type', ['app_review', 'ads_share', 'referral_bonus', 'rank_earning', 'social_follow_reward'])
+            ->selectRaw("{$currencyExpression} as currency, SUM(amount) as total_amount")
+            ->groupBy('currency')
             ->get();
         $earnedByCurrency = [];
-        $spentByCurrency = [];
         foreach ($successRows as $row) {
             $currency = strtoupper((string) $row->currency);
             $amountMinor = CurrencyMinorUnits::toMinor((float) $row->total_amount, $currency);
-            if ($row->direction === 'credit') {
-                $earnedByCurrency[$currency] = ($earnedByCurrency[$currency] ?? 0) + $amountMinor;
-            } elseif ($row->direction === 'debit') {
-                $spentByCurrency[$currency] = ($spentByCurrency[$currency] ?? 0) + $amountMinor;
-            }
+            $earnedByCurrency[$currency] = $amountMinor;
+        }
+
+        // Count only withdrawals that were actually paid. Reservations later
+        // rejected by an admin are not platform spending.
+        $withdrawalRows = WithdrawalRequest::query()
+            ->where('user_id', $request->user()->id)
+            ->where('status', 'paid')
+            ->selectRaw('currency, SUM(amount_minor) as total_amount_minor')
+            ->groupBy('currency')
+            ->get();
+        $spentByCurrency = [];
+        foreach ($withdrawalRows as $row) {
+            $currency = strtoupper((string) $row->currency);
+            $spentByCurrency[$currency] = (int) $row->total_amount_minor;
         }
 
         return response()->json([

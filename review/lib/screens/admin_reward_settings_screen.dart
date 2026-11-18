@@ -18,10 +18,15 @@ class _AdminRewardSettingsScreenState extends State<AdminRewardSettingsScreen> {
     'rewards.referral_task_active': 'Referral task rewards',
     'rewards.subscription_bonus_active': 'Subscription welcome bonuses',
     'rewards.social_follow_active': 'Social follow rewards',
+    'withdrawal.wallet.referral': 'Referral wallet withdrawals (available daily)',
+    'withdrawal.wallet.bonus': 'Bonus wallet withdrawals',
   };
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final Map<String, bool> _values = {for (final key in _keys.keys) key: true};
+  final Map<String, bool> _values = {
+    for (final key in _keys.keys)
+      key: key == 'withdrawal.wallet.bonus' ? false : true,
+  };
   String? _token;
   bool _loading = false;
   bool _saving = false;
@@ -81,7 +86,11 @@ class _AdminRewardSettingsScreenState extends State<AdminRewardSettingsScreen> {
           final key = row['setting_key']?.toString();
           if (!_keys.containsKey(key)) continue;
           final raw = row['value'];
-          final value = raw is Map ? raw['enabled'] : raw;
+          final value = raw is Map
+              ? (key?.startsWith('withdrawal.wallet.') == true
+                    ? raw['active']
+                    : raw['enabled'])
+              : raw;
           _values[key!] =
               value == true ||
               value.toString() == '1' ||
@@ -105,7 +114,9 @@ class _AdminRewardSettingsScreenState extends State<AdminRewardSettingsScreen> {
     try {
       for (final entry in _values.entries) {
         await widget.api.put('admin/settings/${entry.key}', token, {
-          'value': entry.value,
+          'value': entry.key.startsWith('withdrawal.wallet.')
+              ? {'active': entry.value}
+              : entry.value,
           'is_public': false,
         });
       }
@@ -121,7 +132,7 @@ class _AdminRewardSettingsScreenState extends State<AdminRewardSettingsScreen> {
   Widget build(BuildContext context) {
     final token = _token;
     return Scaffold(
-      appBar: AppBar(title: const Text('Reward settings')),
+      appBar: AppBar(title: const Text('Rewards & withdrawal settings')),
       body: token == null
           ? _buildLogin()
           : _loading
@@ -142,7 +153,7 @@ class _AdminRewardSettingsScreenState extends State<AdminRewardSettingsScreen> {
                       ),
                     ),
                   const Text(
-                    'Turn each reward program on or off. Referral rates are configured on each subscription plan.',
+                    'Control reward programs and wallet withdrawals. Referral wallet withdrawals are available daily when enabled; bonus wallet withdrawals start disabled.',
                   ),
                   const SizedBox(height: 14),
                   for (final entry in _keys.entries)
@@ -170,7 +181,7 @@ class _AdminRewardSettingsScreenState extends State<AdminRewardSettingsScreen> {
     children: [
       Text('Admin access', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 8),
-      const Text('Sign in with an admin account to manage reward switches.'),
+      const Text('Sign in with an admin account to manage reward and withdrawal switches.'),
       const SizedBox(height: 18),
       TextField(
         controller: _email,

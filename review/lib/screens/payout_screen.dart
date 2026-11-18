@@ -53,7 +53,14 @@ class _PayoutScreenState extends State<PayoutScreen> {
 
   double get _minimumMajor {
     final methodMinimum = double.tryParse(_option?['min_withdrawal']?.toString() ?? '') ?? 0;
-    return math.max(methodMinimum, _packageMinimumMajorInWallet).toDouble();
+    final methodCurrency = _option?['currency']?.toString().toUpperCase() ?? 'USD';
+    final convertedMethodMinimum = widget.api.convertMajor(
+          methodMinimum,
+          methodCurrency,
+          _currency,
+        ) ??
+        (methodCurrency == _currency ? methodMinimum : 0);
+    return math.max(convertedMethodMinimum, _packageMinimumMajorInWallet).toDouble();
   }
 
   int get _digits {
@@ -116,6 +123,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
           .where(
             (w) =>
                 w['type'] != 'topup_fund' &&
+                w['withdrawal_enabled'] != false &&
                 (widget.walletId == null ||
                     (w['id'] as num?)?.toInt() == widget.walletId),
           )

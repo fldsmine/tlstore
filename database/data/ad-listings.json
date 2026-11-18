@@ -1,6 +1,6 @@
 [
   {
-    "campaign_key": "demo-clean-water-ng",
+    "campaign_key": "clean-water-ng",
     "type": "Facebook",
     "featured": true,
     "title": "Help bring clean water closer",
@@ -20,7 +20,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-financial-literacy-gh",
+    "campaign_key": "financial-literacy-gh",
     "type": "WhatsApp",
     "featured": true,
     "title": "Simple money habits for Ghana",
@@ -40,7 +40,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-mobile-safety-ke",
+    "campaign_key": "mobile-safety-ke",
     "type": "Instagram",
     "title": "Stay safer on your phone",
     "description": "A practical checklist for protecting accounts and recognizing suspicious messages.",
@@ -59,7 +59,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-local-food-za",
+    "campaign_key": "local-food-za",
     "type": "TikTok",
     "title": "Discover local food markets",
     "description": "Explore a directory of independent food markets and small producers in South Africa.",
@@ -78,7 +78,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-learning-tools-uk",
+    "campaign_key": "learning-tools-uk",
     "type": "YouTube",
     "title": "Free learning tools for families",
     "description": "Share a collection of free online learning resources for families in the UK.",
@@ -97,7 +97,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-digital-skills-us",
+    "campaign_key": "digital-skills-us",
     "type": "YouTube",
     "title": "Build practical digital skills",
     "description": "An introductory program with self-paced lessons for people building workplace digital skills.",
@@ -116,7 +116,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-energy-saving-global",
+    "campaign_key": "energy-saving-global",
     "type": "X (Twitter)",
     "title": "Small steps to save energy",
     "description": "A general guide to reducing household energy use with simple everyday changes.",
@@ -135,7 +135,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-community-library-gh",
+    "campaign_key": "community-library-gh",
     "type": "Telegram",
     "title": "Support a community reading club",
     "description": "Help a community reading club connect with volunteers and book donors.",
@@ -154,7 +154,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-small-business-ca",
+    "campaign_key": "small-business-ca",
     "type": "Instagram",
     "title": "Find independent businesses nearby",
     "description": "A directory helping people discover independent businesses in their community.",
@@ -173,7 +173,7 @@
     "ends_at": "2027-10-01 00:00:00"
   },
   {
-    "campaign_key": "demo-online-wellbeing-global",
+    "campaign_key": "online-wellbeing-global",
     "type": "Others",
     "title": "Everyday wellbeing resources",
     "description": "A collection of general educational resources about rest, routines, and wellbeing.",

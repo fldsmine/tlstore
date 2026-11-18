@@ -821,7 +821,6 @@ class _QuickSnapshot {
     required this.providerReady,
     required this.services,
     required this.orders,
-    required this.wallet,
   });
 
   final String token;
@@ -829,7 +828,6 @@ class _QuickSnapshot {
   final bool providerReady;
   final List<Map<String, dynamic>> services;
   final List<Map<String, dynamic>> orders;
-  final Map<String, dynamic> wallet;
 
   static _QuickSnapshot? _current;
 
@@ -879,7 +877,6 @@ class _VasHomeScreenState extends State<VasHomeScreen> {
       _providerReady = snapshot.providerReady;
       _services = snapshot.services;
       _orders = snapshot.orders;
-      _topupWallet = snapshot.wallet;
       _loading = false;
     }
     _load();
@@ -950,7 +947,6 @@ class _VasHomeScreenState extends State<VasHomeScreen> {
         providerReady: _providerReady,
         services: _services,
         orders: _orders,
-        wallet: _topupWallet,
       ),
     );
   }

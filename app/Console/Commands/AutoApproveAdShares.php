@@ -41,22 +41,12 @@ class AutoApproveAdShares extends Command
             'failures' => [],
         ];
 
-        if (app()->isProduction()) {
-            $message = 'Demo app-review auto-approval is disabled in production.';
-
-            $this->error($message);
-
-            $report['status'] = 'disabled';
-            $report['message'] = $message;
-
-            $this->writeReport($report, $startedAt);
-
-            return self::FAILURE;
-        }
-
-        $admin = Admin::query()->where('email', 'admin@tlstore.test')->first();
+        $admin = Admin::query()
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->first();
         if (! $admin) {
-            $message = 'Demo admin account is missing. Seed demo data first.';
+            $message = 'Automatic moderation requires at least one active admin account for its audit trail.';
 
             $this->error($message);
 

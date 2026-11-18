@@ -3,13 +3,13 @@
 namespace App\Console\Support;
 
 use App\Application\Actions\Marketplace\DailyShareRevenue;
+use App\Application\Money\CurrencyConverter;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\AdShareTask;
-use App\Models\ExchangeRateSnapshot;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 
-/** Demo-only reward caps derived from the user's active marketplace package. */
+/** Calculates package-aware task rewards and daily share earning caps. */
 final class TaskRewardCalculator
 {
     public function forAdShare(User $user, AdShareTask $task, SubscriptionPlan $plan): ?int
@@ -48,7 +48,9 @@ final class TaskRewardCalculator
         if ($packageReward === null) return $taskRewardMinor;
         $converted = $this->convertMinor($packageReward, $plan->currency, $taskCurrency);
 
-        return $converted === null ? null : max(0, min($taskRewardMinor, $converted));
+        // Review packages set the exact earning per completed review. The app
+        // listing reward is not the user's reward for Group B/C packages.
+        return $converted === null ? null : max(0, $converted);
     }
 
     /** @param list<string> $featureKeys */
@@ -73,45 +75,11 @@ final class TaskRewardCalculator
         $from = strtoupper($from);
         $to = strtoupper($to);
         if ($from === $to) return $amountMinor;
-        $rate = $this->rate($from, $to);
-        if ($rate === null) return null;
-
-        return CurrencyMinorUnits::toMinor(
-            CurrencyMinorUnits::fromMinor($amountMinor, $from) * $rate,
-            $to,
-        );
-    }
-
-    private function rate(string $from, string $to): ?float
-    {
-        $direct = $this->latestRate($from, $to);
-        if ($direct !== null) return $direct;
-        $inverse = $this->latestRate($to, $from);
-        if ($inverse !== null && $inverse > 0) return 1 / $inverse;
-
-        if ($from !== 'USD' && $to !== 'USD') {
-            $fromUsd = $this->latestRate($from, 'USD');
-            $usdTo = $this->latestRate('USD', $to);
-            if ($fromUsd !== null && $usdTo !== null) return $fromUsd * $usdTo;
-            $inverseFromUsd = $this->latestRate('USD', $from);
-            $inverseUsdTo = $this->latestRate($to, 'USD');
-            if ($inverseFromUsd !== null && $inverseUsdTo !== null && $inverseFromUsd > 0 && $inverseUsdTo > 0) {
-                return (1 / $inverseFromUsd) * (1 / $inverseUsdTo);
-            }
+        try {
+            return app(CurrencyConverter::class)
+                ->convertMinor($amountMinor, $from, $to)['amount_minor'];
+        } catch (\Illuminate\Validation\ValidationException) {
+            return null;
         }
-
-        return null;
-    }
-
-    private function latestRate(string $base, string $quote): ?float
-    {
-        $rate = ExchangeRateSnapshot::query()
-            ->where('base_currency', $base)
-            ->where('quote_currency', $quote)
-            ->orderByDesc('fetched_at')
-            ->orderByDesc('id')
-            ->value('rate');
-
-        return $rate !== null && (float) $rate > 0 ? (float) $rate : null;
     }
 }

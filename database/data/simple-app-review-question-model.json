@@ -149,6 +149,15 @@
           "hint": "At least 15 words. Don't copy the store description.",
           "type": "long_text",
           "min_words": 15
+        },
+        {
+          "key": "dev",
+          "order": 3,
+          "prompt": "Can you say you trust the details of the developer displayed?",
+          "hint": "Check the developer name, website, privacy policy and support email.",
+          "type": "single_choice",
+          "options": ["Yes, I could verify them", "Partly, some details are missing", "No, I couldn't verify them"],
+          "risk_option_indexes": [2]
         }
       ]
     }

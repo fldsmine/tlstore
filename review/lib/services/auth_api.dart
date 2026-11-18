@@ -147,11 +147,9 @@ class AuthApi {
   Future<List<Map<String, dynamic>>>? _faqsInFlight;
   String _preferredCurrency = 'USD';
 
-  // VAS responses are cached for an hour so reopening a screen paints instantly
-  // instead of re-fetching the catalog, wallet balance and order activity every
-  // time. Provider prices are stable over short intervals, so the catalog and
-  // plan lists stay warm; a completed purchase clears only the wallet and order
-  // entries so the next visit still shows the new balance and activity.
+  // VAS catalog and order responses can stay warm while provider data remains
+  // stable. Wallet balances are always fetched live because they can change
+  // after rewards, admin adjustments, transfers, or payments.
   static const _vasCacheTtl = Duration(hours: 12);
   static const _vasCacheIndexKey = 'trustlens.vas.cache.index.v1';
   final Map<String, _CacheEntry> _vasCache = {};
@@ -1097,17 +1095,13 @@ class AuthApi {
     return decoded;
   }
 
-  /// Wallet balances, cached for an hour. Purchases, top-ups and settlements
-  /// invalidate this entry so the next visit re-reads the live balance.
+  /// Wallet balances are financial state and must come from the API on every
+  /// read. Do not serve an old cached balance after rewards or admin changes.
   Future<List<Map<String, dynamic>>> wallets(
     String token, {
     bool forceRefresh = false,
   }) async {
-    final value = await _cachedValue(
-      _vasCacheKey('vas.wallets'),
-      () => _request('GET', 'wallets', token: token),
-      forceRefresh: forceRefresh,
-    );
+    final value = await _request('GET', 'wallets', token: token);
     return _asJsonRows(_asJsonObject(value)['data']);
   }
 

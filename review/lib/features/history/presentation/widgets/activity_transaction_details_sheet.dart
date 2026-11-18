@@ -30,6 +30,11 @@ class _ActivityTransactionDetailsSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final direction = transaction['direction']?.toString().toLowerCase() ?? '';
+
+    final status = transaction['status']?.toString().toLowerCase() ?? 'Unknown';
+    final isPending = status == 'pending';
+    final isRejected = status == 'rejected';
+
     final credit = direction == 'credit';
     final accent = credit ? colors.primary : colors.error;
     final description = transaction['description']?.toString().trim() ?? '';
@@ -42,7 +47,6 @@ class _ActivityTransactionDetailsSheet extends StatelessWidget {
     final dateLabel = createdAt == null
         ? 'Date unavailable'
         : '${_monthName(createdAt.month)} ${createdAt.day}, ${createdAt.year} · ${_time(createdAt)}';
-    final status = transaction['status']?.toString() ?? 'Unknown';
 
     final details = <(String, String)>[
       ('Type', _humanize(rawType)),
@@ -79,7 +83,11 @@ class _ActivityTransactionDetailsSheet extends StatelessWidget {
                   height: 48,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: colors.surfaceContainerHighest,
+					  color: isPending
+					  ? colors.tertiaryContainer.withValues(alpha: .25)
+					  : isRejected
+						  ? colors.errorContainer.withValues(alpha: .45)
+						  : colors.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -123,8 +131,15 @@ class _ActivityTransactionDetailsSheet extends StatelessWidget {
                   : ''}$displayAmount',
               textAlign: TextAlign.center,
               style: theme.textTheme.headlineMedium?.copyWith(
-                color: accent,
+                  color: isPending
+					? colors.error.withValues(alpha: .4)
+					: isRejected
+						? colors.error.withValues(alpha: .6)
+						: accent,
                 fontWeight: FontWeight.w900,
+				decoration: (isPending || isRejected)
+				 ? TextDecoration.lineThrough
+				 : TextDecoration.none,
                 letterSpacing: -.5,
               ),
             ),
@@ -132,7 +147,11 @@ class _ActivityTransactionDetailsSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 15),
               decoration: BoxDecoration(
-                color: colors.surfaceContainerLow,
+			  color: isPending
+			  ? colors.tertiaryContainer.withValues(alpha: .15)
+			  : isRejected
+				  ? colors.errorContainer.withValues(alpha: .15)
+				  : colors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: colors.outlineVariant),
               ),

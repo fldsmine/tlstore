@@ -140,6 +140,15 @@
           "options": ["1", "2", "3", "4"],
           "is_attention_check": true,
           "attention_check_answer": "3"
+        },
+        {
+          "key": "dev",
+          "order": 4,
+          "prompt": "Does the development them look real and legitimate?",
+          "hint": "Check the developer name, website, privacy policy and support email.",
+          "type": "single_choice",
+          "options": ["Yes, I could verify them", "Partly, some details are missing", "No, I couldn't verify them"],
+          "risk_option_indexes": [2]
         }
       ]
     }

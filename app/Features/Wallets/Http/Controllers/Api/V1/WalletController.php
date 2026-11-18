@@ -8,6 +8,7 @@ use App\Application\Security\SecurityPinHasher;
 use App\Models\LedgerEntry;
 use App\Models\Wallet;
 use App\Models\WithdrawalOption;
+use App\Models\SystemSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +17,19 @@ final class WalletController
     public function index(Request $request): JsonResponse
     {
         $wallets = Wallet::query()->where('user_id', $request->user()->id)->where('status', 'active')->get();
-        $data = $wallets->map(function (Wallet $wallet): array {
+        $withdrawalSettings = SystemSetting::query()
+            ->whereIn('setting_key', ['withdrawal.wallet.referral', 'withdrawal.wallet.bonus'])
+            ->get()->keyBy('setting_key');
+        $withdrawalEnabled = ['referral' => true, 'bonus' => false];
+        foreach (['referral', 'bonus'] as $type) {
+            $value = $withdrawalSettings->get('withdrawal.wallet.'.$type)?->value;
+            if ($value !== null) {
+                $withdrawalEnabled[$type] = is_array($value)
+                    ? filter_var($value['active'] ?? false, FILTER_VALIDATE_BOOLEAN)
+                    : filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+        $data = $wallets->map(function (Wallet $wallet) use ($withdrawalEnabled): array {
             $pending = (int) $wallet->ledgerEntries()->where('status', 'pending')->where('direction', 'credit')->sum('amount_minor');
 
             return [
@@ -27,6 +40,7 @@ final class WalletController
                 'balance_minor' => (int) $wallet->balance_minor,
                 'available_balance_minor' => (int) $wallet->balance_minor,
                 'pending_balance_minor' => $pending,
+                'withdrawal_enabled' => $withdrawalEnabled[$wallet->wallet_type->value] ?? true,
             ];
         });
 
@@ -84,4 +98,5 @@ final class WalletController
     {
         return response()->json(['data' => $request->user()->withdrawalRequests()->with(['option', 'userSubscription.plan.group'])->latest()->paginate(30)]);
     }
+
 }

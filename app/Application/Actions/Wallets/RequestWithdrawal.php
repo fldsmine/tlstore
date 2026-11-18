@@ -10,6 +10,7 @@ use App\Models\Wallet;
 use App\Models\UserSubscription;
 use App\Models\WithdrawalOption;
 use App\Models\WithdrawalRequest as Withdrawal;
+use App\Models\SystemSetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -36,6 +37,10 @@ final class RequestWithdrawal
             if (! in_array($walletType, ['review', 'review_group_b', 'review_group_c', 'share', 'referral', 'bonus'], true)) {
                 throw ValidationException::withMessages(['wallet_id' => 'Top-up funds cannot be withdrawn.']);
             }
+            $isReferralOrBonusWallet = in_array($walletType, ['referral', 'bonus'], true);
+            if ($isReferralOrBonusWallet && ! $this->walletWithdrawalsEnabled($walletType)) {
+                throw ValidationException::withMessages(['wallet_id' => 'Withdrawals from this wallet are currently disabled.']);
+            }
             $option = WithdrawalOption::query()->where('is_available', true)->findOrFail($optionId);
             $requiredGroup = match ($walletType) {
                 'share' => 'group_a',
@@ -49,15 +54,15 @@ final class RequestWithdrawal
             if ($requiredGroup !== null) {
                 $subscriptionQuery->whereHas('plan.group', fn ($query) => $query->where('group_key', $requiredGroup));
             }
-            $subscription = $subscriptionQuery->latest('starts_at')->first();
-            if (! $subscription?->plan) {
+            $subscription = $isReferralOrBonusWallet ? null : $subscriptionQuery->latest('starts_at')->first();
+            if (! $isReferralOrBonusWallet && ! $subscription?->plan) {
                 throw ValidationException::withMessages(['subscription' => $requiredGroup === null
                     ? 'An active package is required to request a withdrawal.'
                     : 'An active package in the matching group is required to withdraw from this wallet.']);
             }
-            $plan = $subscription->plan;
-            $withdrawalDays = $plan->withdrawal_days ?? [];
-            if (! $this->isWithdrawalDay($withdrawalDays, now())) {
+            $plan = $subscription?->plan;
+            $withdrawalDays = $plan?->withdrawal_days ?? [];
+            if (! $isReferralOrBonusWallet && ! $this->isWithdrawalDay($withdrawalDays, now())) {
                 throw ValidationException::withMessages(['withdrawal' => 'Your package allows withdrawals on: '.implode(' and ', $withdrawalDays).'.']);
             }
             $requiredFields = $option->fields ?? [];
@@ -74,12 +79,16 @@ final class RequestWithdrawal
                 throw ValidationException::withMessages(['payout_details' => 'Required payout fields are missing: '.implode(', ', $missing)]);
             }
 
-            $minimumMinor = CurrencyMinorUnits::toMinor($option->min_withdrawal, $wallet->currency);
-            $packageMinimumMinor = $this->currencyConverter->convertMinor(
+            $minimumMinor = $this->currencyConverter->convertMinor(
+                CurrencyMinorUnits::toMinor($option->min_withdrawal, $option->currency ?: 'USD'),
+                $option->currency ?: 'USD',
+                $wallet->currency,
+            )['amount_minor'];
+            $packageMinimumMinor = $plan ? $this->currencyConverter->convertMinor(
                 (int) ($plan->minimum_withdrawal_minor ?? 0),
                 $plan->currency,
                 $wallet->currency,
-            )['amount_minor'];
+            )['amount_minor'] : 0;
             $minimumMinor = max($minimumMinor, $packageMinimumMinor);
             if ($amountMinor < $minimumMinor) {
                 throw ValidationException::withMessages(['amount_minor' => 'The requested amount is below the package or payout method minimum.']);
@@ -91,12 +100,12 @@ final class RequestWithdrawal
             }
 
             $withdrawal = Withdrawal::query()->create([
-                'user_id' => $user->id, 'wallet_id' => $wallet->id, 'user_subscription_id' => $subscription->id,
-                'package_withdrawal_terms_snapshot' => [
+                'user_id' => $user->id, 'wallet_id' => $wallet->id, 'user_subscription_id' => $subscription?->id,
+                'package_withdrawal_terms_snapshot' => $plan ? [
                     'plan_key' => $plan->plan_key, 'plan_name' => $plan->name,
                     'currency' => $wallet->currency, 'source_currency' => $plan->currency,
                     'minimum_withdrawal_minor' => $packageMinimumMinor, 'withdrawal_days' => $withdrawalDays,
-                ],
+                ] : null,
                 'withdrawal_option_id' => $option->id,
                 'amount_minor' => $amountMinor, 'fee_minor' => $feeMinor, 'currency' => $wallet->currency,
                 'payout_details' => $payoutDetails, 'status' => 'pending', 'idempotency_key' => $idempotencyKey,
@@ -123,5 +132,18 @@ final class RequestWithdrawal
         }
 
         return false;
+    }
+
+    private function walletWithdrawalsEnabled(string $walletType): bool
+    {
+        $value = SystemSetting::query()->where('setting_key', 'withdrawal.wallet.'.$walletType)->value('value');
+        if ($value === null) {
+            return $walletType === 'referral';
+        }
+        if (is_array($value)) {
+            $value = $value['active'] ?? false;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 }

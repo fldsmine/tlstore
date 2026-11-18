@@ -2,6 +2,12 @@
   "name": "TrustLens app review questionnaire",
   "version": 1,
   "source": "project-overview.html",
+  "template": {
+    "template_key": "first_app_review",
+    "name": "Sample Review Questions",
+    "description": "This review question is the initial app review from the sample project overview file",
+    "status": "published"
+  },
   "steps": [
     {
       "name": "First impressions",
@@ -25,16 +31,8 @@
           "scale": {"min": 1, "max": 5, "low_label": "Very unclear", "high_label": "Very clear"}
         },
         {
-          "key": "polish",
-          "order": 3,
-          "prompt": "How well does the app run and look?",
-          "hint": "Think about speed, crashes, readability and design.",
-          "type": "rating",
-          "scale": {"min": 1, "max": 5, "low_label": "Poor", "high_label": "Excellent"}
-        },
-        {
           "key": "attn",
-          "order": 4,
+          "order": 3,
           "prompt": "Quality check: please select “Somewhat” for this question.",
           "hint": "We use a few of these to catch rushed answers.",
           "type": "single_choice",
@@ -58,17 +56,8 @@
           "risk_option_indexes": [0]
         },
         {
-          "key": "promise",
-          "order": 2,
-          "prompt": "Did it promise guaranteed profit, guaranteed loan approval or very high returns?",
-          "hint": null,
-          "type": "single_choice",
-          "options": ["Yes", "No", "I'm not sure"],
-          "risk_option_indexes": [0]
-        },
-        {
           "key": "attions",
-          "order": 3,
+          "order": 2,
           "prompt": "honestly: Are you just answering ramdomly? choose “me” if you are",
           "hint": "If you look closely you will see an answer.",
           "type": "single_choice",
@@ -78,7 +67,7 @@
         },
         {
           "key": "asked",
-          "order": 4,
+          "order": 3,
           "prompt": "Which of these did the app ask for?",
           "hint": "Choose all that apply. Only choose what you actually saw.",
           "type": "multiple_choice",
@@ -87,18 +76,8 @@
           "exclusive_option_index": 6
         },
         {
-          "key": "signs",
-          "order": 5,
-          "prompt": "Did you notice any of these warning signs?",
-          "hint": "Choose all that apply.",
-          "type": "multiple_choice",
-          "options": ["Fake countdown timers or pressure to hurry", "Store reviews look copied or repeated", "Developer name does not match the company shown in the app", "Hidden or hard-to-read fees", "No working support contact", "Mentions of harassment or threats over repayments", "None of these"],
-          "risk_option_indexes": [0, 1, 2, 3, 4, 5],
-          "exclusive_option_index": 6
-        },
-        {
           "key": "dev",
-          "order": 6,
+          "order": 4,
           "prompt": "Does the developer look legitimate?",
           "hint": "Check the developer name, website, privacy policy and support email.",
           "type": "single_choice",
@@ -130,16 +109,8 @@
           "attention_check_answer": "game"
         },
         {
-          "key": "bw",
-          "order": 3,
-          "prompt": "What's the best and the worst thing about it? Give one real example of each.",
-          "hint": "At least 12 words. Say what you did, and what happened.",
-          "type": "long_text",
-          "min_words": 12
-        },
-        {
           "key": "verdict",
-          "order": 4,
+          "order": 3,
           "prompt": "What is your overall verdict?",
           "hint": null,
           "type": "single_choice",
@@ -148,7 +119,7 @@
         },
         {
           "key": "honest",
-          "order": 5,
+          "order": 4,
           "prompt": null,
           "hint": null,
           "type": "confirmation",

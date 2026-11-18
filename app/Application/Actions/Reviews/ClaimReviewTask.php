@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Reviews;
 
 use App\Application\Actions\Marketplace\ListingEligibility;
+use App\Console\Support\TaskRewardCalculator;
 use App\Models\AppReviewCampaign;
 use App\Models\ReviewTask;
 use App\Models\ReviewTemplateVersion;
@@ -12,7 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 final class ClaimReviewTask
 {
-    public function __construct(private readonly ListingEligibility $eligibility) {}
+    public function __construct(
+        private readonly ListingEligibility $eligibility,
+        private readonly TaskRewardCalculator $rewards,
+    ) {}
 
     public function handle(User $user, AppReviewCampaign $campaign, string $idempotencyKey): ReviewTask
     {
@@ -100,13 +104,25 @@ final class ClaimReviewTask
                 throw ValidationException::withMessages(['campaign' => 'No published review questionnaire is configured.']);
             }
 
+            $rewardMinor = $this->rewards->forReview(
+                (int) $campaign->review_reward_minor,
+                (string) $campaign->currency,
+                $subscription->plan,
+            );
+            if ($rewardMinor === null) {
+                throw ValidationException::withMessages(['reward' => 'The package review reward cannot be converted to the listing currency right now.']);
+            }
+            if ($rewardMinor < 1) {
+                throw ValidationException::withMessages(['reward' => 'The active package does not have a valid per-review reward.']);
+            }
+
             $task = ReviewTask::query()->create([
                 'app_review_campaign_id' => $campaign->id,
                 'reviewer_id' => $user->id,
                 'review_template_version_id' => $templateVersion->id,
                 'status' => 'reserved',
                 'idempotency_key' => $idempotencyKey,
-                'reserved_reward_minor' => $campaign->review_reward_minor,
+                'reserved_reward_minor' => $rewardMinor,
                 'claimed_at' => now(),
                 'expires_at' => now()->addHours(24),
             ]);

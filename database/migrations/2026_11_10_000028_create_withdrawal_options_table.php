@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('icon', 191)->nullable();
             $table->text('description')->nullable();
             $table->longText('fields');
+            $table->char('currency', 3)->default('USD');
             $table->decimal('tax', 5, 2)->default(0.00);
             $table->decimal('min_withdrawal', 5, 2)->default(5.00);
             $table->boolean('is_available')->default(true);

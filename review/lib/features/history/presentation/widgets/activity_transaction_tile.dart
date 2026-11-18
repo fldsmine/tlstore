@@ -26,6 +26,9 @@ class ActivityTransactionTile extends StatelessWidget {
         '${transaction['type'] ?? ''} ${transaction['wallet'] ?? ''} ${transaction['description'] ?? ''}'
             .toLowerCase();
     final direction = transaction['direction']?.toString().toLowerCase();
+    final status = transaction['status']?.toString().toLowerCase();
+    final isPending = status == 'pending';
+    final isRejected = status == 'rejected';
     final credit = direction == 'credit';
     final description = transaction['description']?.toString().trim() ?? '';
     final title = preferDescriptionTitle && description.isNotEmpty
@@ -43,11 +46,22 @@ class ActivityTransactionTile extends StatelessWidget {
         );
 
     return Material(
-      color: colors.surface,
+      color: isPending
+      ? colors.tertiaryContainer.withValues(alpha: .15)
+      : isRejected
+          ? colors.errorContainer.withValues(alpha: .15)
+          : colors.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .8)),
-      ),
+		  borderRadius: BorderRadius.circular(12),
+		  side: BorderSide(
+			color: isPending
+				? colors.error.withValues(alpha: .2)
+				: isRejected
+					? colors.error.withValues(alpha: .3)
+					: colors.outlineVariant.withValues(alpha: .9),
+			width: (isPending || isRejected) ? 1.5 : 1,
+		  ),
+		),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: openDetails,
@@ -105,8 +119,15 @@ class ActivityTransactionTile extends StatelessWidget {
                     : ''}$displayAmount',
                 textAlign: TextAlign.end,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: accent,
+                  color: isPending
+				? colors.error.withValues(alpha: .4)
+				: isRejected
+					? colors.error.withValues(alpha: .6)
+					: accent,
                   fontWeight: FontWeight.w900,
+				  decoration: (isPending || isRejected)
+					? TextDecoration.lineThrough
+					: TextDecoration.none,
                   fontSize: 12,
                 ),
               ),

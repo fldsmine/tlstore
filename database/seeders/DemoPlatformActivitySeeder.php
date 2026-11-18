@@ -20,14 +20,14 @@ class DemoPlatformActivitySeeder extends Seeder
             $ownerId = $users[2];
 
             $this->seedAppStoreSnapshots($apps, $now);
-            $campaigns = $this->seedReviewCampaigns($apps, $ownerId, $now);
-            $templateVersionId = $this->seedQuestionnaireVersion($now);
+            $templateVersionIds = $this->publishedTemplateVersionIds();
+            $campaigns = $this->seedReviewCampaigns($apps, $ownerId, $now, $templateVersionIds);
             $paymentIntents = $this->seedSubscriptionPayments($users, $plans, $now);
             $subscriptions = $this->seedSubscriptions($users, $plans, $paymentIntents, $now);
             $this->seedLocationAddons($users, $plans, $now);
             $wallets = $this->walletIdsByUser($users);
-            $reviewTasks = $this->seedReviewTasks($campaigns, $users, $templateVersionId, $now);
-            $this->seedReviewSubmissions($reviewTasks, $users, $templateVersionId, $adminId, $wallets, $now);
+            $reviewTasks = $this->seedReviewTasks($campaigns, $users, $now);
+            $this->seedReviewSubmissions($reviewTasks, $users, $adminId, $wallets, $now);
             $this->seedAdShareActivity($users, $wallets, $now);
             $this->seedTopupsAndManualDeposits($users, $wallets, $now);
             $this->seedReferralActivity($users, $wallets, $now);
@@ -62,8 +62,8 @@ class DemoPlatformActivitySeeder extends Seeder
             $rows[] = [
                 'app_id' => $apps[$prototypeId],
                 'store' => ['Google Play', 'Samsung Galaxy Store', 'Apple App Store'][$prototypeId],
-                'external_listing_id' => 'demo-listing-'.$prototypeId,
-                'source_url' => 'https://example.com/demo-store-listing/'.$prototypeId,
+                'external_listing_id' => 'listing-'.$prototypeId,
+                'source_url' => 'https://example.com/store-listing/'.$prototypeId,
                 'rating' => $stats['rating'],
                 'total_reviews' => $stats['total_reviews'],
                 'metadata' => json_encode(['source' => 'demo_seed_not_live'], JSON_THROW_ON_ERROR),
@@ -80,25 +80,67 @@ class DemoPlatformActivitySeeder extends Seeder
         );
     }
 
-    private function seedReviewCampaigns(array $apps, int $ownerId, $now): array
+    /** @return array<string, int> template key => latest published version ID */
+    private function publishedTemplateVersionIds(): array
+    {
+        $versions = DB::table('review_templates as templates')
+            ->join('review_template_versions as versions', 'versions.review_template_id', '=', 'templates.id')
+            ->where('templates.status', 'published')
+            ->where('versions.status', 'published')
+            ->whereNotNull('versions.published_at')
+            ->whereExists(function ($query): void {
+                $query->selectRaw('1')
+                    ->from('review_template_version_questions as version_questions')
+                    ->whereColumn('version_questions.review_template_version_id', 'versions.id');
+            })
+            ->orderBy('templates.template_key')
+            ->orderByDesc('versions.version')
+            ->get(['templates.template_key', 'versions.id']);
+
+        $result = [];
+        foreach ($versions as $version) {
+            $result[$version->template_key] ??= (int) $version->id;
+        }
+
+        return $result;
+    }
+
+    private function seedReviewCampaigns(array $apps, int $ownerId, $now, array $templateVersionIds): array
     {
         $appRows = DB::table('apps')->whereNotNull('prototype_id')->get()->keyBy('prototype_id');
+        $listingModel = json_decode(
+            file_get_contents(database_path('data/app-listings.json')),
+            true,
+            512,
+            JSON_THROW_ON_ERROR,
+        );
+        $templateKeysByPrototype = collect($listingModel['apps'])
+            ->mapWithKeys(static fn (array $listing): array => [
+                (int) $listing['prototype_id'] => $listing['review_template_key'] ?? null,
+            ])
+            ->all();
         $campaignKeys = [
-            0 => 'demo-review-fitpulse-ng',
-            1 => 'demo-review-cashbloom-global',
-            2 => 'demo-review-nairawise-global',
+            0 => 'review-fitpulse-ng',
+            1 => 'review-cashbloom-global',
+            2 => 'review-nairawise-global',
         ];
         $rows = [];
         foreach ($appRows as $prototypeId => $app) {
             if (! isset($apps[$prototypeId])) {
                 continue;
             }
+            $templateKey = $templateKeysByPrototype[$prototypeId] ?? null;
+            $templateVersionId = $templateKey === null ? null : ($templateVersionIds[$templateKey] ?? null);
+            if ($templateVersionId === null) {
+                throw new \RuntimeException('App listing "'.$app->name.'" must reference a published review-question template with questions.');
+            }
             $currency = strtoupper($app->currency ?: 'USD');
             $maximum = $app->maximum_review === null ? null : (int) $app->maximum_review;
             $paidAmountMinor = CurrencyMinorUnits::toMinor($app->paid_amount, $currency);
             $rows[] = [
-                'campaign_key' => $campaignKeys[$prototypeId] ?? 'demo-review-app-'.$prototypeId,
+                'campaign_key' => $campaignKeys[$prototypeId] ?? 'review-app-'.$prototypeId,
                 'app_id' => $apps[$prototypeId],
+                'review_template_version_id' => $templateVersionId,
                 'owner_id' => $ownerId,
                 'paid_amount_minor' => $paidAmountMinor,
                 'currency' => $currency,
@@ -120,73 +162,17 @@ class DemoPlatformActivitySeeder extends Seeder
         DB::table('app_review_campaigns')->upsert(
             $rows,
             ['campaign_key'],
-            ['app_id', 'owner_id', 'paid_amount_minor', 'currency', 'location', 'review_reward_minor',
+            ['app_id', 'review_template_version_id', 'owner_id', 'paid_amount_minor', 'currency', 'location', 'review_reward_minor',
                 'maximum_review', 'status', 'starts_at', 'ends_at', 'updated_at']
         );
 
-        // Keep historical demo task records linked to their campaign, but stop
+        // Keep historical task records linked to their campaign, but stop
         // exposing the duplicate regional copy of NairaWise as a second listing.
         DB::table('app_review_campaigns')
-            ->where('campaign_key', 'demo-review-nairawise-gb')
+            ->where('campaign_key', 'review-nairawise-gb')
             ->update(['status' => 'draft', 'location' => null, 'updated_at' => $now]);
 
         return DB::table('app_review_campaigns')->pluck('id', 'campaign_key')->all();
-    }
-
-    private function seedQuestionnaireVersion($now): int
-    {
-        DB::table('review_templates')->upsert([[
-            'template_key' => 'demo-app-review',
-            'name' => 'Demo app review questionnaire',
-            'description' => 'Demo version of the question set extracted from the owner prototype.',
-            'status' => 'published',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]], ['template_key'], ['name', 'description', 'status', 'updated_at']);
-
-        $templateId = DB::table('review_templates')->where('template_key', 'demo-app-review')->value('id');
-        DB::table('review_template_versions')->upsert([[
-            'review_template_id' => $templateId,
-            'version' => 1,
-            'status' => 'published',
-            'published_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]], ['review_template_id', 'version'], ['status', 'published_at', 'updated_at']);
-
-        $versionId = (int) DB::table('review_template_versions')
-            ->where('review_template_id', $templateId)
-            ->where('version', 1)
-            ->value('id');
-        $path = database_path('data/review-question-model.json');
-        $model = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
-        $questionIds = DB::table('review_questions')->pluck('id', 'question_key')->all();
-        $rows = [];
-
-        foreach ($model['steps'] as $step) {
-            foreach ($step['questions'] as $question) {
-                if (!isset($questionIds[$question['key']])) {
-                    continue;
-                }
-                $rows[] = [
-                    'review_template_version_id' => $versionId,
-                    'review_question_id' => $questionIds[$question['key']],
-                    'step_order' => $step['order'],
-                    'step_name' => $step['name'],
-                    'question_order' => $question['order'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
-        }
-
-        DB::table('review_template_version_questions')->upsert(
-            $rows,
-            ['review_template_version_id', 'review_question_id'],
-            ['step_order', 'step_name', 'question_order', 'updated_at']
-        );
-
-        return $versionId;
     }
 
     private function seedSubscriptionPayments(array $users, array $plans, $now): array
@@ -198,7 +184,7 @@ class DemoPlatformActivitySeeder extends Seeder
             }
             $planKey = $this->planKeyForUser($number);
             $plan = DB::table('subscription_plans')->where('id', $plans[$planKey])->first();
-            $key = 'demo-subscription-user-'.$number;
+            $key = 'subscription-user-'.$number;
             $records[$number] = $key;
             DB::table('payment_intents')->upsert([[
                 'user_id' => $userId,
@@ -208,7 +194,7 @@ class DemoPlatformActivitySeeder extends Seeder
                 'amount_minor' => $plan->price_minor,
                 'currency' => $plan->currency,
                 'provider' => 'demo',
-                'provider_reference' => 'DEMO-PAY-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
+                'provider_reference' => 'PAY-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
                 'idempotency_key' => $key,
                 'status' => 'paid',
                 'provider_metadata' => json_encode(['seed' => true, 'not_a_real_payment' => true], JSON_THROW_ON_ERROR),
@@ -223,7 +209,7 @@ class DemoPlatformActivitySeeder extends Seeder
             $intent = DB::table('payment_intents')->where('idempotency_key', $key)->first();
             DB::table('payment_transactions')->upsert([[
                 'payment_intent_id' => $intent->id,
-                'provider_transaction_id' => 'DEMO-TXN-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
+                'provider_transaction_id' => 'TXN-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
                 'transaction_type' => 'capture',
                 'amount_minor' => $intent->amount_minor,
                 'currency' => $intent->currency,
@@ -236,7 +222,7 @@ class DemoPlatformActivitySeeder extends Seeder
 
             DB::table('payment_webhook_events')->upsert([[
                 'provider' => 'demo',
-                'provider_event_id' => 'DEMO-EVENT-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
+                'provider_event_id' => 'EVENT-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
                 'event_type' => 'payment.succeeded',
                 'payload' => json_encode(['seed' => true, 'payment_intent_id' => $intent->id], JSON_THROW_ON_ERROR),
                 'signature_valid' => true,
@@ -263,7 +249,7 @@ class DemoPlatformActivitySeeder extends Seeder
             $startsAt = $now->copy()->subDays(($number % 7) + 1);
             $endsAt = $now->copy()->addDays(30 - ($number % 5));
             $status = $number === 14 ? 'expired' : 'active';
-            $providerRef = 'DEMO-SUB-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT);
+            $providerRef = 'SUB-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT);
 
             DB::table('user_subscriptions')->upsert([[
                 'user_id' => $users[$number],
@@ -291,9 +277,9 @@ class DemoPlatformActivitySeeder extends Seeder
     private function seedLocationAddons(array $users, array $plans, $now): void
     {
         $fixtures = [
-            [3, 'demo-location-starter-weekly', 2],
-            [4, 'demo-location-basic-monthly', 10],
-            [5, 'demo-location-premium-quarterly', 20],
+            [3, 'location-starter-weekly', 2],
+            [4, 'location-basic-monthly', 10],
+            [5, 'location-premium-quarterly', 20],
         ];
 
         foreach ($fixtures as [$userNumber, $planKey, $elapsedDays]) {
@@ -311,7 +297,7 @@ class DemoPlatformActivitySeeder extends Seeder
                 default => $startsAt->copy()->addMonth(),
             };
             $numberKey = str_pad((string) $userNumber, 2, '0', STR_PAD_LEFT);
-            $paymentKey = 'demo-location-payment-u'.$numberKey;
+            $paymentKey = 'location-payment-u'.$numberKey;
 
             DB::table('payment_intents')->upsert([[
                 'user_id' => $users[$userNumber],
@@ -321,7 +307,7 @@ class DemoPlatformActivitySeeder extends Seeder
                 'amount_minor' => $plan->price_minor,
                 'currency' => $plan->currency,
                 'provider' => 'demo',
-                'provider_reference' => 'DEMO-LOC-PAY-'.$numberKey,
+                'provider_reference' => 'LOC-PAY-'.$numberKey,
                 'idempotency_key' => $paymentKey,
                 'status' => 'paid',
                 'provider_metadata' => json_encode(['seed' => true, 'not_a_real_payment' => true], JSON_THROW_ON_ERROR),
@@ -332,7 +318,7 @@ class DemoPlatformActivitySeeder extends Seeder
             ]], ['idempotency_key'], ['amount_minor', 'currency', 'status', 'provider_metadata', 'paid_at', 'updated_at']);
 
             $paymentId = (int) DB::table('payment_intents')->where('idempotency_key', $paymentKey)->value('id');
-            $transactionKey = 'DEMO-LOC-TXN-'.$numberKey;
+            $transactionKey = 'LOC-TXN-'.$numberKey;
             DB::table('payment_transactions')->upsert([[
                 'payment_intent_id' => $paymentId,
                 'provider_transaction_id' => $transactionKey,
@@ -348,7 +334,7 @@ class DemoPlatformActivitySeeder extends Seeder
 
             DB::table('payment_webhook_events')->upsert([[
                 'provider' => 'demo',
-                'provider_event_id' => 'DEMO-LOC-EVENT-'.$numberKey,
+                'provider_event_id' => 'LOC-EVENT-'.$numberKey,
                 'event_type' => 'location_addon.payment_succeeded',
                 'payload' => json_encode(['seed' => true, 'payment_intent_id' => $paymentId], JSON_THROW_ON_ERROR),
                 'signature_valid' => true,
@@ -360,7 +346,7 @@ class DemoPlatformActivitySeeder extends Seeder
                 'updated_at' => $now,
             ]], ['provider', 'provider_event_id'], ['event_type', 'payload', 'processing_status', 'processed_at', 'updated_at']);
 
-            $providerSubscriptionReference = 'DEMO-LOC-SUB-'.$numberKey;
+            $providerSubscriptionReference = 'LOC-SUB-'.$numberKey;
 
             $planSnapshot = [
                 'plan_key' => $planKey,
@@ -399,26 +385,30 @@ class DemoPlatformActivitySeeder extends Seeder
         return $ids;
     }
 
-    private function seedReviewTasks(array $campaigns, array $users, int $templateVersionId, $now): array
+    private function seedReviewTasks(array $campaigns, array $users, $now): array
     {
         $assignments = [
-            ['campaign' => 'demo-review-fitpulse-ng', 'user' => 1, 'status' => 'completed', 'result' => 'approved'],
-            ['campaign' => 'demo-review-cashbloom-global', 'user' => 3, 'status' => 'completed', 'result' => 'pending_review'],
-            ['campaign' => 'demo-review-cashbloom-global', 'user' => 4, 'status' => 'completed', 'result' => 'rejected'],
-            ['campaign' => 'demo-review-nairawise-gb', 'user' => 5, 'status' => 'completed', 'result' => 'approved'],
-            ['campaign' => 'demo-review-nairawise-global', 'user' => 6, 'status' => 'completed', 'result' => 'pending_review'],
-            ['campaign' => 'demo-review-nairawise-global', 'user' => 7, 'status' => 'reserved', 'result' => null],
+            ['campaign' => 'review-fitpulse-ng', 'user' => 1, 'status' => 'completed', 'result' => 'approved'],
+            ['campaign' => 'review-cashbloom-global', 'user' => 3, 'status' => 'completed', 'result' => 'pending_review'],
+            ['campaign' => 'review-cashbloom-global', 'user' => 4, 'status' => 'completed', 'result' => 'rejected'],
+            ['campaign' => 'review-nairawise-gb', 'user' => 5, 'status' => 'completed', 'result' => 'approved'],
+            ['campaign' => 'review-nairawise-global', 'user' => 6, 'status' => 'completed', 'result' => 'pending_review'],
+            ['campaign' => 'review-nairawise-global', 'user' => 7, 'status' => 'reserved', 'result' => null],
         ];
+        $campaignTemplateVersions = DB::table('app_review_campaigns')
+            ->whereIn('id', array_values($campaigns))
+            ->pluck('review_template_version_id', 'id')
+            ->all();
         $rows = [];
         foreach ($assignments as $assignment) {
             if (!isset($campaigns[$assignment['campaign']], $users[$assignment['user']])) {
                 continue;
             }
-            $key = 'demo-review-task-'.$assignment['campaign'].'-u'.$assignment['user'];
+            $key = 'review-task-'.$assignment['campaign'].'-u'.$assignment['user'];
             $rows[] = [
                 'app_review_campaign_id' => $campaigns[$assignment['campaign']],
                 'reviewer_id' => $users[$assignment['user']],
-                'review_template_version_id' => $templateVersionId,
+                'review_template_version_id' => $campaignTemplateVersions[$campaigns[$assignment['campaign']]],
                 'status' => $assignment['status'],
                 'idempotency_key' => $key,
                 'reserved_reward_minor' => (int) DB::table('app_review_campaigns')
@@ -455,11 +445,12 @@ class DemoPlatformActivitySeeder extends Seeder
             if ($assignment['status'] !== 'completed' || !isset($campaigns[$assignment['campaign']], $users[$assignment['user']])) {
                 continue;
             }
-            $key = 'demo-review-task-'.$assignment['campaign'].'-u'.$assignment['user'];
+            $key = 'review-task-'.$assignment['campaign'].'-u'.$assignment['user'];
             $tasks[] = [
                 'id' => (int) DB::table('review_tasks')->where('idempotency_key', $key)->value('id'),
                 'user_number' => $assignment['user'],
                 'result' => $assignment['result'],
+                'template_version_id' => (int) $campaignTemplateVersions[$campaigns[$assignment['campaign']]],
                 'reward_minor' => (int) DB::table('app_review_campaigns')
                     ->where('id', $campaigns[$assignment['campaign']])
                     ->value('review_reward_minor'),
@@ -468,22 +459,12 @@ class DemoPlatformActivitySeeder extends Seeder
         return $tasks;
     }
 
-    private function seedReviewSubmissions(array $tasks, array $users, int $templateVersionId, int $adminId, array $wallets, $now): void
+    private function seedReviewSubmissions(array $tasks, array $users, int $adminId, array $wallets, $now): void
     {
-        $reviewQuestions = DB::table('review_questions')->get(['id', 'question_key']);
-        $questionIds = [];
-        foreach ($reviewQuestions as $question) {
-            $questionIds[$question->question_key] = $question->id;
-        }
-        $longAnswer = 'I opened the app and explored the main screens. It explains its core purpose clearly, the navigation was easy to follow, and I checked the key features before forming this opinion.';
-        $answers = [
-            'match' => 0, 'clear' => 4, 'polish' => 4, 'attn' => 1,
-            'pay' => 1, 'promise' => 1, 'asked' => [6], 'signs' => [6], 'dev' => 0,
-            'what' => $longAnswer, 'bw' => $longAnswer, 'verdict' => 0, 'honest' => true,
-        ];
         $answerRows = [];
         foreach ($tasks as $task) {
             $taskStatus = $task['result'];
+            $templateVersionId = (int) $task['template_version_id'];
             DB::table('review_submissions')->upsert([[
                 'review_task_id' => $task['id'],
                 'reviewer_id' => $users[$task['user_number']],
@@ -497,28 +478,36 @@ class DemoPlatformActivitySeeder extends Seeder
             ]], ['review_task_id'], ['status', 'decided_at', 'updated_at']);
 
             $submissionId = (int) DB::table('review_submissions')->where('review_task_id', $task['id'])->value('id');
-            foreach ($answers as $key => $value) {
-                if (isset($questionIds[$key])) {
-                    $answerRows[] = [
-                        'review_submission_id' => $submissionId,
-                        'review_question_id' => $questionIds[$key],
-                        'answer_value' => json_encode($value, JSON_THROW_ON_ERROR),
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
-                }
+            DB::table('review_answers')->where('review_submission_id', $submissionId)->delete();
+            $questions = DB::table('review_template_version_questions as version_questions')
+                ->join('review_questions as questions', 'questions.id', '=', 'version_questions.review_question_id')
+                ->where('version_questions.review_template_version_id', $templateVersionId)
+                ->orderBy('version_questions.step_order')
+                ->orderBy('version_questions.question_order')
+                ->get([
+                    'questions.id', 'questions.type', 'questions.options', 'questions.is_attention_check',
+                    'questions.attention_check_answer',
+                ]);
+            foreach ($questions as $question) {
+                $answerRows[] = [
+                    'review_submission_id' => $submissionId,
+                    'review_question_id' => $question->id,
+                    'answer_value' => json_encode($this->demoAnswerFor($question), JSON_THROW_ON_ERROR),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
 
             if (in_array($taskStatus, ['approved', 'rejected'], true)) {
                 $decision = $taskStatus === 'approved' ? 'approved' : 'rejected';
                 DB::table('moderation_decisions')->upsert([[
-                    'decision_key' => 'demo-review-decision-'.$submissionId,
+                    'decision_key' => 'review-decision-'.$submissionId,
                     'review_submission_id' => $submissionId,
                     'decided_by' => null,
                     'decided_by_admin_id' => $adminId,
                     'decision' => $decision,
                     'reason_code' => $decision === 'approved' ? 'demo_quality_pass' : 'demo_quality_fail',
-                    'reason' => $decision === 'approved' ? 'Demo review accepted for workflow testing.' : 'Demo review rejected for workflow testing.',
+                    'reason' => $decision === 'approved' ? 'Review accepted for workflow testing.' : 'Review rejected for workflow testing.',
                     'policy_version' => 1,
                     'decided_at' => $now->copy()->subHours(8),
                     'created_at' => $now,
@@ -527,13 +516,13 @@ class DemoPlatformActivitySeeder extends Seeder
 
                 if ($decision === 'rejected') {
                     DB::table('risk_signals')->upsert([[
-                        'signal_key' => 'demo-review-risk-'.$submissionId,
+                        'signal_key' => 'review-risk-'.$submissionId,
                         'review_submission_id' => $submissionId,
                         'ad_share_event_id' => null,
                         'signal_type' => 'demo_attention_required',
                         'severity' => 'medium',
                         'source' => 'demo_seed',
-                        'rule_version' => 'demo-v1',
+                        'rule_version' => 'v1',
                         'details' => json_encode(['seed' => true], JSON_THROW_ON_ERROR),
                         'created_at' => $now,
                     ]], ['signal_key'], ['severity', 'details']);
@@ -550,8 +539,8 @@ class DemoPlatformActivitySeeder extends Seeder
                             'status' => 'posted',
                             'source_type' => 'review_submission',
                             'source_id' => $submissionId,
-                            'idempotency_key' => 'demo-review-reward-'.$submissionId,
-                            'description' => 'Demo approved app review reward',
+                            'idempotency_key' => 'review-reward-'.$submissionId,
+                            'description' => 'Approved app review reward',
                             'available_at' => $now->copy()->subHours(8),
                             'posted_at' => $now->copy()->subHours(8),
                             'created_at' => $now,
@@ -571,9 +560,32 @@ class DemoPlatformActivitySeeder extends Seeder
         }
     }
 
+    private function demoAnswerFor(object $question): mixed
+    {
+        if ((bool) $question->is_attention_check && $question->attention_check_answer !== null) {
+            $expected = json_decode($question->attention_check_answer, true, 512, JSON_THROW_ON_ERROR);
+            if (is_array($expected) && ($expected['mode'] ?? null) === 'contains') {
+                return $expected['phrase'].' I tested the main app flow and checked its result myself.';
+            }
+
+            return $expected;
+        }
+
+        $options = json_decode($question->options ?: '[]', true, 512, JSON_THROW_ON_ERROR);
+
+        return match ($question->type) {
+            'single_choice' => $options[0] ?? 'The app worked as expected.',
+            'multiple_choice' => [$options[0] ?? 'No issues found'],
+            'rating' => 4,
+            'long_text' => 'I opened the app and explored the main screens. The core purpose was clear, navigation was easy to follow, and I checked its key features before forming this opinion.',
+            'boolean' => true,
+            default => 'I opened the app and checked its main features.',
+        };
+    }
+
     private function seedAdShareActivity(array $users, array $wallets, $now): void
     {
-        $adId = DB::table('ads')->where('campaign_key', 'demo-energy-saving-global')->value('id');
+        $adId = DB::table('ads')->where('campaign_key', 'energy-saving-global')->value('id');
         if (!$adId) {
             return;
         }
@@ -585,7 +597,7 @@ class DemoPlatformActivitySeeder extends Seeder
             if (!$userId) {
                 continue;
             }
-            $key = 'demo-ad-share-energy-u'.$number;
+            $key = 'ad-share-energy-u'.$number;
             DB::table('ad_share_tasks')->upsert([[
                 'ad_id' => $adId,
                 'user_id' => $userId,
@@ -599,13 +611,13 @@ class DemoPlatformActivitySeeder extends Seeder
                 'updated_at' => $now,
             ]], ['idempotency_key'], ['status', 'completed_at', 'updated_at']);
             $taskId = (int) DB::table('ad_share_tasks')->where('idempotency_key', $key)->value('id');
-            $token = 'demo-track-energy-u'.$number;
+            $token = 'track-energy-u'.$number;
             $eventStatus = $result;
             DB::table('ad_share_events')->upsert([[
                 'ad_share_task_id' => $taskId,
                 'channel' => 'copy_link',
                 'tracking_token' => $token,
-                'external_reference' => 'demo-share-ref-'.$number,
+                'external_reference' => 'share-ref-'.$number,
                 'status' => $eventStatus,
                 'verification_method' => $result === 'validated' ? 'demo_attribution' : null,
                 'evidence' => json_encode(['seed' => true, 'destination' => 'example.test'], JSON_THROW_ON_ERROR),
@@ -618,13 +630,13 @@ class DemoPlatformActivitySeeder extends Seeder
             $eventId = (int) DB::table('ad_share_events')->where('tracking_token', $token)->value('id');
             if ($result === 'rejected') {
                 DB::table('risk_signals')->upsert([[
-                    'signal_key' => 'demo-ad-share-risk-'.$eventId,
+                    'signal_key' => 'ad-share-risk-'.$eventId,
                     'review_submission_id' => null,
                     'ad_share_event_id' => $eventId,
                     'signal_type' => 'demo_share_duplicate',
                     'severity' => 'low',
                     'source' => 'demo_seed',
-                    'rule_version' => 'demo-v1',
+                    'rule_version' => 'v1',
                     'details' => json_encode(['seed' => true], JSON_THROW_ON_ERROR),
                     'created_at' => $now,
                 ]], ['signal_key'], ['severity', 'details']);
@@ -640,8 +652,8 @@ class DemoPlatformActivitySeeder extends Seeder
                         'status' => $result === 'validated' ? 'posted' : 'pending',
                         'source_type' => 'ad_share_event',
                         'source_id' => $eventId,
-                        'idempotency_key' => 'demo-share-reward-'.$eventId,
-                        'description' => 'Demo ad share reward',
+                        'idempotency_key' => 'share-reward-'.$eventId,
+                        'description' => 'Ad share reward',
                         'available_at' => $result === 'validated' ? $now->copy()->subHours(10) : null,
                         'posted_at' => $result === 'validated' ? $now->copy()->subHours(10) : null,
                         'created_at' => $now,
@@ -669,7 +681,7 @@ class DemoPlatformActivitySeeder extends Seeder
     private function seedTopupsAndManualDeposits(array $users, array $wallets, $now): void
     {
         foreach ([3 => 2000, 2 => 4200, 4 => 5000] as $number => $amount) {
-            $key = 'demo-topup-user-'.$number;
+            $key = 'topup-user-'.$number;
             DB::table('payment_intents')->upsert([[
                 'user_id' => $users[$number],
                 'purpose' => 'account_topup',
@@ -678,7 +690,7 @@ class DemoPlatformActivitySeeder extends Seeder
                 'amount_minor' => $amount,
                 'currency' => 'USD',
                 'provider' => 'demo',
-                'provider_reference' => 'DEMO-TOPUP-'.$number,
+                'provider_reference' => 'TOPUP-'.$number,
                 'idempotency_key' => $key,
                 'status' => 'paid',
                 'provider_metadata' => json_encode(['seed' => true, 'not_a_real_payment' => true], JSON_THROW_ON_ERROR),
@@ -690,7 +702,7 @@ class DemoPlatformActivitySeeder extends Seeder
             $intentId = DB::table('payment_intents')->where('idempotency_key', $key)->value('id');
             DB::table('payment_transactions')->upsert([[
                 'payment_intent_id' => $intentId,
-                'provider_transaction_id' => 'DEMO-TOPUP-TXN-'.$number,
+                'provider_transaction_id' => 'TOPUP-TXN-'.$number,
                 'transaction_type' => 'capture',
                 'amount_minor' => $amount,
                 'currency' => 'USD',
@@ -702,7 +714,7 @@ class DemoPlatformActivitySeeder extends Seeder
             ]], ['provider_transaction_id'], ['payment_intent_id', 'amount_minor', 'status', 'updated_at']);
             DB::table('payment_webhook_events')->upsert([[
                 'provider' => 'demo',
-                'provider_event_id' => 'DEMO-TOPUP-EVENT-'.$number,
+                'provider_event_id' => 'TOPUP-EVENT-'.$number,
                 'event_type' => 'topup.succeeded',
                 'payload' => json_encode(['seed' => true, 'payment_intent_id' => $intentId], JSON_THROW_ON_ERROR),
                 'signature_valid' => true,
@@ -723,8 +735,8 @@ class DemoPlatformActivitySeeder extends Seeder
                     'status' => 'posted',
                     'source_type' => 'payment_intent',
                     'source_id' => $intentId,
-                    'idempotency_key' => 'demo-topup-ledger-'.$number,
-                    'description' => 'Demo account top-up',
+                    'idempotency_key' => 'topup-ledger-'.$number,
+                    'description' => 'Users account top-up',
                     'available_at' => $now->copy()->subDay(),
                     'posted_at' => $now->copy()->subDay(),
                     'created_at' => $now,
@@ -734,7 +746,7 @@ class DemoPlatformActivitySeeder extends Seeder
         }
 
         $userNumber = 8;
-        $key = 'demo-manual-deposit-user-'.$userNumber;
+        $key = 'manual-deposit-user-'.$userNumber;
         DB::table('payment_intents')->upsert([[
             'user_id' => $users[$userNumber],
             'purpose' => 'manual_deposit',
@@ -743,7 +755,7 @@ class DemoPlatformActivitySeeder extends Seeder
             'amount_minor' => 10000,
             'currency' => 'USD',
             'provider' => 'manual_bank',
-            'provider_reference' => 'DEMO-MANUAL-'.$userNumber,
+            'provider_reference' => 'MANUAL-'.$userNumber,
             'idempotency_key' => $key,
             'status' => 'pending',
             'provider_metadata' => json_encode(['seed' => true, 'not_a_real_payment' => true], JSON_THROW_ON_ERROR),
@@ -758,8 +770,8 @@ class DemoPlatformActivitySeeder extends Seeder
             'user_id' => $users[$userNumber],
             'amount_minor' => 10000,
             'currency' => 'USD',
-            'bank_reference' => 'DEMO-BANK-REF-008',
-            'proof_storage_path' => 'prototype://deposit-proofs/demo-user-08',
+            'bank_reference' => 'BANK-REF-008',
+            'proof_storage_path' => 'prototype://deposit-proofs/user-08',
             'status' => 'submitted',
             'reviewed_by' => null,
             'review_note' => null,
@@ -801,14 +813,14 @@ class DemoPlatformActivitySeeder extends Seeder
                     'status' => 'posted',
                     'source_type' => 'referral_attribution',
                     'source_id' => $attributionId,
-                    'idempotency_key' => 'demo-referral-ledger-'.$attributionId,
-                    'description' => 'Demo qualified referral reward',
+                    'idempotency_key' => 'referral-ledger-'.$attributionId,
+                    'description' => 'Qualified referral reward',
                     'available_at' => $now->copy()->subDay(),
                     'posted_at' => $now->copy()->subDay(),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]], ['idempotency_key'], ['status', 'updated_at']);
-                $ledgerId = DB::table('ledger_entries')->where('idempotency_key', 'demo-referral-ledger-'.$attributionId)->value('id');
+                $ledgerId = DB::table('ledger_entries')->where('idempotency_key', 'referral-ledger-'.$attributionId)->value('id');
                 DB::table('referral_rewards')->upsert([[
                     'referral_attribution_id' => $attributionId,
                     'reward_type' => 'task',
@@ -837,7 +849,7 @@ class DemoPlatformActivitySeeder extends Seeder
             if (!isset($users[$number], $wallets[$number]['review'], $optionIds[$optionKey])) {
                 continue;
             }
-            $key = 'demo-withdrawal-u'.$number;
+            $key = 'withdrawal-u'.$number;
 
             // Add a clearly-labelled fixture credit so these sample requests have funds to draw from.
             if (in_array($number, [3, 4], true)) {
@@ -849,8 +861,8 @@ class DemoPlatformActivitySeeder extends Seeder
                     'status' => 'posted',
                     'source_type' => 'demo_fixture',
                     'source_id' => $users[$number],
-                    'idempotency_key' => 'demo-withdrawal-funds-u'.$number,
-                    'description' => 'Demo-only opening earnings for withdrawal testing',
+                    'idempotency_key' => 'withdrawal-funds-u'.$number,
+                    'description' => 'only opening earnings for withdrawal testing',
                     'available_at' => $now->copy()->subDays(3),
                     'posted_at' => $now->copy()->subDays(3),
                     'created_at' => $now,
@@ -868,7 +880,7 @@ class DemoPlatformActivitySeeder extends Seeder
                 'payout_details' => json_encode(['demo' => true, 'destination' => 'test-only'], JSON_THROW_ON_ERROR),
                 'status' => $status,
                 'idempotency_key' => $key,
-                'provider_reference' => 'DEMO-WD-'.$number,
+                'provider_reference' => 'WD-'.$number,
                 'processed_by' => null,
                 'processed_by_admin_id' => $status === 'pending' ? null : (int) Admin::query()->where('email', 'admin@tlstore.test')->value('id'),
                 'failure_reason' => null,
@@ -886,8 +898,8 @@ class DemoPlatformActivitySeeder extends Seeder
                 'status' => $status === 'pending' ? 'reserved' : 'posted',
                 'source_type' => 'withdrawal_request',
                 'source_id' => DB::table('withdrawal_requests')->where('idempotency_key', $key)->value('id'),
-                'idempotency_key' => 'demo-withdrawal-ledger-u'.$number,
-                'description' => 'Demo withdrawal amount plus processing fee',
+                'idempotency_key' => 'withdrawal-ledger-u'.$number,
+                'description' => 'Withdrawal amount plus processing fee',
                 'available_at' => $status === 'pending' ? null : $now->copy()->subDay(),
                 'posted_at' => $status === 'pending' ? null : $now->copy()->subDay(),
                 'created_at' => $now,
@@ -902,7 +914,7 @@ class DemoPlatformActivitySeeder extends Seeder
             if (!isset($users[$number])) {
                 continue;
             }
-            $key = 'demo-welcome-user-'.$number;
+            $key = 'welcome-user-'.$number;
             DB::table('notifications')->upsert([[
                 'user_id' => $users[$number],
                 'notification_key' => $key,
@@ -924,7 +936,7 @@ class DemoPlatformActivitySeeder extends Seeder
                     'channel' => 'push',
                     'provider' => 'demo',
                     'status' => 'sent',
-                    'provider_message_id' => 'DEMO-PUSH-'.$number,
+                    'provider_message_id' => 'PUSH-'.$number,
                     'failure_reason' => null,
                     'sent_at' => $now->copy()->subHours(4),
                     'created_at' => $now,
@@ -934,24 +946,24 @@ class DemoPlatformActivitySeeder extends Seeder
         }
 
         DB::table('audit_logs')->upsert([[
-            'audit_key' => 'demo-audit-campaign-publish',
+            'audit_key' => 'audit-campaign-publish',
             'actor_user_id' => null,
             'actor_admin_id' => (int) Admin::query()->where('email', 'admin@tlstore.test')->value('id'),
             'action' => 'campaign.demo_seeded',
             'entity_type' => 'app_review_campaign',
-            'entity_id' => 'demo-review-fitpulse-ng',
+            'entity_id' => 'review-fitpulse-ng',
             'before_values' => null,
             'after_values' => json_encode(['status' => 'active', 'seed' => true], JSON_THROW_ON_ERROR),
-            'request_id' => 'demo-seed-run',
+            'request_id' => 'seed-run',
             'ip_hash' => null,
             'created_at' => $now,
         ]], ['audit_key'], ['actor_user_id', 'actor_admin_id', 'action', 'after_values']);
 
         DB::table('outbox_events')->upsert([[
-            'event_key' => 'demo-event-review-approved',
+            'event_key' => 'event-review-approved',
             'event_type' => 'review.submission.approved',
             'aggregate_type' => 'review_submission',
-            'aggregate_id' => 'demo-seed-sample',
+            'aggregate_id' => 'seed-sample',
             'payload' => json_encode(['seed' => true, 'purpose' => 'outbox workflow test'], JSON_THROW_ON_ERROR),
             'status' => 'pending',
             'attempts' => 0,
@@ -966,9 +978,9 @@ class DemoPlatformActivitySeeder extends Seeder
     private function planKeyForUser(int $number): string
     {
         return match ($number % 3) {
-            0 => 'demo-market-gold',
-            1 => 'demo-market-lite',
-            default => 'demo-market-premium',
+            0 => 'market-gold',
+            1 => 'market-lite',
+            default => 'market-premium',
         };
     }
 }

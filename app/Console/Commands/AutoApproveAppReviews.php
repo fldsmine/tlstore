@@ -160,7 +160,7 @@ class AutoApproveAppReviews extends Command
                     $failedAttentionChecks = $this->failedAttentionChecks($submission);
                     if ($failedAttentionChecks !== []) {
                         $questionKeys = implode(', ', array_column($failedAttentionChecks, 'question_key'));
-                        $reason = 'The review did not pass all attention checks. Required response instructions were missed for: '.$questionKeys.'.';
+                        $reason = 'The review did not pass all attention checks. Required response instructions were missed.';
                         $decide->handle(
                             $admin,
                             $submission->fresh(),

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  * Legacy migration 2026_11_09_130000 added the balance_minor column and
  * back-filled it with (posted credits) - (posted + reserved debits). That
  * migration no longer exists - the column is part of the wallets create - so
- * the balance is never populated when demo activity is seeded. The demo
+ * the balance is never populated when activity is seeded. The
  * seeders write ledger entries but not wallet balances, which would leave every
  * dashboard at zero.
  *

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class WithdrawalOption extends Model
 {
     protected $table = 'withdrawal_options';
-    protected $fillable = ['option_id', 'name', 'icon', 'description', 'fields', 'tax', 'min_withdrawal', 'is_available', 'order'];
+    protected $fillable = ['option_id', 'name', 'icon', 'description', 'fields', 'currency', 'tax', 'min_withdrawal', 'is_available', 'order'];
     protected $casts = [
         'fields' => 'array',
         'tax' => 'decimal:2',

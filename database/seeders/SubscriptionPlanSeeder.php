@@ -9,7 +9,7 @@ class SubscriptionPlanSeeder extends Seeder
 {
     public function run(): void
     {
-        // Keep this seeder self-contained for targeted demo-data runs.
+        // Keep this seeder self-contained for targeted data runs.
         $this->call(SubscriptionGroupSeeder::class);
 
         $groups = DB::table('subscription_groups')->pluck('id', 'group_key');
@@ -17,7 +17,7 @@ class SubscriptionPlanSeeder extends Seeder
 
         $plans = [
             [
-                'plan_key' => 'demo-market-lite', 'subscription_group_id' => $groups['group_a'],
+                'plan_key' => 'market-lite', 'subscription_group_id' => $groups['group_a'],
                 'product_type' => 'marketplace_access', 'name' => 'Lite', 'tier_key' => 'lite',
                 'billing_interval' => 'monthly', 'duration_count' => 1, 'price_minor' => 150000, 'currency' => 'NGN',
                 'discount' => 0, 'bonus' => 500, 'subscription_referral_percent' => 50, 'task_referral_percent' => 0,
@@ -33,7 +33,7 @@ class SubscriptionPlanSeeder extends Seeder
                 ],
             ],
             [
-                'plan_key' => 'demo-market-premium', 'subscription_group_id' => $groups['group_a'],
+                'plan_key' => 'market-premium', 'subscription_group_id' => $groups['group_a'],
                 'product_type' => 'marketplace_access', 'name' => 'Premium', 'tier_key' => 'premium',
                 'billing_interval' => 'monthly', 'duration_count' => 1, 'price_minor' => 350000, 'currency' => 'NGN',
                 'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 50, 'task_referral_percent' => 0,
@@ -48,7 +48,7 @@ class SubscriptionPlanSeeder extends Seeder
                 ],
             ],
             [
-                'plan_key' => 'demo-market-gold', 'subscription_group_id' => $groups['group_a'],
+                'plan_key' => 'market-gold', 'subscription_group_id' => $groups['group_a'],
                 'product_type' => 'marketplace_access', 'name' => 'Gold', 'tier_key' => 'gold',
                 'billing_interval' => 'monthly', 'duration_count' => 1, 'price_minor' => 620000, 'currency' => 'NGN',
                 'discount' => 12, 'bonus' => 0, 'subscription_referral_percent' => 54.6, 'task_referral_percent' => 0,

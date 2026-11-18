@@ -22,10 +22,14 @@ final class WithdrawalOptionController
             'name' => ['required', 'string', 'max:191'], 'icon' => ['nullable', 'string', 'max:191'],
             'description' => ['nullable', 'string'], 'fields' => ['required', 'array', 'min:1'],
             'fields.*' => ['required', 'string', 'max:80', 'distinct'],
+            'currency' => ['sometimes', 'string', 'size:3', 'regex:/^[A-Za-z]{3}$/'],
             'tax' => ['required', 'numeric', 'min:0', 'max:100'],
             'min_withdrawal' => ['required', 'numeric', 'min:0'],
             'is_available' => ['sometimes', 'boolean'], 'order' => ['sometimes', 'integer'],
         ]);
+        if (isset($data['currency'])) {
+            $data['currency'] = strtoupper($data['currency']);
+        }
         $option = WithdrawalOption::query()->create($data);
         $this->audit($request->user(), 'withdrawal_option.created', $option, null, $data);
 
@@ -38,9 +42,13 @@ final class WithdrawalOptionController
             'name' => ['sometimes', 'string', 'max:191'], 'icon' => ['sometimes', 'nullable', 'string', 'max:191'],
             'description' => ['sometimes', 'nullable', 'string'], 'fields' => ['sometimes', 'array', 'min:1'],
             'fields.*' => ['required', 'string', 'max:80', 'distinct'],
+            'currency' => ['sometimes', 'string', 'size:3', 'regex:/^[A-Za-z]{3}$/'],
             'tax' => ['sometimes', 'numeric', 'min:0', 'max:100'], 'min_withdrawal' => ['sometimes', 'numeric', 'min:0'],
             'is_available' => ['sometimes', 'boolean'], 'order' => ['sometimes', 'integer'],
         ]);
+        if (isset($data['currency'])) {
+            $data['currency'] = strtoupper($data['currency']);
+        }
         $before = $option->only(array_keys($data));
         $option->fill($data)->save();
         $this->audit($request->user(), 'withdrawal_option.updated', $option, $before, $option->only(array_keys($data)));

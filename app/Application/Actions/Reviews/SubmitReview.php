@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Reviews;
 
 use App\Application\Actions\Marketplace\ListingEligibility;
+use App\Console\Support\TaskRewardCalculator;
 use App\Models\ReviewAnswer;
 use App\Models\ReviewSubmission;
 use App\Models\ReviewTask;
@@ -14,7 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 final class SubmitReview
 {
-    public function __construct(private readonly ListingEligibility $eligibility) {}
+    public function __construct(
+        private readonly ListingEligibility $eligibility,
+        private readonly TaskRewardCalculator $rewards,
+    ) {}
 
     public function handle(User $user, ReviewTask $task, array $answers, ?int $durationSeconds): ReviewSubmission
     {
@@ -25,6 +29,25 @@ final class SubmitReview
             }
             if (! $this->eligibility->appAllowed($user, $task->campaign->location, $task->campaign->app?->store, $task->campaign->app?->category)) {
                 throw ValidationException::withMessages(['task' => 'Your package or app store eligibility is no longer active for this task.']);
+            }
+            $subscription = $this->eligibility->subscriptionForTask(
+                $user,
+                'review',
+                $task->campaign->app?->store,
+                $task->campaign->app?->category,
+            );
+            if (! $subscription?->plan) {
+                throw ValidationException::withMessages(['task' => 'An eligible app review package is required to submit this review.']);
+            }
+            $campaign = $task->campaign;
+            $currency = strtoupper((string) $campaign->currency);
+            $rewardMinor = $this->rewards->forReview(
+                (int) $task->reserved_reward_minor,
+                $currency,
+                $subscription->plan,
+            );
+            if ($rewardMinor === null || $rewardMinor < 1) {
+                throw ValidationException::withMessages(['reward' => 'The package review reward cannot be converted or is unavailable right now.']);
             }
 
             $questions = $task->templateVersion->questions->keyBy('id');
@@ -54,10 +77,12 @@ final class SubmitReview
                     'answer_value' => ['value' => $answer['value']],
                 ]);
             }
-            $task->update(['status' => 'submitted', 'completed_at' => now()]);
+            $task->update([
+                'status' => 'submitted',
+                'completed_at' => now(),
+                'reserved_reward_minor' => $rewardMinor,
+            ]);
 
-            $campaign = $task->campaign;
-            $currency = strtoupper($campaign->currency);
             $appName = trim((string) $campaign->app?->name) ?: 'app listing';
             Transaction::query()->updateOrCreate(
                 ['reference' => 'review-submission:'.$submission->id],
@@ -65,7 +90,7 @@ final class SubmitReview
                     'user_id' => $user->id,
                     'type' => 'app_review',
                     'direction' => 'credit',
-                    'amount' => CurrencyMinorUnits::fromMinor((int) $task->reserved_reward_minor, $currency),
+                    'amount' => CurrencyMinorUnits::fromMinor($rewardMinor, $currency),
                     'fee' => 0,
                     'wallet' => null,
                     'status' => 'pending',
@@ -73,7 +98,7 @@ final class SubmitReview
                     'meta' => [
                         'currency' => $currency,
                         'currency_minor_units' => CurrencyMinorUnits::precision($currency),
-                        'amount_minor' => (int) $task->reserved_reward_minor,
+                        'amount_minor' => $rewardMinor,
                         'review_submission_id' => $submission->id,
                         'review_task_id' => $task->id,
                         'campaign_id' => $campaign->id,

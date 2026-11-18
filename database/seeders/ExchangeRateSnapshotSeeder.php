@@ -14,7 +14,7 @@ class ExchangeRateSnapshotSeeder extends Seeder
         $contents = file_get_contents($path);
 
         if ($contents === false) {
-            throw new RuntimeException("Unable to read demo exchange rates at {$path}");
+            throw new RuntimeException("Unable to read exchange rates at {$path}");
         }
 
         $snapshot = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);

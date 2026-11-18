@@ -248,7 +248,7 @@ class _AddonsScreenState extends State<AddonsScreen> {
       minorValue,
       currency.trim().isEmpty ? 'USD' : currency,
       units,
-      currency,
+      _preferredCurrency,
       isMinor: true,
     );
   }
@@ -407,7 +407,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
         .where((item) => item['status']?.toString().toLowerCase() == 'active')
         .toList(growable: false);
     final wallet = _wallet();
-    final walletCurrency = _preferredCurrency;
+    final walletCurrency = (wallet['currency'] ?? _preferredCurrency)
+        .toString()
+        .toUpperCase();
     final walletBalance = _money(
       wallet['available_balance_minor'] ?? wallet['balance_minor'] ?? 0,
       walletCurrency,
@@ -1071,7 +1073,9 @@ class _AddonsScreenState extends State<AddonsScreen> {
     final name = addon['name']?.toString() ?? 'Proxy add-on';
     final options = _checkoutOptions(record);
     final wallet = _wallet();
-    final walletCurrency = _preferredCurrency;
+    final walletCurrency = (wallet['currency'] ?? _preferredCurrency)
+        .toString()
+        .toUpperCase();
     final walletAmount = _money(
       wallet['available_balance_minor'] ?? wallet['balance_minor'] ?? 0,
       walletCurrency,

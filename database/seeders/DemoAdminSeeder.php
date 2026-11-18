@@ -18,7 +18,7 @@ class DemoAdminSeeder extends Seeder
         $admin = Admin::updateOrCreate(
             ['email' => 'admin@tlstore.test'],
             [
-                'full_name' => 'TrustLens Demo Admin',
+                'full_name' => 'TrustLens Admin',
                 'password' => $password,
                 'role' => 'super_admin',
                 'status' => 'active',
