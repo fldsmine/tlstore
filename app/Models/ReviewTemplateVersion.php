@@ -25,7 +25,10 @@ class ReviewTemplateVersion extends Model
             'review_template_version_questions',
             'review_template_version_id',
             'review_question_id'
-        )->withPivot(['step_order', 'step_name', 'question_order'])->withTimestamps();
+        )->withPivot(['step_order', 'step_name', 'question_order'])
+            ->withTimestamps()
+            ->orderByPivot('step_order')
+            ->orderByPivot('question_order');
     }
 
     public function questionLinks(): HasMany

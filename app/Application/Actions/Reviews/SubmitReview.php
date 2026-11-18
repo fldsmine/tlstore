@@ -6,6 +6,8 @@ use App\Application\Actions\Marketplace\ListingEligibility;
 use App\Models\ReviewAnswer;
 use App\Models\ReviewSubmission;
 use App\Models\ReviewTask;
+use App\Models\Transaction;
+use App\Application\Money\CurrencyMinorUnits;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -54,6 +56,32 @@ final class SubmitReview
             }
             $task->update(['status' => 'submitted', 'completed_at' => now()]);
 
+            $campaign = $task->campaign;
+            $currency = strtoupper($campaign->currency);
+            $appName = trim((string) $campaign->app?->name) ?: 'app listing';
+            Transaction::query()->updateOrCreate(
+                ['reference' => 'review-submission:'.$submission->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'app_review',
+                    'direction' => 'credit',
+                    'amount' => CurrencyMinorUnits::fromMinor((int) $task->reserved_reward_minor, $currency),
+                    'fee' => 0,
+                    'wallet' => null,
+                    'status' => 'pending',
+                    'description' => 'App review: '.$appName,
+                    'meta' => [
+                        'currency' => $currency,
+                        'currency_minor_units' => CurrencyMinorUnits::precision($currency),
+                        'amount_minor' => (int) $task->reserved_reward_minor,
+                        'review_submission_id' => $submission->id,
+                        'review_task_id' => $task->id,
+                        'campaign_id' => $campaign->id,
+                        'app_id' => $campaign->app_id,
+                    ],
+                ],
+            );
+
             return $submission->load('answers.question', 'task.campaign.app');
         });
     }
@@ -76,4 +104,5 @@ final class SubmitReview
             throw ValidationException::withMessages(['answers' => "An answer is invalid for question {$question->question_key}."]);
         }
     }
+
 }

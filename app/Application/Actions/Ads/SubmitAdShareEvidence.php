@@ -5,6 +5,8 @@ namespace App\Application\Actions\Ads;
 use App\Application\Actions\Marketplace\ListingEligibility;
 use App\Models\AdShareEvent;
 use App\Models\AdShareTask;
+use App\Models\Transaction;
+use App\Application\Money\CurrencyMinorUnits;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -46,6 +48,30 @@ final class SubmitAdShareEvidence
                 'shared_at' => now(),
             ]);
             $task->update(['status' => 'submitted', 'completed_at' => now()]);
+
+            $currency = strtoupper($task->ad->currency);
+            Transaction::query()->updateOrCreate(
+                ['reference' => 'ad-share-event:'.$event->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'ads_share',
+                    'direction' => 'credit',
+                    'amount' => CurrencyMinorUnits::fromMinor((int) $task->reserved_reward_minor, $currency),
+                    'fee' => 0,
+                    'wallet' => null,
+                    'status' => 'pending',
+                    'description' => 'Ad share: '.$task->ad->title,
+                    'meta' => [
+                        'currency' => $currency,
+                        'currency_minor_units' => CurrencyMinorUnits::precision($currency),
+                        'amount_minor' => (int) $task->reserved_reward_minor,
+                        'ad_share_event_id' => $event->id,
+                        'ad_share_task_id' => $task->id,
+                        'ad_id' => $task->ad_id,
+                        'channel' => $channel,
+                    ],
+                ],
+            );
 
             return $event->load('task.ad');
         });

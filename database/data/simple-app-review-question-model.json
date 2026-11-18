@@ -1,0 +1,156 @@
+{
+  "name": "Simple Review Questions",
+  "version": 1,
+  "source": "project/database/data/review-question-model.json (trimmed question bank, same schema)",
+  "template": {
+    "template_key": "simple_app_review",
+    "name": "Simple Review Questions",
+    "description": "This is for basic app review question, with 40% attention check question and 50% basic and 10% long text",
+    "status": "published"
+  },
+  "mix": {
+    "attention_check": {
+      "count": 4,
+      "share": "40%"
+    },
+    "basic": {
+      "count": 5,
+      "share": "50%"
+    },
+    "long_text": {
+      "count": 1,
+      "share": "10%"
+    }
+  },
+  "steps": [
+    {
+      "name": "First look",
+      "order": 1,
+      "questions": [
+        {
+          "key": "simple_match",
+          "order": 1,
+          "prompt": "Do the store screenshots match what the app really shows?",
+          "hint": "Open the app and compare it with the pictures on the listing.",
+          "type": "single_choice",
+          "options": [
+            "Yes, they match",
+            "Mostly, with small differences",
+            "Not really",
+            "No, they look completely different"
+          ],
+          "risk_option_indexes": [2, 3]
+        },
+        {
+          "key": "simple_attn_somewhat",
+          "order": 2,
+          "prompt": "Quality check: please select “Somewhat” for this question.",
+          "hint": "We use a few of these to catch rushed answers.",
+          "type": "single_choice",
+          "options": ["Not at all", "Somewhat", "Very much"],
+          "is_attention_check": true,
+          "attention_check_answer": "Somewhat"
+        },
+        {
+          "key": "simple_clear",
+          "order": 3,
+          "prompt": "How clearly does the app explain what it does in the first minute?",
+          "hint": null,
+          "type": "rating",
+          "scale": {
+            "min": 1,
+            "max": 5,
+            "low_label": "Very unclear",
+            "high_label": "Very clear"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Safety check",
+      "order": 2,
+      "questions": [
+        {
+          "key": "simple_attn_game",
+          "order": 1,
+          "prompt": "Note: you are required to select “game” as your response to this question.",
+          "hint": "Just pay attention to the question for an answer.",
+          "type": "single_choice",
+          "options": ["Utility", "game", "games"],
+          "is_attention_check": true,
+          "attention_check_answer": "game"
+        },
+        {
+          "key": "simple_pay",
+          "order": 2,
+          "prompt": "Did the app ask you for money, a deposit or a “registration fee” before showing you anything useful?",
+          "hint": null,
+          "type": "single_choice",
+          "options": ["Yes", "No", "I'm not sure"],
+          "risk_option_indexes": [0]
+        },
+        {
+          "key": "simple_attn_none",
+          "order": 3,
+          "prompt": "Attention check: choose “None of these” in the list below.",
+          "hint": "One of the answers below is exactly what the question asks for.",
+          "type": "single_choice",
+          "options": ["Bank statement", "None of these", "Passport photo"],
+          "is_attention_check": true,
+          "attention_check_answer": "None of these"
+        },
+        {
+          "key": "simple_contact",
+          "order": 4,
+          "prompt": "Could you reach a real person at the developer?",
+          "hint": "Use whatever support option the app itself shows.",
+          "type": "single_choice",
+          "options": [
+            "Yes, and support replied",
+            "Yes, but nobody replied",
+            "No support or contact details at all"
+          ],
+          "risk_option_indexes": [2]
+        },
+        {
+          "key": "simple_attn_not_random",
+          "order": 5,
+          "prompt": "Honestly: are you just answering randomly? Select “Not random” if you are reading this.",
+          "hint": "If you look closely you will see the answer.",
+          "type": "single_choice",
+          "options": ["Me", "Not random", "Randomly"],
+          "is_attention_check": true,
+          "attention_check_answer": "Not random"
+        }
+      ]
+    },
+    {
+      "name": "In your own words",
+      "order": 3,
+      "questions": [
+        {
+          "key": "simple_verdict",
+          "order": 1,
+          "prompt": "What is your overall verdict?",
+          "hint": null,
+          "type": "single_choice",
+          "options": [
+            "I would install and recommend it",
+            "I would install it with caution",
+            "I would not install it",
+            "I suspect this app is a scam"
+          ],
+          "risk_option_indexes": [3]
+        },
+        {
+          "key": "simple_what",
+          "order": 2,
+          "prompt": "In your own words, what does this app do, and would you recommend it to a friend?",
+          "hint": "At least 15 words. Don't copy the store description.",
+          "type": "long_text",
+          "min_words": 15
+        }
+      ]
+    }
+  ]
+}

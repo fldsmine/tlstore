@@ -1,0 +1,149 @@
+{
+  "name": "Local Reality Review",
+  "version": 1,
+  "source": "project/database/data/review-question-model.json (same schema, third angle)",
+  "template": {
+    "template_key": "local_reality_review",
+    "name": "Local Reality Review",
+    "description": "Reviews an app the way a real user in Nigeria actually meets it: will it run on the phone and the data people really have, what it costs beyond naira, and whether you would put it in a neighbour's hand.",
+    "status": "published"
+  },
+  "notes": "Nine questions, three per step. The traps here never look like traps: one asks the reviewer to spot English among Yoruba and Hausa, one makes them do small arithmetic on a naira price, and one makes them type a sentence that matters — this app is not a bank — before saying what the app is actually for.",
+  "attention_check_conventions": {
+    "single_choice": "attention_check_answer is the exact option string that must be selected.",
+    "multiple_choice": "attention_check_answer is the full list of options that must be ticked, and nothing else.",
+    "long_text": "attention_check_answer is {\"mode\":\"contains\",\"phrase\":\"...\",\"case_sensitive\":false} — the written answer must contain that phrase and still meet min_words."
+  },
+  "steps": [
+    {
+      "name": "Will it run here",
+      "order": 1,
+      "questions": [
+        {
+          "key": "lr_setup",
+          "order": 1,
+          "prompt": "How did the app behave the very first time you opened it on your own data?",
+          "hint": "Think about how long it took and how much of your bundle it seemed to eat.",
+          "type": "single_choice",
+          "options": [
+            "It opened almost instantly and felt light",
+            "A normal download and load, nothing painful",
+            "It was heavy — I waited a while on my network",
+            "It never loaded, or it timed out"
+          ]
+        },
+        {
+          "key": "lr_device",
+          "order": 2,
+          "prompt": "Did every screen work properly on the phone you are using?",
+          "hint": "Mention the phone model in your answer if you can.",
+          "type": "single_choice",
+          "options": [
+            "Everything worked",
+            "It worked but felt slow or heavy",
+            "Some screens broke or would not open",
+            "It crashed, froze or refused to open"
+          ]
+        },
+        {
+          "key": "lr_attn_language",
+          "order": 3,
+          "prompt": "Attention check: tick every word below that is written in English.",
+          "hint": "More than one answer is correct. Read each word properly before ticking.",
+          "type": "multiple_choice",
+          "options": ["Ẹ káàrọ̀", "Good morning", "Barka da safe", "Thank you", "Ẹ ṣé"],
+          "is_attention_check": true,
+          "attention_check_answer": ["Good morning", "Thank you"]
+        }
+      ]
+    },
+    {
+      "name": "What it costs you",
+      "order": 2,
+      "questions": [
+        {
+          "key": "lr_naira",
+          "order": 1,
+          "prompt": "Add up everything the app asked you to pay before you could get real value. Roughly what does it come to?",
+          "hint": "Count subscriptions, unlocks, top-ups and anything billed in naira.",
+          "type": "single_choice",
+          "options": [
+            "Nothing at all — it was free",
+            "Under ₦1,000",
+            "Between ₦1,000 and ₦5,000",
+            "More than ₦5,000"
+          ]
+        },
+        {
+          "key": "lr_hidden_cost",
+          "order": 2,
+          "prompt": "Besides money, what did the app take from you?",
+          "hint": "Tick everything it actually asked for. Only report what you really saw.",
+          "type": "multiple_choice",
+          "options": [
+            "My phone number",
+            "Access to my contacts or gallery",
+            "Permission to read my SMS or place calls",
+            "Background data every day, even when closed",
+            "Push notifications I could not switch off",
+            "Nothing beyond money"
+          ],
+          "risk_option_indexes": [1, 2],
+          "exclusive_option_index": 5
+        },
+        {
+          "key": "lr_attn_math",
+          "order": 3,
+          "prompt": "Attention check: this app charged ₦2,000 for one month. What would two months cost? Select the correct answer.",
+          "hint": "Do the sum, then pick the option that matches it.",
+          "type": "single_choice",
+          "options": ["₦2,000", "₦4,000", "₦6,000"],
+          "is_attention_check": true,
+          "attention_check_answer": "₦4,000"
+        }
+      ]
+    },
+    {
+      "name": "Tell your neighbour",
+      "order": 3,
+      "questions": [
+        {
+          "key": "lr_neighbour",
+          "order": 1,
+          "prompt": "Would you hand your own phone to a neighbour and let them use this app as it is?",
+          "hint": "Answer as the person who knows what you saw inside the app.",
+          "type": "single_choice",
+          "options": [
+            "Yes, without hesitating",
+            "Yes, but I would warn them about something first",
+            "Only if they asked me to install it for them",
+            "No, I would keep them away from it"
+          ],
+          "risk_option_indexes": [3]
+        },
+        {
+          "key": "lr_attn_phrase",
+          "order": 2,
+          "prompt": "Attention check: type this sentence exactly — this app is not a bank — then add one more line saying what the app is actually for.",
+          "hint": "At least 10 words in total. Copy the sentence, then answer in your own words.",
+          "type": "long_text",
+          "min_words": 10,
+          "is_attention_check": true,
+          "attention_check_answer": {
+            "mode": "contains",
+            "phrase": "this app is not a bank",
+            "case_sensitive": false
+          }
+        },
+        {
+          "key": "lr_letter",
+          "order": 3,
+          "prompt": "Write the message you would drop in your family group chat about this app — the honest one, not the polite one.",
+          "hint": "At least 15 words. Praise or warning, as long as it is specific to what you saw.",
+          "type": "long_text",
+          "min_words": 15
+        }
+      ]
+    }
+  ]
+}

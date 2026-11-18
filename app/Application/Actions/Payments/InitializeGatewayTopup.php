@@ -8,6 +8,7 @@ use App\Models\PaymentIntent;
 use App\Models\SubscriptionPlan;
 use App\Models\PackageAddon;
 use App\Models\User;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -96,6 +97,34 @@ final class InitializeGatewayTopup
             'expires_at' => now()->addHours(2),
         ]));
 
+        $transactionType = match ($purpose) {
+            'subscription' => $subscriptionPlan?->product_type->value ?? 'subscription_plan',
+            'package_addon' => 'package_addon',
+            default => 'top_up_fund',
+        };
+        Transaction::query()->updateOrCreate(['reference' => 'payment-intent:'.$intent->id], [
+            'user_id' => $user->id,
+            'type' => $transactionType,
+            'direction' => $purpose === 'topup' ? 'credit' : 'debit',
+            'amount' => CurrencyMinorUnits::fromMinor($amountMinor, $currency),
+            'fee' => 0,
+            'wallet' => null,
+            'status' => 'pending',
+            'description' => match ($purpose) {
+                'subscription' => 'Subscription package purchase: '.$subscriptionPlan?->name,
+                'package_addon' => 'Package add-on purchase: '.$packageAddon?->name,
+                default => 'Wallet top-up',
+            },
+            'meta' => [
+                'payment_intent_id' => $intent->id,
+                'currency' => $currency,
+                'currency_minor_units' => CurrencyMinorUnits::precision($currency),
+                'amount_minor' => $amountMinor,
+                'provider' => $gateway,
+                'purpose' => $purpose,
+            ],
+        ]);
+
         $amount = CurrencyMinorUnits::fromMinor($amountMinor, $currency);
         $name = trim((string) $user->full_name) ?: $user->username;
         $notificationUrl = $webhookBaseUrl.'/api/v1/webhooks/'.$gateway;
@@ -168,6 +197,7 @@ final class InitializeGatewayTopup
             return ['intent_id' => $intent->id, 'reference' => $reference, 'provider' => $gateway, 'checkout_url' => $checkoutUrl, 'status' => 'pending'];
         } catch (\Throwable $exception) {
             $intent->forceFill(['status' => 'failed', 'provider_metadata' => ['initialization_error' => 'Gateway checkout could not be initialized.']])->save();
+            Transaction::query()->where('reference', 'payment-intent:'.$intent->id)->update(['status' => 'failed', 'updated_at' => now()]);
             if ($exception instanceof \Illuminate\Http\Client\RequestException) {
                 Log::warning('Payment gateway rejected checkout initialization.', [
                     'provider' => $gateway,

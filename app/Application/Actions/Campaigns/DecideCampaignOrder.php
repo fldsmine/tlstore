@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\LedgerEntry;
 use App\Models\UserCampaignOrder;
 use App\Models\Wallet;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -84,6 +85,10 @@ final class DecideCampaignOrder
             $order->reviewed_by_admin_id = $admin->id;
             $order->reviewed_at = now();
             $order->save();
+            Transaction::query()->where('reference', 'campaign-order:'.$order->id)->update([
+                'status' => $decision,
+                'updated_at' => now(),
+            ]);
 
             AuditLog::query()->create([
                 'actor_admin_id' => $admin->id,

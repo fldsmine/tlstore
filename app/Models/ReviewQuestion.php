@@ -10,13 +10,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ReviewQuestion extends Model
 {
     protected $table = 'review_questions';
-    protected $fillable = ['question_key', 'step_name', 'step_order', 'question_order', 'prompt', 'hint', 'type', 'options', 'settings'];
+    protected $fillable = [
+        'question_key', 'step_name', 'step_order', 'question_order', 'prompt', 'hint',
+        'type', 'options', 'settings', 'is_attention_check', 'attention_check_answer',
+    ];
     protected $casts = [
         'step_order' => 'integer',
         'question_order' => 'integer',
         'type' => ReviewQuestionType::class,
         'options' => 'array',
         'settings' => 'array',
+        'is_attention_check' => 'boolean',
+        'attention_check_answer' => 'json',
     ];
 
     public function templateVersions(): BelongsToMany

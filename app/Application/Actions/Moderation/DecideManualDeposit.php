@@ -9,6 +9,7 @@ use App\Models\ManualDepositSubmission;
 use App\Models\Notification;
 use App\Models\PaymentTransaction;
 use App\Models\Wallet;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -35,6 +36,10 @@ final class DecideManualDeposit
             $deposit->paymentIntent->update([
                 'status' => $decision === 'approved' ? 'paid' : 'failed',
                 'paid_at' => $decision === 'approved' ? $now : null,
+            ]);
+            Transaction::query()->where('reference', 'payment-intent:'.$deposit->payment_intent_id)->update([
+                'status' => $decision,
+                'updated_at' => $now,
             ]);
 
             Notification::query()->firstOrCreate(

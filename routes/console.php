@@ -10,6 +10,9 @@ Artisan::command('inspire', function () {
 
 Schedule::command('tasks:expire-reservations')->everyMinute();
 Schedule::command('vas:reconcile-pending')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('listings:generate')
+    ->dailyAt('00:30')
+    ->withoutOverlapping();
 Schedule::command('rankings:check-eligibility')->dailyAt('00:05');
 Schedule::command('rankings:reward-monthly')->dailyAt('00:10');
 Schedule::command('demo:generate-listings')
@@ -22,5 +25,4 @@ Schedule::command('app:auto-approve-ad-shares')
     ->withoutOverlapping();
 Schedule::command('app:auto-approve-app-reviews')
     ->everyMinute()
-    ->environments(['local', 'testing', 'staging'])
     ->withoutOverlapping();

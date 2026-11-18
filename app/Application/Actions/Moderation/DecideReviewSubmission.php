@@ -13,6 +13,7 @@ use App\Models\ModerationDecision;
 use App\Models\Notification;
 use App\Models\ReviewSubmission;
 use App\Models\SubscriptionPlan;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,7 +22,7 @@ final class DecideReviewSubmission
     public function handle(Admin $admin, ReviewSubmission $submission, string $decision, ?string $reasonCode, ?string $reason, ?SubscriptionPlan $referralPlan = null): ReviewSubmission
     {
         return DB::transaction(function () use ($admin, $submission, $decision, $reasonCode, $reason, $referralPlan): ReviewSubmission {
-            $submission = ReviewSubmission::query()->with('task.campaign')->lockForUpdate()->findOrFail($submission->id);
+            $submission = ReviewSubmission::query()->with('task.campaign.app')->lockForUpdate()->findOrFail($submission->id);
             if ($submission->status->value !== 'pending_review') {
                 throw ValidationException::withMessages(['submission' => 'This review has already been decided.']);
             }
@@ -31,6 +32,8 @@ final class DecideReviewSubmission
 
             /** @var AppReviewCampaign $campaign */
             $campaign = AppReviewCampaign::query()->lockForUpdate()->findOrFail($submission->task->app_review_campaign_id);
+            $app = $submission->task->campaign?->app;
+            $appName = trim((string) $app?->name) !== '' ? trim((string) $app->name) : 'the app';
             $now = now();
             ModerationDecision::query()->create([
                 'decision_key' => 'review-'.$submission->id.'-'.\Illuminate\Support\Str::uuid(),
@@ -46,16 +49,28 @@ final class DecideReviewSubmission
 
             $submission->update(['status' => $decision, 'decided_at' => $now]);
             $submission->task->update(['status' => $decision === 'approved' ? 'completed' : 'cancelled']);
+            Transaction::query()->where('reference', 'review-submission:'.$submission->id)->update([
+                'status' => $decision,
+                'updated_at' => $now,
+            ]);
             Notification::query()->firstOrCreate(
                 ['notification_key' => 'review-decision-'.$submission->id],
                 [
                     'user_id' => $submission->reviewer_id,
                     'type' => 'review_decision',
-                    'title' => $decision === 'approved' ? 'App review approved' : 'App review not approved',
+                    'title' => $decision === 'approved'
+                        ? 'Review approved: '.$appName
+                        : 'Review rejected: '.$appName,
                     'body' => $decision === 'approved'
-                        ? 'Your app review was approved. The reward was added to your Review wallet.'
-                        : 'Your app review was not approved. '.($reason ?? 'Please review the task requirements.'),
-                    'data' => ['review_submission_id' => $submission->id, 'status' => $decision],
+                        ? 'Your review of '.$appName.' was approved. The reward was added to your Review wallet.'
+                        : 'Your review of '.$appName.' was rejected. '.($reason ?? 'Please review the task requirements.'),
+                    'data' => [
+                        'review_submission_id' => $submission->id,
+                        'app_id' => $app?->id,
+                        'app_name' => $appName,
+                        'status' => $decision,
+                        'reason' => $decision === 'rejected' ? $reason : null,
+                    ],
                 ],
             );
             $campaign->reserved_reviews = max(0, $campaign->reserved_reviews - 1);

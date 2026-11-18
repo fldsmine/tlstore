@@ -14,6 +14,7 @@ use App\Models\AuditLog;
 use App\Models\ModerationDecision;
 use App\Models\Notification;
 use App\Models\SubscriptionPlan;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -48,6 +49,10 @@ final class DecideAdShare
             $event->update([
                 'status' => $decision === 'approved' ? 'validated' : 'rejected',
                 'validated_at' => $decision === 'approved' ? $now : null,
+            ]);
+            Transaction::query()->where('reference', 'ad-share-event:'.$event->id)->update([
+                'status' => $decision,
+                'updated_at' => $now,
             ]);
             $event->task->update(['status' => $decision === 'approved' ? 'completed' : 'cancelled']);
             Notification::query()->firstOrCreate(

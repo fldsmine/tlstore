@@ -29,6 +29,8 @@ return new class extends Migration
             $table->string('type', 32);
             $table->json('options')->nullable();
             $table->json('settings')->nullable();
+            $table->boolean('is_attention_check')->default(false);
+            $table->json('attention_check_answer')->nullable();
             $table->timestamps();
             $table->index(['step_order', 'question_order']);
         });

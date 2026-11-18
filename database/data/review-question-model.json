@@ -38,7 +38,9 @@
           "prompt": "Quality check: please select “Somewhat” for this question.",
           "hint": "We use a few of these to catch rushed answers.",
           "type": "single_choice",
-          "options": ["Not at all", "Somewhat", "Very much"]
+          "options": ["Not at all", "Somewhat", "Very much"],
+          "is_attention_check": true,
+          "attention_check_answer": "Somewhat"
         }
       ]
     },
@@ -65,8 +67,18 @@
           "risk_option_indexes": [0]
         },
         {
-          "key": "asked",
+          "key": "attions",
           "order": 3,
+          "prompt": "honestly: Are you just answering ramdomly? choose “me” if you are",
+          "hint": "If you look closely you will see an answer.",
+          "type": "single_choice",
+          "options": ["Me","Not random","ramdomly"],
+          "is_attention_check": true,
+          "attention_check_answer": "Me"
+        },
+        {
+          "key": "asked",
+          "order": 4,
           "prompt": "Which of these did the app ask for?",
           "hint": "Choose all that apply. Only choose what you actually saw.",
           "type": "multiple_choice",
@@ -76,7 +88,7 @@
         },
         {
           "key": "signs",
-          "order": 4,
+          "order": 5,
           "prompt": "Did you notice any of these warning signs?",
           "hint": "Choose all that apply.",
           "type": "multiple_choice",
@@ -86,7 +98,7 @@
         },
         {
           "key": "dev",
-          "order": 5,
+          "order": 6,
           "prompt": "Does the developer look legitimate?",
           "hint": "Check the developer name, website, privacy policy and support email.",
           "type": "single_choice",
@@ -103,21 +115,31 @@
           "key": "what",
           "order": 1,
           "prompt": "In your own words, what does this app do and who is it for?",
-          "hint": "At least 25 words. Don't copy the store description.",
+          "hint": "At least 10 words. Don't copy the store description.",
           "type": "long_text",
-          "min_words": 25
+          "min_words": 10
+        },
+        {
+          "key": "attion",
+          "order": 2,
+          "prompt": "Note: you are required to select “game” as your response to this question.",
+          "hint": "Just pay attention to the question for an answers.",
+          "type": "single_choice",
+          "options": ["Utility","game","games"],
+          "is_attention_check": true,
+          "attention_check_answer": "game"
         },
         {
           "key": "bw",
-          "order": 2,
+          "order": 3,
           "prompt": "What's the best and the worst thing about it? Give one real example of each.",
-          "hint": "At least 20 words. Say what you did, and what happened.",
+          "hint": "At least 12 words. Say what you did, and what happened.",
           "type": "long_text",
-          "min_words": 20
+          "min_words": 12
         },
         {
           "key": "verdict",
-          "order": 3,
+          "order": 4,
           "prompt": "What is your overall verdict?",
           "hint": null,
           "type": "single_choice",
@@ -126,7 +148,7 @@
         },
         {
           "key": "honest",
-          "order": 4,
+          "order": 5,
           "prompt": null,
           "hint": null,
           "type": "confirmation",

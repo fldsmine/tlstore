@@ -5,6 +5,7 @@ namespace App\Application\Actions\Payments;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Enums\PaymentIntentStatus;
 use App\Models\PaymentIntent;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\Http;
 
 final class VerifyGatewayTopup
@@ -55,6 +56,8 @@ final class VerifyGatewayTopup
             if (in_array($providerStatus, ['failed', 'failure', 'cancelled', 'canceled', 'abandoned'], true)
                 && $intent->status === PaymentIntentStatus::Pending) {
                 $intent->forceFill(['status' => 'failed'])->save();
+                Transaction::query()->where('reference', 'payment-intent:'.$intent->id)
+                    ->update(['status' => 'failed', 'updated_at' => now()]);
             }
 
             return $intent->fresh() ?? $intent;

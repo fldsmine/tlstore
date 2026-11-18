@@ -458,6 +458,7 @@ Future<bool> _checkAddonBeforeSubmit() async {
                     number: index + 1,
                     total: total,
                     question: question,
+                    isAttentionCheck: question['is_attention_check'] == true,
                     answer: _answers[_questionId(question)],
                     textController: _controllerFor(question),
                     onChanged: (value) => setState(() {
@@ -788,6 +789,7 @@ class _QuestionSlide extends StatelessWidget {
     required this.number,
     required this.total,
     required this.question,
+    required this.isAttentionCheck,
     required this.answer,
     required this.textController,
     required this.onChanged,
@@ -796,6 +798,7 @@ class _QuestionSlide extends StatelessWidget {
   final int number;
   final int total;
   final Map<String, dynamic> question;
+  final bool isAttentionCheck;
   final dynamic answer;
   final TextEditingController textController;
   final ValueChanged<dynamic> onChanged;
@@ -843,6 +846,18 @@ class _QuestionSlide extends StatelessWidget {
               ),
             ),
             const Spacer(),
+            if (isAttentionCheck) ...[
+              Icon(Icons.fact_check_outlined, size: 15, color: scheme.tertiary),
+              const SizedBox(width: 5),
+              Text(
+                'Attention check',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.tertiary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 9),
+            ],
             Text(
               type == 'multiple_choice'
                   ? 'Select all that apply'
@@ -883,6 +898,32 @@ class _QuestionSlide extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+        if (isAttentionCheck) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: scheme.tertiaryContainer.withValues(alpha: .55),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 18, color: scheme.tertiary),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'Read the prompt carefully and follow its response instruction.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onTertiaryContainer,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
         const SizedBox(height: 22),
@@ -1019,6 +1060,30 @@ class _QuestionSlide extends StatelessWidget {
 int _countWords(dynamic value) {
   if (value is! String || value.trim().isEmpty) return 0;
   return value.trim().split(RegExp(r'\s+')).length;
+}
+
+bool _reviewAnswersMatch(dynamic actual, dynamic expected) {
+  if (expected is Map && expected['mode'] == 'contains') {
+    final String phrase = expected['phrase']?.toString() ?? '';
+    if (phrase.isEmpty || actual is! String) return false;
+    final bool caseSensitive = expected['case_sensitive'] == true;
+    return caseSensitive
+        ? actual.contains(phrase)
+        : actual.toLowerCase().contains(phrase.toLowerCase());
+  }
+  if (actual is List && expected is List) {
+    final actualValues = actual.map((value) => value.toString()).toList()
+      ..sort();
+    final expectedValues = expected.map((value) => value.toString()).toList()
+      ..sort();
+    if (actualValues.length != expectedValues.length) return false;
+    for (var index = 0; index < actualValues.length; index++) {
+      if (actualValues[index] != expectedValues[index]) return false;
+    }
+    return true;
+  }
+  if (actual is num && expected is num) return actual == expected;
+  return actual == expected;
 }
 
 class _AnswerChoice extends StatelessWidget {
@@ -1201,7 +1266,8 @@ class _TrustSummaryPage extends StatelessWidget {
     final scheme = theme.colorScheme;
     var claimsBroken = 0;
     var warningSignals = 0;
-    var attentionPassed = false;
+    var attentionChecks = 0;
+    var attentionPassed = 0;
     String? developerAssessment;
     String? verdict;
 
@@ -1220,9 +1286,11 @@ class _TrustSummaryPage extends StatelessWidget {
           ? (question['options'] as List).map((e) => e.toString()).toList()
           : const <String>[];
 
-      if (key == 'attn') {
-        attentionPassed =
-            value?.toString().toLowerCase().contains('somewhat') ?? false;
+      if (question['is_attention_check'] == true) {
+        attentionChecks++;
+        if (_reviewAnswersMatch(value, question['attention_check_answer'])) {
+          attentionPassed++;
+        }
       }
       if (key == 'dev') developerAssessment = value?.toString();
       if (key == 'verdict') verdict = value?.toString();
@@ -1327,10 +1395,12 @@ class _TrustSummaryPage extends StatelessWidget {
                 warning: warningSignals > 0,
               ),
               _SummaryMetric(
-                label: 'Attention check',
-                value: attentionPassed ? 'Passed' : 'Check answer',
+                label: 'Attention checks',
+                value: attentionChecks == 0
+                    ? 'Not required'
+                    : '$attentionPassed / $attentionChecks passed',
                 icon: Icons.center_focus_strong,
-                warning: !attentionPassed,
+                warning: attentionChecks > attentionPassed,
               ),
               _SummaryMetric(
                 label: 'Developer verification',

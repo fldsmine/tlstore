@@ -4,11 +4,15 @@ namespace App\Console\Commands;
 
 use App\Application\Actions\Marketplace\ListingEligibility;
 use App\Application\Actions\Moderation\DecideReviewSubmission;
+use App\Application\Money\CurrencyMinorUnits;
 use App\Console\Support\TaskRewardCalculator;
 use App\Models\Admin;
+use App\Models\LedgerEntry;
+use App\Models\ReferralReward;
 use App\Models\ReviewSubmission;
 use App\Models\ReviewTask;
 use App\Models\SystemSetting;
+use App\Models\Transaction;
 use App\Models\UserPackageAddon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -43,22 +47,9 @@ class AutoApproveAppReviews extends Command
             'failures' => [],
         ];
 
-        if (app()->isProduction()) {
-            $message = 'Demo app-review auto-approval is disabled in production.';
-
-            $this->error($message);
-
-            $report['status'] = 'disabled';
-            $report['message'] = $message;
-
-            $this->writeReport($report, $startedAt);
-
-            return self::FAILURE;
-        }
-
-        $admin = Admin::query()->where('email', 'admin@tlstore.test')->first();
+        $admin = Admin::query()->where('status', 'active')->orderBy('id')->first();
         if (! $admin) {
-            $message = 'The demo admin account is missing. Seed demo data first.';
+            $message = 'Automatic moderation requires at least one active admin account for its audit trail.';
 
             $this->error($message);
 
@@ -81,7 +72,12 @@ class AutoApproveAppReviews extends Command
         $report['limit'] = $limit;
 
         $submissions = ReviewSubmission::query()
-            ->with(['task.reviewer', 'task.campaign.app'])
+            ->with([
+                'answers.question',
+                'task.reviewer',
+                'task.campaign.app',
+                'task.templateVersion.questions',
+            ])
             ->where('status', 'pending_review')
             ->whereHas('reviewer', fn ($query) =>
                 $query->where('status', 'active')
@@ -101,7 +97,7 @@ class AutoApproveAppReviews extends Command
             $baseDetails = [
                 'submission_id' => $submission->id,
                 'reviewer_id' => $submission->reviewer_id,
-                'task_id' => $submission->task_id,
+                'task_id' => $submission->review_task_id,
             ];
 
             try {
@@ -152,13 +148,33 @@ class AutoApproveAppReviews extends Command
                     $admin,
                     $subscription,
                     $decide
-                ): string {
+                ): array {
                     $lockedTask = ReviewTask::query()
                         ->lockForUpdate()
                         ->findOrFail($task->id);
 
                     if ($lockedTask->status->value !== 'submitted') {
-                        return 'skipped';
+                        return ['status' => 'skipped'];
+                    }
+
+                    $failedAttentionChecks = $this->failedAttentionChecks($submission);
+                    if ($failedAttentionChecks !== []) {
+                        $questionKeys = implode(', ', array_column($failedAttentionChecks, 'question_key'));
+                        $reason = 'The review did not pass all attention checks. Required response instructions were missed for: '.$questionKeys.'.';
+                        $decide->handle(
+                            $admin,
+                            $submission->fresh(),
+                            'rejected',
+                            'attention_check_failed',
+                            $reason,
+                            $subscription->plan,
+                        );
+
+                        return [
+                            'status' => 'rejected',
+                            'reason' => $reason,
+                            'attention_check_failures' => $failedAttentionChecks,
+                        ];
                     }
 
                     if ($subscription->plan->addons) {
@@ -183,7 +199,10 @@ class AutoApproveAppReviews extends Command
                                 $subscription->plan,
                             );
 
-                            return 'rejected';
+                            return [
+                                'status' => 'rejected',
+                                'reason' => 'This review package requires an active package add-on. The submission was rejected because no active add-on was found.',
+                            ];
                         }
                     }
 
@@ -200,23 +219,32 @@ class AutoApproveAppReviews extends Command
                         $subscription->plan,
                     );
 
-                    return 'approved';
+                    return ['status' => 'approved'];
                 });
 
-                if ($result === 'approved') {
+                $resultStatus = $result['status'];
+                if ($resultStatus === 'approved') {
                     $report['approved']++;
-                } elseif ($result === 'rejected') {
+                } elseif ($resultStatus === 'rejected') {
                     $report['rejected']++;
                 } else {
                     $report['skipped']++;
                 }
 
+                $referralReward = null;
+                if ($resultStatus === 'approved') {
+                    $referralReward = $this->ensureTaskReferralTransaction($submission);
+                }
+
                 $report['submissions'][] = [
                     ...$baseDetails,
-                    'status' => $result,
-                    'reward_minor' => $result === 'approved'
+                    'status' => $resultStatus,
+                    'reason' => $result['reason'] ?? null,
+                    'attention_check_failures' => $result['attention_check_failures'] ?? [],
+                    'reward_minor' => $resultStatus === 'approved'
                         ? $rewardMinor
                         : null,
+                    'task_referral_reward' => $referralReward,
                 ];
 
             } catch (Throwable $exception) {
@@ -285,6 +313,123 @@ class AutoApproveAppReviews extends Command
             max(is_numeric($value) ? (int) $value : 60, 0),
             525600
         );
+    }
+
+    /** @return array<int, array{question_key:string}> */
+    private function failedAttentionChecks(ReviewSubmission $submission): array
+    {
+        $answers = $submission->answers->keyBy('review_question_id');
+        $failures = [];
+
+        foreach ($submission->task?->templateVersion?->questions ?? [] as $question) {
+            if (! $question->is_attention_check) {
+                continue;
+            }
+
+            $questionAnswer = $answers->get($question->id);
+            $actual = is_array($questionAnswer?->answer_value)
+                ? ($questionAnswer->answer_value['value'] ?? null)
+                : null;
+            if (! $questionAnswer || ! $this->matchesAttentionAnswer($actual, $question->attention_check_answer)) {
+                $failures[] = ['question_key' => $question->question_key];
+            }
+        }
+
+        return $failures;
+    }
+
+    private function matchesAttentionAnswer(mixed $actual, mixed $expected): bool
+    {
+        if (is_array($expected) && ($expected['mode'] ?? null) === 'contains') {
+            $phrase = (string) ($expected['phrase'] ?? '');
+            if (! is_string($actual) || $phrase === '') {
+                return false;
+            }
+
+            if (($expected['case_sensitive'] ?? false) === true) {
+                return str_contains($actual, $phrase);
+            }
+
+            return str_contains(mb_strtolower($actual), mb_strtolower($phrase));
+        }
+
+        if (is_array($actual) && is_array($expected)) {
+            $actualValues = array_map('strval', $actual);
+            $expectedValues = array_map('strval', $expected);
+            sort($actualValues);
+            sort($expectedValues);
+
+            return $actualValues === $expectedValues;
+        }
+
+        if (is_numeric($actual) && is_numeric($expected)) {
+            return (float) $actual === (float) $expected;
+        }
+
+        return $actual === $expected;
+    }
+
+    /**
+     * Ensure a task referral reward appears in account history even if a
+     * ledger observer was unavailable while the reward was posted.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function ensureTaskReferralTransaction(ReviewSubmission $submission): ?array
+    {
+        $reward = ReferralReward::query()
+            ->where('reward_type', 'task')
+            ->where('source_type', 'review_submission')
+            ->where('source_id', $submission->id)
+            ->where('status', 'paid')
+            ->first();
+
+        if (! $reward) {
+            return null;
+        }
+
+        $ledger = LedgerEntry::query()->with('wallet')->find($reward->ledger_entry_id);
+        if (! $ledger?->wallet) {
+            return [
+                'reward_id' => $reward->id,
+                'status' => 'paid',
+                'transaction_recorded' => false,
+            ];
+        }
+
+        $currency = strtoupper($ledger->wallet->currency);
+        $transaction = Transaction::query()->updateOrCreate(
+            ['reference' => 'ledger:'.$ledger->id],
+            [
+                'user_id' => $ledger->wallet->user_id,
+                'type' => 'referral_bonus',
+                'direction' => 'credit',
+                'amount' => CurrencyMinorUnits::fromMinor((int) $ledger->amount_minor, $currency),
+                'fee' => 0,
+                'wallet' => $ledger->wallet->wallet_type->value,
+                'status' => $ledger->status->value === 'posted' ? 'completed' : $ledger->status->value,
+                'description' => $ledger->description ?: 'Referral reward for approved app review',
+                'meta' => array_merge($ledger->metadata ?? [], [
+                    'currency' => $currency,
+                    'currency_minor_units' => CurrencyMinorUnits::precision($currency),
+                    'amount_minor' => (int) $ledger->amount_minor,
+                    'ledger_entry_id' => $ledger->id,
+                    'referral_reward_id' => $reward->id,
+                    'reward_type' => 'task',
+                    'source_type' => 'review_submission',
+                    'source_id' => $submission->id,
+                ]),
+            ],
+        );
+
+        return [
+            'reward_id' => $reward->id,
+            'transaction_id' => $transaction->id,
+            'amount_minor' => (int) $reward->amount_minor,
+            'currency' => strtoupper($reward->currency),
+            'status' => $reward->status,
+            'transaction_recorded' => true,
+        ];
     }
 
     private function writeReport(array $report, float $startedAt): void

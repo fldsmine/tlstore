@@ -54,7 +54,7 @@ final class LedgerEntryObserver
 
     private function sync(LedgerEntry $entry): void
     {
-        $entry->loadMissing('wallet');
+        $entry->loadMissing(['wallet', 'source']);
         $wallet = $entry->wallet;
         if (! $wallet) {
             return;
@@ -68,7 +68,7 @@ final class LedgerEntryObserver
             str_contains($entry->entry_type, 'social_follow') => 'social_follow_reward',
             str_contains($entry->entry_type, 'withdrawal') => 'withdrawal',
             str_contains($entry->entry_type, 'subscription') => 'subscription_plan',
-            str_contains($entry->entry_type, 'location') => 'location_addons',
+            str_contains($entry->entry_type, 'addons') => 'package_addon',
             str_contains($entry->entry_type, 'rank') => 'rank_earning',
             str_contains($entry->entry_type, 'vtu') => 'vtu_purchase',
             str_contains($entry->entry_type, 'transfer') => 'fund_transfer',
@@ -84,8 +84,40 @@ final class LedgerEntryObserver
             default => $entry->status->value,
         };
 
+        $reference = match (true) {
+            $entry->entry_type === 'review_reward' && $entry->source_type === 'review_submission'
+                => 'review-submission:'.$entry->source_id,
+            $entry->entry_type === 'ad_share_reward' && $entry->source_type === 'ad_share_event'
+                => 'ad-share-event:'.$entry->source_id,
+            $entry->source_type === 'payment_intent'
+                => 'payment-intent:'.$entry->source_id,
+            $entry->source_type === 'user_campaign_order' && ! str_contains($entry->entry_type, 'refund')
+                => 'campaign-order:'.$entry->source_id,
+            default => 'ledger:'.$entry->id,
+        };
+        $existing = Transaction::query()->where('reference', $reference)->first();
+
+        $activityStatus = match ($entry->source_type) {
+            'review_submission' => $entry->source?->status?->value ?? $entry->source?->status ?? $transactionStatus,
+            'ad_share_event' => match ($entry->source?->status?->value ?? $entry->source?->status) {
+                'validated' => 'approved',
+                'rejected' => 'rejected',
+                'pending_validation' => 'pending',
+                default => $transactionStatus,
+            },
+            'user_campaign_order' => $entry->source?->status ?? $transactionStatus,
+            'payment_intent' => ($entry->source?->provider === 'manual')
+                ? match ($entry->source?->status?->value ?? $entry->source?->status) {
+                    'paid' => 'approved',
+                    'failed', 'cancelled', 'expired' => 'rejected',
+                    default => 'pending',
+                }
+                : $transactionStatus,
+            default => $transactionStatus,
+        };
+
         Transaction::query()->updateOrCreate(
-            ['reference' => 'ledger:'.$entry->id],
+            ['reference' => $reference],
             [
                 'user_id' => $wallet->user_id,
                 'type' => $type,
@@ -93,9 +125,9 @@ final class LedgerEntryObserver
                 'amount' => CurrencyMinorUnits::fromMinor($entry->amount_minor, $currency),
                 'fee' => 0,
                 'wallet' => $wallet->wallet_type->value,
-                'status' => $transactionStatus,
-                'description' => $entry->description,
-                'meta' => array_merge($entry->metadata ?? [], [
+                'status' => $activityStatus,
+                'description' => $existing?->description ?: $entry->description,
+                'meta' => array_merge($existing?->meta ?? [], $entry->metadata ?? [], [
                     'ledger_entry_id' => $entry->id,
                     'currency' => $currency,
                     'currency_minor_units' => CurrencyMinorUnits::precision($currency),

@@ -1325,6 +1325,12 @@ class _QuestionCard extends StatelessWidget {
                       color: meta.color,
                       label: meta.label,
                     ),
+                    if (question['is_attention_check'] == true)
+                      const _MetaChip(
+                        icon: Icons.fact_check_rounded,
+                        color: _Palette.rose,
+                        label: 'Attention check',
+                      ),
                     if (step.isNotEmpty)
                       _MetaChip(
                         icon: Icons.layers_rounded,
@@ -2102,6 +2108,8 @@ class _QuestionEditorState extends State<_QuestionEditor> {
       <TextEditingController>[];
 
   late String _type;
+  late TextEditingController _attentionAnswerController;
+  bool _isAttentionCheck = false;
   bool _saving = false;
   String? _error;
 
@@ -2113,6 +2121,15 @@ class _QuestionEditorState extends State<_QuestionEditor> {
     final Map<String, dynamic> row =
         widget.existing ?? const <String, dynamic>{};
     _type = row['type']?.toString() ?? 'single_choice';
+    _isAttentionCheck = row['is_attention_check'] == true;
+    final dynamic attentionAnswer = row['attention_check_answer'];
+    _attentionAnswerController = TextEditingController(
+      text: attentionAnswer is List
+          ? attentionAnswer.join(', ')
+          : attentionAnswer is Map
+          ? (attentionAnswer['phrase']?.toString() ?? '')
+          : (attentionAnswer?.toString() ?? ''),
+    );
     _fields = <String, TextEditingController>{
       for (final String key in _fieldKeys) key: _controllerFor(key, row),
     };
@@ -2147,6 +2164,7 @@ class _QuestionEditorState extends State<_QuestionEditor> {
     for (final TextEditingController controller in _fields.values) {
       controller.dispose();
     }
+    _attentionAnswerController.dispose();
     for (final TextEditingController controller in _options) {
       controller.dispose();
     }
@@ -2191,6 +2209,11 @@ class _QuestionEditorState extends State<_QuestionEditor> {
       setState(() => _error = 'Add at least two answer options.');
       return;
     }
+    final dynamic attentionAnswer = _buildAttentionAnswer(options);
+    if (_isAttentionCheck && attentionAnswer == null) {
+      setState(() => _error = 'Set the required answer for this attention check.');
+      return;
+    }
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     setState(() {
       _saving = true;
@@ -2207,6 +2230,8 @@ class _QuestionEditorState extends State<_QuestionEditor> {
             int.tryParse(_fields['question_order']!.text.trim()) ?? 1,
         'type': _type,
         'options': _isChoice ? options : null,
+        'is_attention_check': _isAttentionCheck,
+        'attention_check_answer': _isAttentionCheck ? attentionAnswer : null,
         'settings': _type == 'rating'
             ? <String, dynamic>{'scale': <String, int>{'min': 1, 'max': 5}}
             : <String, dynamic>{},
@@ -2321,6 +2346,21 @@ class _QuestionEditorState extends State<_QuestionEditor> {
               lines: 2,
               validator: (String? value) => null,
             ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: _isAttentionCheck,
+              onChanged: _saving
+                  ? null
+                  : (bool value) => setState(() {
+                      _isAttentionCheck = value;
+                      _error = null;
+                    }),
+              title: const Text('Attention check'),
+              subtitle: const Text(
+                'Require a specific answer stated in the question prompt.',
+              ),
+            ),
+            if (_isAttentionCheck) _buildAttentionAnswerField(),
             if (_isChoice) ...<Widget>[
               _label(theme, 'Answer options'),
               for (int index = 0; index < _options.length; index++)
@@ -2412,6 +2452,118 @@ class _QuestionEditorState extends State<_QuestionEditor> {
           onPressed: _saving ? null : _save,
         ),
       ],
+    );
+  }
+
+  dynamic _buildAttentionAnswer(List<String> options) {
+    final String value = _attentionAnswerController.text.trim();
+    if (value.isEmpty) return null;
+    return switch (_type) {
+      'single_choice' => options.contains(value) ? value : null,
+      'multiple_choice' => _multipleChoiceAttentionAnswer(value, options),
+      'rating' => num.tryParse(value),
+      'confirmation' => value.toLowerCase() == 'true'
+          ? true
+          : value.toLowerCase() == 'false'
+          ? false
+          : null,
+      'long_text' => <String, dynamic>{
+          'mode': 'contains',
+          'phrase': value,
+          'case_sensitive': false,
+        },
+      _ => value,
+    };
+  }
+
+  List<String>? _multipleChoiceAttentionAnswer(
+    String value,
+    List<String> options,
+  ) {
+    final List<String> answers = value
+        .split(',')
+        .map((String item) => item.trim())
+        .where((String item) => item.isNotEmpty)
+        .toList();
+    return answers.isNotEmpty && answers.every(options.contains)
+        ? answers
+        : null;
+  }
+
+  Widget _buildAttentionAnswerField() {
+    if (_type == 'single_choice') {
+      return AnimatedBuilder(
+        animation: Listenable.merge(_options),
+        builder: (BuildContext context, Widget? child) {
+          final List<String> currentOptions = _options
+              .map((TextEditingController controller) => controller.text.trim())
+              .where((String value) => value.isNotEmpty)
+              .toList();
+          final String? selected = currentOptions.contains(
+            _attentionAnswerController.text,
+          )
+              ? _attentionAnswerController.text
+              : null;
+          return DropdownButtonFormField<String>(
+            value: selected,
+            decoration: const InputDecoration(
+              labelText: 'Required answer',
+              helperText: 'Choose the response required by the prompt.',
+            ),
+            items: <DropdownMenuItem<String>>[
+              for (final String option in currentOptions)
+                DropdownMenuItem<String>(value: option, child: Text(option)),
+            ],
+            onChanged: _saving
+                ? null
+                : (String? value) => setState(() {
+                    _attentionAnswerController.text = value ?? '';
+                    _error = null;
+                  }),
+          );
+        },
+      );
+    }
+    if (_type == 'multiple_choice') {
+      return _DialogTextField(
+        controller: _attentionAnswerController,
+        label: 'Required answer(s)',
+        hint: 'Enter exact option labels separated by commas',
+        icon: Icons.checklist_rounded,
+        lines: 2,
+        validator: (String? value) => null,
+      );
+    }
+    if (_type == 'confirmation') {
+      final String? selected = <String>['true', 'false'].contains(
+        _attentionAnswerController.text.toLowerCase(),
+      )
+          ? _attentionAnswerController.text.toLowerCase()
+          : null;
+      return DropdownButtonFormField<String>(
+        value: selected,
+        decoration: const InputDecoration(labelText: 'Required response'),
+        items: const <DropdownMenuItem<String>>[
+          DropdownMenuItem<String>(value: 'true', child: Text('Yes / confirmed')),
+          DropdownMenuItem<String>(value: 'false', child: Text('No / not confirmed')),
+        ],
+        onChanged: _saving
+            ? null
+            : (String? value) => setState(() {
+                _attentionAnswerController.text = value ?? '';
+                _error = null;
+              }),
+      );
+    }
+    return _DialogTextField(
+      controller: _attentionAnswerController,
+      label: _type == 'rating' ? 'Required rating' : 'Required phrase',
+      hint: _type == 'rating'
+          ? 'Enter a number within the rating scale'
+          : 'The response must include this phrase.',
+      icon: Icons.rule_rounded,
+      keyboard: _type == 'rating' ? TextInputType.number : TextInputType.text,
+      validator: (String? value) => null,
     );
   }
 

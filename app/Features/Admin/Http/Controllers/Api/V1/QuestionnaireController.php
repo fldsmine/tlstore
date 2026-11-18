@@ -124,6 +124,8 @@ final class QuestionnaireController
             'options' => ['sometimes', 'nullable', 'array'],
             'options.*' => ['required', 'string', 'max:500'],
             'settings' => ['sometimes', 'nullable', 'array'],
+            'is_attention_check' => ['sometimes', 'boolean'],
+            'attention_check_answer' => ['sometimes', 'nullable'],
         ];
         if ($creating) {
             $rules['question_key'] = ['required', 'string', 'max:64', 'alpha_dash', 'unique:review_questions,question_key'];
@@ -131,8 +133,12 @@ final class QuestionnaireController
 
         $data = $request->validate($rules);
         $type = $data['type'] ?? $request->route('question')?->type?->value;
+        $isAttentionCheck = (bool) ($data['is_attention_check']
+            ?? $request->route('question')?->is_attention_check
+            ?? false);
+        $options = $data['options'] ?? $request->route('question')?->options ?? [];
         if (in_array($type, ['single_choice', 'multiple_choice'], true)
-            && count($data['options'] ?? $request->route('question')?->options ?? []) < 1) {
+            && count($options) < 1) {
             throw \Illuminate\Validation\ValidationException::withMessages(['options' => 'Choice questions require at least one option.']);
         }
         if ($type === 'rating') {
@@ -141,6 +147,40 @@ final class QuestionnaireController
                 || ! is_numeric($scale['max']) || (float) $scale['max'] <= (float) $scale['min']) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['settings.scale' => 'Rating questions require a scale with numeric min and max values.']);
             }
+        }
+
+        if (array_key_exists('is_attention_check', $data) || array_key_exists('attention_check_answer', $data) || $creating) {
+            $answer = $data['attention_check_answer'] ?? null;
+            if ($isAttentionCheck && $answer === null) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'attention_check_answer' => 'An attention check requires its expected answer.',
+                ]);
+            }
+            if ($isAttentionCheck) {
+                $validAnswer = match ($type) {
+                    'single_choice' => is_string($answer) && in_array($answer, $options, true),
+                    'multiple_choice' => is_array($answer) && $answer !== []
+                        && count(array_diff($answer, $options)) === 0,
+                    'rating' => is_numeric($answer)
+                        && (float) $answer >= (float) ($data['settings']['scale']['min'] ?? $request->route('question')?->settings['scale']['min'] ?? 1)
+                        && (float) $answer <= (float) ($data['settings']['scale']['max'] ?? $request->route('question')?->settings['scale']['max'] ?? 5),
+                    'long_text' => (is_string($answer) && trim($answer) !== '')
+                        || (is_array($answer)
+                            && ($answer['mode'] ?? null) === 'contains'
+                            && is_string($answer['phrase'] ?? null)
+                            && trim($answer['phrase']) !== ''
+                            && (! array_key_exists('case_sensitive', $answer) || is_bool($answer['case_sensitive']))),
+                    'confirmation' => is_bool($answer),
+                    default => false,
+                };
+                if (! $validAnswer) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'attention_check_answer' => 'The expected answer must be valid for this question and match one of its options where applicable.',
+                    ]);
+                }
+            }
+            $data['is_attention_check'] = $isAttentionCheck;
+            $data['attention_check_answer'] = $isAttentionCheck ? $answer : null;
         }
 
         return $data;

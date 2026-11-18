@@ -1,7 +1,12 @@
 {
-  "name": "TrustLens demo app listings",
+  "name": "TrustLens real app listings",
   "version": 1,
-  "source": "project-overview.html",
+  "source": "Store metadata from Google Play, the Apple App Store and the Samsung Galaxy Store; icons and screenshots gathered from the web and resized into storage/app/public.",
+  "notes": [
+    "paid_amount is the campaign budget: review_reward × maximum_review, in the listing currency.",
+    "Each listing has 2-4 screenshots so the review flow can show a swipeable gallery.",
+    "Two listings per country: NG, US, UK, GH and CA, each billed in that country's currency."
+  ],
   "apps": [
     {
       "prototype_id": 0,
@@ -137,7 +142,6 @@
   },
   {
     "prototype_id": 5,
-    "featured": true,
     "name": "LearnSphere Academy",
     "short_code": "LS",
     "store": "Google Play",
@@ -240,6 +244,430 @@
       {"position": 3, "source_type": "prototype_svg", "illustration_index": 2, "alt_text": "Generated TrustLens prototype view 3 of 4 for RideWave Mobility.", "storage_disk": "local", "storage_path": "images/app-image-15.jpg"},
       {"position": 4, "source_type": "prototype_svg", "illustration_index": 3, "alt_text": "Generated TrustLens prototype view 4 of 4 for RideWave Mobility.", "storage_disk": "local", "storage_path": "images/app-image-16.jpg"}
     ]
-  }
+  },
+    {
+      "prototype_id": 9,
+      "name": "WhatsApp Messenger",
+      "short_code": "WA",
+      "store": "Google Play",
+      "brand_color": "#25D366",
+      "developer": "WhatsApp LLC",
+      "category": "Communication",
+      "install_count_label": "5B+",
+      "description": "Free, end-to-end encrypted messaging and calling for family, friends and business customers.",
+      "store_link": "https://play.google.com/store/apps/details?id=com.whatsapp",
+      "paid_amount": "125000.00",
+      "location": "NG",
+      "currency": "NGN",
+      "rating": 4.3,
+      "total_reviews": 480,
+      "review_reward": "250.00",
+      "app_icon": "app-icons/whatsapp-messenger.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 500,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "WhatsApp Messenger screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/whatsapp-messenger/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "WhatsApp Messenger screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/whatsapp-messenger/2.jpg"
+        },
+        {
+          "position": 3,
+          "source_type": "image",
+          "illustration_index": 2,
+          "alt_text": "WhatsApp Messenger screenshot 3",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/whatsapp-messenger/3.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 10,
+      "name": "Jumia: Online Shopping",
+      "short_code": "JM",
+      "store": "Google Play",
+      "brand_color": "#F68B1E",
+      "developer": "Jumia",
+      "category": "Shopping",
+      "install_count_label": "10M+",
+      "description": "Order phones, fashion, groceries and home goods from verified sellers, with pay on delivery across Nigeria.",
+      "store_link": "https://play.google.com/store/apps/details?id=com.jumia.android",
+      "paid_amount": "81000.00",
+      "location": "NG",
+      "currency": "NGN",
+      "rating": 4.2,
+      "total_reviews": 460,
+      "review_reward": "180.00",
+      "app_icon": "app-icons/jumia-online-shopping.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 450,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Jumia: Online Shopping screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/jumia-online-shopping/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Jumia: Online Shopping screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/jumia-online-shopping/2.jpg"
+        },
+        {
+          "position": 3,
+          "source_type": "image",
+          "illustration_index": 2,
+          "alt_text": "Jumia: Online Shopping screenshot 3",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/jumia-online-shopping/3.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 11,
+	  "featured": true,
+      "name": "Spotify: Music and Podcasts",
+      "short_code": "SP",
+      "store": "Apple App Store",
+      "brand_color": "#1DB954",
+      "developer": "Spotify",
+      "category": "Music",
+      "install_count_label": "500M+",
+      "description": "Stream millions of songs, playlists and podcasts, and keep favourites offline with Premium.",
+      "store_link": "https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580",
+      "paid_amount": "270.00",
+      "location": "US",
+      "currency": "USD",
+      "rating": 4.8,
+      "total_reviews": 620,
+      "review_reward": "0.45",
+      "app_icon": "app-icons/spotify.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 600,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Spotify: Music and Podcasts screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/spotify/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Spotify: Music and Podcasts screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/spotify/2.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 12,
+      "name": "Cash App",
+      "short_code": "CA",
+      "store": "Apple App Store",
+      "brand_color": "#00D54B",
+      "developer": "Block, Inc.",
+      "category": "Finance",
+      "install_count_label": "50M+",
+      "description": "Send and receive money instantly, buy bitcoin and manage a Cash Card straight from your phone.",
+      "store_link": "https://apps.apple.com/us/app/cash-app/id711923939",
+      "paid_amount": "240.00",
+      "location": "US",
+      "currency": "USD",
+      "rating": 4.7,
+      "total_reviews": 540,
+      "review_reward": "0.60",
+      "app_icon": "app-icons/cash-app.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 400,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Cash App screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/cash-app/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Cash App screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/cash-app/2.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 13,
+      "name": "Revolut: Spend, Save, Trade",
+      "short_code": "RV",
+      "store": "Apple App Store",
+      "brand_color": "#191C1F",
+      "developer": "Revolut Ltd",
+      "category": "Finance",
+      "install_count_label": "30M+",
+      "description": "Multi-currency accounts, budgeting, savings and stock trading in one app for UK customers.",
+      "store_link": "https://apps.apple.com/gb/app/revolut-spend-save-trade/id932493382",
+      "paid_amount": "180.00",
+      "location": "UK",
+      "currency": "GBP",
+      "rating": 4.6,
+      "total_reviews": 500,
+      "review_reward": "0.40",
+      "app_icon": "app-icons/revolut.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 450,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Revolut: Spend, Save, Trade screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/revolut/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Revolut: Spend, Save, Trade screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/revolut/2.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 14,
+      "name": "Trainline: Train tickets",
+      "short_code": "TL",
+      "store": "Google Play",
+      "brand_color": "#00A88F",
+      "developer": "Trainline",
+      "category": "Travel & Local",
+      "install_count_label": "10M+",
+      "description": "Compare and book UK and European train tickets, store mobile tickets and follow live platforms.",
+      "store_link": "https://play.google.com/store/apps/details?id=com.thetrainline",
+      "paid_amount": "122.50",
+      "location": "UK",
+      "currency": "GBP",
+      "rating": 4.4,
+      "total_reviews": 380,
+      "review_reward": "0.35",
+      "app_icon": "app-icons/trainline.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 350,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Trainline: Train tickets screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/trainline/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Trainline: Train tickets screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/trainline/2.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 15,
+      "name": "Bolt: Request a Ride",
+      "short_code": "BO",
+      "store": "Google Play",
+      "brand_color": "#34D186",
+      "developer": "Bolt Technology OÜ",
+      "category": "Maps & Navigation",
+      "install_count_label": "50M+",
+      "description": "Book affordable rides with the fare shown up front, and pay by cash, card or mobile money.",
+      "store_link": "https://play.google.com/store/apps/details?id=ee.mtakso.client",
+      "paid_amount": "7200.00",
+      "location": "GH",
+      "currency": "GHS",
+      "rating": 4.5,
+      "total_reviews": 420,
+      "review_reward": "18.00",
+      "app_icon": "app-icons/bolt.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 400,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Bolt: Request a Ride screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/bolt/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Bolt: Request a Ride screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/bolt/2.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 16,
+	  "featured": true,
+      "name": "Opera Mini: Fast Web Browser",
+      "short_code": "OM",
+      "store": "Samsung Galaxy Store",
+      "brand_color": "#DE1B22",
+      "developer": "Opera",
+      "category": "Tools",
+      "install_count_label": "100M+",
+      "description": "A lightweight browser that compresses pages to save data, with a news feed and download manager.",
+      "store_link": "https://galaxystore.samsung.com/detail/com.opera.mini.native",
+      "paid_amount": "4500.00",
+      "location": "GH",
+      "currency": "GHS",
+      "rating": 4.3,
+      "total_reviews": 300,
+      "review_reward": "15.00",
+      "app_icon": "app-icons/opera-mini.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 300,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Opera Mini: Fast Web Browser screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/opera-mini/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Opera Mini: Fast Web Browser screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/opera-mini/2.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 17,
+      "name": "Duolingo: Language Lessons",
+      "short_code": "DU",
+      "store": "Google Play",
+      "brand_color": "#58CC02",
+      "developer": "Duolingo",
+      "category": "Education",
+      "install_count_label": "100M+",
+      "description": "Short daily lessons in Spanish, French, Yoruba and more, with streaks and leagues to keep you going.",
+      "store_link": "https://play.google.com/store/apps/details?id=com.duolingo",
+      "paid_amount": "275.00",
+      "location": "CA",
+      "currency": "CAD",
+      "rating": 4.7,
+      "total_reviews": 610,
+      "review_reward": "0.55",
+      "app_icon": "app-icons/duolingo.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 500,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Duolingo: Language Lessons screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/duolingo/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Duolingo: Language Lessons screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/duolingo/2.jpg"
+        },
+        {
+          "position": 3,
+          "source_type": "image",
+          "illustration_index": 2,
+          "alt_text": "Duolingo: Language Lessons screenshot 3",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/duolingo/3.jpg"
+        }
+      ]
+    },
+    {
+      "prototype_id": 18,
+      "name": "Amazon Shopping",
+      "short_code": "AM",
+      "store": "Samsung Galaxy Store",
+      "brand_color": "#FF9900",
+      "developer": "Amazon Mobile LLC",
+      "category": "Shopping",
+      "install_count_label": "100M+",
+      "description": "Search millions of products, compare prices, read reviews and track every delivery.",
+      "store_link": "https://galaxystore.samsung.com/detail/com.amazon.mShop.android.shopping",
+      "paid_amount": "200.00",
+      "location": "CA",
+      "currency": "CAD",
+      "rating": 4.6,
+      "total_reviews": 480,
+      "review_reward": "0.50",
+      "app_icon": "app-icons/amazon-shopping.png",
+      "app_icon_storage_disk": "local",
+      "maximum_review": 400,
+      "screenshots": [
+        {
+          "position": 1,
+          "source_type": "image",
+          "illustration_index": 0,
+          "alt_text": "Amazon Shopping screenshot 1",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/amazon-shopping/1.jpg"
+        },
+        {
+          "position": 2,
+          "source_type": "image",
+          "illustration_index": 1,
+          "alt_text": "Amazon Shopping screenshot 2",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/amazon-shopping/2.jpg"
+        },
+        {
+          "position": 3,
+          "source_type": "image",
+          "illustration_index": 2,
+          "alt_text": "Amazon Shopping screenshot 3",
+          "storage_disk": "local",
+          "storage_path": "app-screenshots/amazon-shopping/3.jpg"
+        }
+      ]
+    }
   ]
 }

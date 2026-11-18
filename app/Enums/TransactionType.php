@@ -14,7 +14,6 @@ enum TransactionType: string
     case WITHDRAWAL = 'withdrawal';
     case SUBSCRIPTION_PLAN = 'subscription_plan';
     case PACKAGE_ADDON = 'package_addon';
-    case LOCATION_ADDONS = 'location_addons';
     case FUND_TRANSFER = 'fund_transfer';
     case RANK_EARNING = 'rank_earning';
     case VTU_PURCHASE = 'vtu_purchase';
@@ -27,7 +26,6 @@ enum TransactionType: string
             self::CAMPAIGN_ORDER => 'Campaign order',
             self::RANK_EARNING => 'Salary Salary',
             self::FUND_TRANSFER => 'Account Topup',
-            self::LOCATION_ADDONS => 'Location Proxy',
             self::SUBSCRIPTION_PLAN => 'Package Purchase',
             self::PACKAGE_ADDON => 'Package Add-on',
             self::WITHDRAWAL => 'Cash withdrawal',
@@ -47,7 +45,6 @@ enum TransactionType: string
             self::VTU_PURCHASE,
             self::SUBSCRIPTION_PLAN,
             self::PACKAGE_ADDON,
-            self::LOCATION_ADDONS,
             self::TOP_UP_FUND,
         ], true);
     }
@@ -77,7 +74,6 @@ enum TransactionType: string
             self::WITHDRAWAL => 'ri-arrow-right-up-line',
             self::SUBSCRIPTION_PLAN => 'ri-shopping-bag-3-line',
             self::PACKAGE_ADDON => 'ri-add-circle-line',
-            self::LOCATION_ADDONS => 'ri-add-circle-line',
             self::FUND_TRANSFER => 'ri-scales-3-line',
             self::RANK_EARNING => 'ri-exchange-funds-line',
             self::VTU_PURCHASE => 'ri-shopping-bag-line',

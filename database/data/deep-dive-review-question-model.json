@@ -1,0 +1,147 @@
+{
+  "name": "Deep Dive Review",
+  "version": 1,
+  "source": "project/database/data/review-question-model.json (same schema, new angle)",
+  "template": {
+    "template_key": "deep_dive_review",
+    "name": "Deep Dive Review",
+    "description": "A hands-on template for reviewers who actually use the app: three steps — play the user, play the sceptic, play the witness — with 9 questions that demand evidence, punish rushing and end in one honest sentence.",
+    "status": "published"
+  },
+  "notes": "Every attention check here is a trap the reviewer can only pass by reading: one multiple choice where more than one option must be ticked, one that makes them write a phrase in their own words, and one that asks them to count the flow they are in.",
+  "attention_check_conventions": {
+    "single_choice": "attention_check_answer is the exact option string that must be selected.",
+    "multiple_choice": "attention_check_answer is the full list of options that must be ticked, and nothing else.",
+    "long_text": "attention_check_answer is {\"mode\":\"contains\",\"phrase\":\"...\",\"case_sensitive\":false} — the written answer must contain that phrase and still meet min_words."
+  },
+  "steps": [
+    {
+      "name": "Play the user",
+      "order": 1,
+      "questions": [
+        {
+          "key": "dd_first_win",
+          "order": 1,
+          "prompt": "What was the very first thing the app let you do without creating an account?",
+          "hint": "Think about the first screen you landed on and what it allowed before any sign-up.",
+          "type": "single_choice",
+          "options": [
+            "I could browse or try the main feature",
+            "I could look, but every action asked me to sign up",
+            "Nothing — it demanded an account before showing anything",
+            "It showed an advert or an offer instead of the app"
+          ],
+          "risk_option_indexes": [2, 3]
+        },
+        {
+          "key": "dd_task_attempt",
+          "order": 2,
+          "prompt": "Give the app a real job to do — a search, a name, a small action it is built for. Then describe the exact steps you took and what came back.",
+          "hint": "At least 20 words. Say what you tapped, what you typed in, and exactly what the app returned.",
+          "type": "long_text",
+          "min_words": 20
+        },
+        {
+          "key": "dd_attn_colours",
+          "order": 3,
+          "prompt": "Attention check: tick every word in this list that is a colour.",
+          "hint": "More than one answer is correct. Tick only the colours.",
+          "type": "multiple_choice",
+          "options": ["Lagos", "Blue", "Seven", "Crimson", "Kite", "Rice"],
+          "is_attention_check": true,
+          "attention_check_answer": ["Blue", "Crimson"]
+        }
+      ]
+    },
+    {
+      "name": "Play the sceptic",
+      "order": 2,
+      "questions": [
+        {
+          "key": "dd_pressure",
+          "order": 1,
+          "prompt": "Did anything in the app try to rush you? Countdowns, “only 3 slots left”, “offer ends today”, that kind of thing.",
+          "hint": "Include push notifications, pop-ups and anything that made you feel late.",
+          "type": "single_choice",
+          "options": [
+            "No pressure anywhere",
+            "Once or twice, and it felt harmless",
+            "Constantly — the app kept nudging me",
+            "It blocked me until I agreed to something"
+          ],
+          "risk_option_indexes": [2, 3]
+        },
+        {
+          "key": "dd_money_path",
+          "order": 2,
+          "prompt": "Follow the money: if you had paid in this app, where would your naira actually have gone?",
+          "hint": "Tick everything you saw. Only report a route you could actually see in the app.",
+          "type": "multiple_choice",
+          "options": [
+            "Store subscription billed by Play Store or App Store",
+            "In-app purchase handled by the store",
+            "Bank transfer to a company account",
+            "Transfer to a personal account",
+            "Crypto wallet address",
+            "Nowhere — the app never asked me for money",
+            "I could not tell"
+          ],
+          "risk_option_indexes": [3, 4],
+          "exclusive_option_index": 5
+        },
+        {
+          "key": "dd_attn_write",
+          "order": 3,
+          "prompt": "Attention check: write the sentence “I checked it myself” in the box, then use one more sentence to say what you actually tested in this app.",
+          "hint": "At least 8 words in total. Copy the sentence exactly, then answer in your own words.",
+          "type": "long_text",
+          "min_words": 8,
+          "is_attention_check": true,
+          "attention_check_answer": {
+            "mode": "contains",
+            "phrase": "I checked it myself",
+            "case_sensitive": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Play the witness",
+      "order": 3,
+      "questions": [
+        {
+          "key": "dd_evidence",
+          "order": 1,
+          "prompt": "If our trust team opened this app tomorrow, what is the first thing they would notice?",
+          "hint": "Be blunt. Base it on what you saw, not on what the store page says.",
+          "type": "single_choice",
+          "options": [
+            "A normal, honest product",
+            "Rough edges, but nothing shady",
+            "Aggressive selling or bait-and-switch",
+            "The beginnings of a scam"
+          ],
+          "risk_option_indexes": [2, 3]
+        },
+        {
+          "key": "dd_one_line",
+          "order": 2,
+          "prompt": "Write the one sentence you would tell a friend about this app if you met them in a queue.",
+          "hint": "At least 12 words. Praise or warning — just make it honest and specific.",
+          "type": "long_text",
+          "min_words": 12
+        },
+        {
+          "key": "dd_attn_count",
+          "order": 3,
+          "prompt": "Attention check: this review has three steps and you are on the third. Select “3” below.",
+          "hint": "Read the question again before answering.",
+          "type": "single_choice",
+          "options": ["1", "2", "3", "4"],
+          "is_attention_check": true,
+          "attention_check_answer": "3"
+        }
+      ]
+    }
+  ]
+}
