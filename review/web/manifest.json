@@ -1,11 +1,11 @@
 {
-    "name": "TrustLens",
-    "short_name": "TrustLens",
+    "name": "TLStore",
+    "short_name": "TLStore",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#145A3D",
     "theme_color": "#145A3D",
-    "description": "TrustLens app review and rewards platform",
+    "description": "TLStore app review, sponsored sharing and rewards platform",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

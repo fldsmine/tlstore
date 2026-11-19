@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
 $firebaseDefaults = @{
+    API_BASE_URL = 'https://tlstore.org/api/v1/'
+    BASE_URL = 'https://tlstore.org'
     FIREBASE_WEB_API_KEY = 'AIzaSyA8LT6sW1iS8UQWTR4soGezRD2uHfKQhE4'
     FIREBASE_WEB_APP_ID = '1:1068160277012:web:20fd2e58c0ce62a60fe501'
     FIREBASE_WEB_AUTH_DOMAIN = 'tl-store-application.firebaseapp.com'

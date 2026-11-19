@@ -8,7 +8,7 @@ class ApiConfig {
 
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://gptminpro.online/api/v1/',
+    defaultValue: 'https://tlstore.org/api/v1/',
   );
 
   static Uri endpoint(String path) {
