@@ -45,11 +45,11 @@ class AppListingCard extends StatelessWidget {
         app['description']?.toString() ??
         'Try the app and share an honest review.';
     final screenshots = _screenshots;
-    final status = item['task_access_status']?.toString();
     final location = item['location']?.toString();
     final iconUrl = MediaUrl.resolve(app['app_icon']?.toString());
     final radius = BorderRadius.circular(16);
-	final storeInfo = getStoreInfo(app['store']?.toString());
+	  final storeInfo = getStoreInfo(app['store']?.toString());
+
 
     return Card(
       margin: EdgeInsets.zero,

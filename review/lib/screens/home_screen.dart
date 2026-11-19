@@ -791,12 +791,18 @@ class _HomeScreenState extends State<HomeScreen>
             children: [
               Transform.translate(
                 offset: Offset(-width * .2 * (1 - progress), 0),
-                child: AdvancedAppDrawer(
-                  user: _sessionUser,
-                  preferredCurrency: _currency,
-                  onCurrencyTap: _choosePreferredCurrency,
-                  selectedDestination: _activeDrawerDestination,
-                  onSelect: _handleDrawerSelection,
+                child: ScaffoldMessenger(
+                  // The drawer Scaffold sits behind the dashboard Scaffold on
+                  // this same route. Keep its messenger separate so a
+                  // dashboard snackbar is not rendered twice with the same
+                  // Hero tag.
+                  child: AdvancedAppDrawer(
+                    user: _sessionUser,
+                    preferredCurrency: _currency,
+                    onCurrencyTap: _choosePreferredCurrency,
+                    selectedDestination: _activeDrawerDestination,
+                    onSelect: _handleDrawerSelection,
+                  ),
                 ),
               ),
               Transform(

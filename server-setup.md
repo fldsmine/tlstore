@@ -29,6 +29,11 @@ In Cloud Manager:
    ssh-keygen -t ed25519 -C "tlstore-linode"
    Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
    ```
+   ```ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO1BBL6YXsULSSFbMjOpZixx6MO/h6LoFw7Iim5nNV6L dailylifeinfos@gmail.com```
+   `root ``le!Sa23@!kI8.?1s```
+   `deploy``hE*?ia*?iD$a*?1f```
+   `ssh``sshE*?ia*?iD$a*?1```
+   
 
    Add the displayed `.pub` key to Cloud Manager. Keep the private `id_ed25519` file on your computer and never paste it into the server or a repository.
 7. Set a strong unique root password as the initial recovery method. Use SSH keys for routine access.
@@ -40,7 +45,8 @@ In Cloud Manager:
 At your DNS provider, create an `A` record for the domain or subdomain that will host the app, pointing to the Linode IPv4 address. For example:
 
 ```text
-app.example.com  A  <LINODE_IPV4>
+app.tlstore.org  A  139.162.182.64
+web.tlstore.org  A  139.162.182.64
 ```
 
 If you add an `AAAA` record, make sure IPv6 is configured and reachable on the server too. Otherwise, do not publish an `AAAA` record yet. DNS can take some time to update.
@@ -52,7 +58,7 @@ This guide uses one hostname for both the Flutter site and API. The Flutter clie
 From PowerShell, connect using the root password/key configured at creation:
 
 ```powershell
-ssh root@<LINODE_IPV4>
+ssh root@139.162.182.64
 ```
 
 On the server:
@@ -72,7 +78,7 @@ chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 600 /home/deploy/.ssh/authorized_keys
 ```
 
-Paste the **public** key as one line and save. Open a second PowerShell window and verify `ssh deploy@<LINODE_IPV4>` works before closing the root session. After confirming access, harden SSH to disallow password and root login. Follow Linode's current [Set up and secure a Compute Instance](https://www.linode.com/docs/products/compute/compute-instances/guides/set-up-and-secure/) steps carefully; keep a working SSH session open while validating SSH configuration.
+Paste the **public** key as one line and save. Open a second PowerShell window and verify `ssh deploy@139.162.182.64` works before closing the root session. After confirming access, harden SSH to disallow password and root login. Follow Linode's current [Set up and secure a Compute Instance](https://www.linode.com/docs/products/compute/compute-instances/guides/set-up-and-secure/) steps carefully; keep a working SSH session open while validating SSH configuration.
 
 ## 4. Configure the firewall
 
@@ -118,7 +124,7 @@ In the MySQL prompt (replace the placeholders; do not use angle brackets literal
 
 ```sql
 CREATE DATABASE tlstore CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'tlstore_app'@'localhost' IDENTIFIED BY 'REPLACE_WITH_A_LONG_RANDOM_PASSWORD';
+CREATE USER 'tlstore_app'@'localhost' IDENTIFIED BY 'GN#gKnude&PY*Q94';
 GRANT ALL PRIVILEGES ON tlstore.* TO 'tlstore_app'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
@@ -131,7 +137,7 @@ Use your private Git repository or another authenticated deployment method. Do n
 ```bash
 sudo mkdir -p /var/www/tlstore
 sudo chown deploy:www-data /var/www/tlstore
-git clone <YOUR_PRIVATE_REPOSITORY_URL> /var/www/tlstore
+git clone git@github.com:fldsmine/tlstore.git /var/www/tlstore
 cd /var/www/tlstore
 ```
 
@@ -210,8 +216,8 @@ flutter build web --release --base-href /web/ --dart-define=API_BASE_URL=https:/
 Deploy the contents of `review/build/web/` to `/var/www/tlstore/public/web/` (preserving the `web` directory level). For example, from PowerShell with `scp` available:
 
 ```powershell
-ssh deploy@<LINODE_IPV4> "sudo mkdir -p /var/www/tlstore/public/web && sudo chown -R deploy:www-data /var/www/tlstore/public/web"
-scp -r .\build\web\* deploy@<LINODE_IPV4>:/var/www/tlstore/public/web/
+ssh deploy@139.162.182.64 "sudo mkdir -p /var/www/tlstore/public/web && sudo chown -R deploy:www-data /var/www/tlstore/public/web"
+scp -r .\build\web\* deploy@139.162.182.64:/var/www/tlstore/public/web/
 ```
 
 Create `/var/www/tlstore/public/web` first and ensure the deploy user's SSH key is accepted. If using a different build machine, copy that build output from its actual location. Rebuild and redeploy this web folder whenever Flutter code or the API base URL changes.

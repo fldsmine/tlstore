@@ -7,6 +7,7 @@ import '../features/ads/presentation/screens/social_ad_task_screen.dart';
 import '../features/marketplace/presentation/screens/review_task_screen.dart';
 import '../features/marketplace/presentation/widgets/app_report_dialog.dart';
 import '../features/marketplace/presentation/widgets/app_review_details_sheet.dart';
+import '../features/marketplace/presentation/utils/app_review_reward.dart';
 import '../services/media_url.dart';
 import 'my_tasks_screen.dart';
 import 'subscriptions_screen.dart';
@@ -556,14 +557,22 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
       key == 'x' ? 'X (Twitter)' : '${key[0].toUpperCase()}${key.substring(1)}';
 
   String _reward(String type, Map<String, dynamic> item) {
+    if (type == 'apps') {
+      return appReviewRewardText(
+        api: widget.api,
+        user: widget.user,
+        listing: item,
+        preferredCurrency: widget.api.preferredCurrency,
+      );
+    }
     final currency = item['currency']?.toString() ?? 'USD';
     return moneyConverted(
       widget.api,
-      type == 'apps' ? item['review_reward_minor'] : item['share_reward'],
+      item['share_reward'],
       currency,
       item['currency_minor_units'],
       widget.api.preferredCurrency,
-      isMinor: type == 'apps',
+      isMinor: false,
     );
   }
 
@@ -970,6 +979,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
         'app': app,
         'slots_remaining':
             task['slots_remaining'] ?? campaign['slots_remaining'],
+        'reserved_reward_minor': task['reserved_reward_minor'],
       };
       return _taskAppCard(type, item, activeTask: task);
     }
@@ -997,6 +1007,7 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
     final title = (app['name']?.toString() ?? 'App review');
     final subtitle = (app['developer']?.toString() ?? '');
     final slots = item['slots_remaining'];
+    final location = item['location']?.toString();
     final id = activeTask == null
         ? '$type:${item['id']}'
         : 'active:$type:${activeTask['id']}';
@@ -1098,11 +1109,12 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
                     label: category,
                     colors: colors,
                   ),
-                _InfoPill(
-                  icon: Icons.people_alt_outlined,
-                  label: slots == null ? 'Open slots' : '$slots slots left',
-                  colors: colors,
-                ),
+                if (location != null && location.isNotEmpty)
+                  _InfoPill(
+                    icon: Icons.location_on_outlined,
+                    label: location,
+                    colors: colors,
+                  ),
               ],
             ),
             const SizedBox(height: 15),

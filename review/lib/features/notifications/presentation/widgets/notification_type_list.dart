@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../widgets/auth_components.dart';
-
 class NotificationTypeList extends StatelessWidget {
   const NotificationTypeList({
     super.key,
@@ -10,6 +8,7 @@ class NotificationTypeList extends StatelessWidget {
     required this.onSelectType,
     required this.onRefresh,
     required this.onOpen,
+    required this.onMarkAllRead,
   });
 
   final List<Map<String, dynamic>> items;
@@ -17,6 +16,7 @@ class NotificationTypeList extends StatelessWidget {
   final ValueChanged<String> onSelectType;
   final Future<void> Function() onRefresh;
   final ValueChanged<Map<String, dynamic>> onOpen;
+  final VoidCallback onMarkAllRead;
 
   static const _types = <(String, String)>[
     ('all', 'All'),
@@ -37,15 +37,19 @@ class NotificationTypeList extends StatelessWidget {
             )
             .toList();
 
-  int _count(String type) => type == 'all'
-      ? items.length
-      : items
-            .where((item) => _category(item['type']?.toString()) == type)
-            .length;
+  int _unreadCount(String type) => items
+      .where(
+        (item) =>
+            item['read_at'] == null &&
+            (type == 'all' || _category(item['type']?.toString()) == type),
+      )
+      .length;
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
+    final colors = Theme.of(context).colorScheme;
+    final unreadCount = _unreadCount('all');
     return Column(
       children: [
         SizedBox(
@@ -59,25 +63,65 @@ class NotificationTypeList extends StatelessWidget {
               final (key, label) = _types[index];
               final selected = key == selectedType;
               return ChoiceChip(
-                label: Text('$label (${_count(key)})'),
+                label: Text('$label (${_unreadCount(key)})'),
                 selected: selected,
                 onSelected: (_) => onSelectType(key),
                 showCheckmark: false,
-                selectedColor: brandGreen,
+                selectedColor: colors.primary,
                 backgroundColor: Theme.of(context).cardColor,
                 labelStyle: TextStyle(
-                  color: selected ? Colors.white : mutedInk,
+                  color: selected ? colors.onPrimary : colors.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
                 ),
                 side: BorderSide(
-                  color: selected ? brandGreen : const Color(0xFFE2E8E3),
+                  color: selected ? colors.primary : colors.outlineVariant,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
               );
             },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  unreadCount == 0
+                      ? "You're all caught up"
+                      : '$unreadCount unread',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: unreadCount == 0 ? null : onMarkAllRead,
+                icon: const Icon(Icons.done_all_rounded, size: 18),
+                label: const Text('Mark all as read'),
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.primary,
+                  backgroundColor: colors.primaryContainer.withValues(
+                    alpha: .45,
+                  ),
+                  disabledForegroundColor: colors.onSurfaceVariant.withValues(
+                    alpha: .45,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  shape: const StadiumBorder(),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -87,13 +131,13 @@ class NotificationTypeList extends StatelessWidget {
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      const SizedBox(height: 145),
+                      const SizedBox(height: 120),
                       Center(
                         child: Text(
                           items.isEmpty
-                              ? 'You are all caught up.'
+                              ? 'No notifications here yet.'
                               : 'No ${_typeLabel(selectedType).toLowerCase()} notifications.',
-                          style: const TextStyle(color: mutedInk),
+                          style: TextStyle(color: colors.onSurfaceVariant),
                         ),
                       ),
                     ],
@@ -152,75 +196,175 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final unread = item['read_at'] == null;
     final date = DateTime.tryParse(item['created_at']?.toString() ?? '')
         ?.toLocal();
     final dateLabel = date == null
         ? null
         : '${date.day}/${date.month}/${date.year} · ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: unread ? const Color(0xFFB8D6C1) : const Color(0xFFE5E9E4),
-          ),
+    final background = unread
+        ? colors.onSecondary
+        : Color.alphaBlend(colors.onSurface.withValues(alpha: .035), colors.surface);
+    return Material(
+      color: background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: unread
+              ? Color.alphaBlend(colors.primary.withValues(alpha: .48), colors.outlineVariant)
+              : colors.outlineVariant,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              unread
-                  ? Icons.notifications_active_outlined
-                  : Icons.notifications_none_rounded,
-              color: brandGreen,
+      ),
+      elevation: unread ? 1 : 0,
+      shadowColor: colors.primary.withValues(alpha: .16),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          if (unread)
+            Positioned(
+              left: 0,
+              top: 14,
+              bottom: 14,
+              child: Container(
+                width: 5,
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  borderRadius: const BorderRadius.horizontal(
+                    right: Radius.circular(4),
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
+          InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item['title']?.toString() ?? 'Update',
-                    style: const TextStyle(
-                      color: ink,
-                      fontWeight: FontWeight.w800,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      unread
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_none_rounded,
+                      color: unread ? colors.primary : colors.onSurfaceVariant,
+                      size: 25,
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    item['body']?.toString() ??
-                        item['message']?.toString() ??
-                        '',
-                    style: const TextStyle(
-                      color: mutedInk,
-                      fontSize: 12,
-                      height: 1.4,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: item['title']?.toString() ?? 'Update',
+                                style: TextStyle(
+                                  color: unread
+                                      ? colors.onSurface
+                                      : colors.onSurfaceVariant,
+                                  fontWeight: unread
+                                      ? FontWeight.w800
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                              if (unread)
+                                WidgetSpan(
+                                  alignment: PlaceholderAlignment.middle,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: _NewTag(
+                                      color: colors.primary,
+                                      foreground: colors.onPrimary,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          item['body']?.toString() ??
+                              item['message']?.toString() ??
+                              '',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: unread
+                                ? colors.onSurface
+                                : colors.onSurfaceVariant,
+                            height: 1.45,
+                          ),
+                        ),
+                        if (dateLabel != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: Text(
+                              dateLabel,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: unread
+                                    ? colors.primary
+                                    : colors.onSurfaceVariant,
+                                fontWeight: unread
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (dateLabel != null)
+                  if (unread)
                     Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        dateLabel,
-                        style: const TextStyle(color: mutedInk, fontSize: 10),
+                      padding: const EdgeInsets.only(left: 10, top: 6),
+                      child: Container(
+                        width: 11,
+                        height: 11,
+                        decoration: BoxDecoration(
+                          color: colors.primary,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
-            if (unread)
-              const Padding(
-                padding: EdgeInsets.only(left: 8, top: 5),
-                child: CircleAvatar(radius: 4, backgroundColor: brandGreen),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _NewTag extends StatelessWidget {
+  const _NewTag({required this.color, required this.foreground});
+
+  final Color color;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      'New',
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        color: foreground,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }

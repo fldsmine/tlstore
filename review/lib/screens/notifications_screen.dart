@@ -69,6 +69,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Future<void> _markAllRead() async {
+    final unread = _items
+        .where((item) => item['read_at'] == null && item['id'] != null)
+        .toList();
+    if (unread.isEmpty) return;
+    try {
+      await Future.wait(
+        unread.map(
+          (item) => widget.api.patch(
+            'notifications/${item['id']}/read',
+            widget.token,
+            const {},
+          ),
+        ),
+      );
+      if (!mounted) return;
+      final readAt = DateTime.now().toIso8601String();
+      setState(() {
+        for (final item in unread) {
+          item['read_at'] = readAt;
+        }
+      });
+      showAuthMessage(
+        context,
+        '${unread.length} notification${unread.length == 1 ? '' : 's'} marked as read.',
+      );
+    } on AuthException catch (error) {
+      if (mounted) showAuthMessage(context, error.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -112,6 +143,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             onSelectType: (type) => setState(() => _selectedType = type),
             onRefresh: _load,
             onOpen: _markRead,
+            onMarkAllRead: _markAllRead,
           ),
   );
 }

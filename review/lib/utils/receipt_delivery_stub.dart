@@ -14,3 +14,15 @@ Future<void> deliverPdfReceipt(Uint8List bytes, String fileName) async {
     ),
   );
 }
+
+Future<void> deliverImageReceipt(Uint8List bytes, String fileName) async {
+  await SharePlus.instance.share(
+    ShareParams(
+      files: <XFile>[
+        XFile.fromData(bytes, name: fileName, mimeType: 'image/png'),
+      ],
+      title: 'Withdrawal receipt image',
+      subject: 'TLStore withdrawal receipt',
+    ),
+  );
+}

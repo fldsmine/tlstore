@@ -29,14 +29,36 @@ class ActivityTransactionTile extends StatelessWidget {
     final status = transaction['status']?.toString().toLowerCase();
     final isPending = status == 'pending';
     final isRejected = status == 'rejected';
+    final isApproved = status == 'approved' ||
+        status == 'completed' ||
+        status == 'success';
+    final isDark = theme.brightness == Brightness.dark;
     final credit = direction == 'credit';
     final description = transaction['description']?.toString().trim() ?? '';
     final title = preferDescriptionTitle && description.isNotEmpty
         ? description
         : _title(type, direction, description);
     final category = _category(type, direction);
-    final accent = credit ? colors.primary : colors.error;
-    final icon = _icon(type, direction);
+    final accent = isPending
+        ? (isDark ? const Color(0xFFF1C566) : const Color(0xFF8A5A00))
+        : isRejected
+            ? (isDark ? const Color(0xFFFF9A94) : const Color(0xFFB3261E))
+            : isApproved
+                ? (isDark ? const Color(0xFF6FD1A0) : const Color(0xFF17593F))
+                : credit
+                    ? colors.primary
+                    : colors.error;
+    final background = Color.alphaBlend(
+      accent.withValues(alpha: isDark ? .14 : .07),
+      colors.surface,
+    );
+    final icon = isPending
+        ? Icons.schedule_rounded
+        : isRejected
+            ? Icons.close_rounded
+            : isApproved
+                ? Icons.check_rounded
+                : _icon(type, direction);
     final openDetails =
         onTap ??
         () => showActivityTransactionDetailsSheet(
@@ -45,44 +67,43 @@ class ActivityTransactionTile extends StatelessWidget {
           displayAmount: displayAmount,
         );
 
-    return Material(
-      color: isPending
-      ? colors.tertiaryContainer.withValues(alpha: .15)
-      : isRejected
-          ? colors.errorContainer.withValues(alpha: .15)
-          : colors.surface,
+    final radius = BorderRadius.circular(20);
+    final tile = Material(
+      color: background,
       shape: RoundedRectangleBorder(
-		  borderRadius: BorderRadius.circular(12),
-		  side: BorderSide(
-			color: isPending
-				? colors.error.withValues(alpha: .2)
-				: isRejected
-					? colors.error.withValues(alpha: .3)
-					: colors.outlineVariant.withValues(alpha: .9),
-			width: (isPending || isRejected) ? 1.5 : 1,
-		  ),
-		),
+        borderRadius: radius,
+        side: BorderSide(
+          color: isRejected || isPending
+              ? Colors.transparent
+              : isApproved
+                  ? accent.withValues(alpha: .42)
+                  : colors.outlineVariant.withValues(alpha: .75),
+          width: isPending || isApproved ? 1.5 : 1,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: openDetails,
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 12 : 14,
-            vertical: compact ? 10 : 12,
+            vertical: compact ? 11 : 14,
           ),
           child: Row(
             children: [
               Container(
-                width: compact ? 40 : 48,
-                height: compact ? 40 : 48,
+                width: compact ? 42 : 52,
+                height: compact ? 42 : 52,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
+                  color: accent.withValues(
+                    alpha: isDark ? .22 : .13,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, size: 22, color: accent),
+                child: Icon(icon, size: 25, color: accent),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,7 +115,7 @@ class ActivityTransactionTile extends StatelessWidget {
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: colors.onSurface,
-                        fontSize: 12,
+                        fontSize: compact ? 13 : 15,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -104,38 +125,78 @@ class ActivityTransactionTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colors.onSurfaceVariant,
-                        fontSize: 10,
+                      fontSize: compact ? 11 : 13,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                '${credit
-                    ? '+'
-                    : direction == 'debit'
-                    ? '−'
-                    : ''}$displayAmount',
-                textAlign: TextAlign.end,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: isPending
-				? colors.error.withValues(alpha: .4)
-				: isRejected
-					? colors.error.withValues(alpha: .6)
-					: accent,
-                  fontWeight: FontWeight.w900,
-				  decoration: (isPending || isRejected)
-					? TextDecoration.lineThrough
-					: TextDecoration.none,
-                  fontSize: 12,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${credit
+                        ? '+'
+                        : direction == 'debit'
+                            ? '−'
+                            : ''}$displayAmount',
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w800,
+                      decoration: isRejected
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      fontSize: compact ? 13 : 16,
+                    ),
+                  ),
+                  if (status != null && status.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    _StatusChip(
+                      label: _statusLabel(status),
+                      color: accent,
+                      background: Color.alphaBlend(
+                        accent.withValues(
+                          alpha: isDark ? .24 : .13,
+                        ),
+                        colors.surface,
+                      ),
+                      pulse: isPending,
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
         ),
       ),
     );
+
+    if (isRejected) {
+      return ClipRRect(
+        borderRadius: radius,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: accent, width: 6)),
+            borderRadius: radius,
+          ),
+          child: Padding(padding: const EdgeInsets.only(left: 6), child: tile),
+        ),
+      );
+    }
+    if (isPending) {
+      return CustomPaint(
+        foregroundPainter: _DashedRoundedBorderPainter(color: accent),
+        child: tile,
+      );
+    }
+    return tile;
+  }
+
+  static String _statusLabel(String status) {
+    if (status.isEmpty) return '';
+    return status[0].toUpperCase() + status.substring(1);
   }
 
   static String _title(String type, String? direction, String description) {
@@ -231,4 +292,110 @@ class ActivityTransactionTile extends StatelessWidget {
       return '${(difference.inDays / 30).floor()} months ago';
     return '${(difference.inDays / 365).floor()} years ago';
   }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({
+    required this.label,
+    required this.color,
+    required this.background,
+    this.pulse = false,
+  });
+
+  final String label;
+  final Color color;
+  final Color background;
+  final bool pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (pulse) ...[
+            _PulsingDot(color: color),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulsingDot extends StatefulWidget {
+  const _PulsingDot({required this.color});
+
+  final Color color;
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: Tween<double>(begin: 1, end: .25).animate(_controller),
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
+        ),
+      );
+}
+
+class _DashedRoundedBorderPainter extends CustomPainter {
+  const _DashedRoundedBorderPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(rect.deflate(.75), const Radius.circular(20)));
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      const dashLength = 6.0;
+      const gapLength = 4.0;
+      while (distance < metric.length) {
+        final end = (distance + dashLength).clamp(0.0, metric.length).toDouble();
+        canvas.drawPath(metric.extractPath(distance, end), paint);
+        distance = end + gapLength;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRoundedBorderPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

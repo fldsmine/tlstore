@@ -296,24 +296,71 @@ class _PayoutScreenState extends State<PayoutScreen> {
     if (!mounted) return;
     setState(() => _submitting = true);
     try {
-      await widget.api.post('withdrawals', widget.token, {
+      final amountMinor = (major * math.pow(10, _digits)).round();
+      final response = await widget.api.post('withdrawals', widget.token, {
         'wallet_id': wallet['id'],
         'withdrawal_option_id': option['id'],
-        'amount_minor': (major * math.pow(10, _digits)).round(),
+        'amount_minor': amountMinor,
         'payout_details': payout,
         'idempotency_key':
             'withdraw-mobile-${DateTime.now().microsecondsSinceEpoch}',
         if (pin != null) 'security_pin': pin,
       });
       if (!mounted) return;
+
+      final created = response['data'];
+      final receiptData = created is Map
+          ? Map<String, dynamic>.from(created)
+          : <String, dynamic>{};
+      if (receiptData.isNotEmpty) {
+        final responseDetails = receiptData['payout_details'];
+        final displayDetails = responseDetails is Map
+            ? Map<String, dynamic>.from(responseDetails)
+            : Map<String, dynamic>.from(payout);
+        displayDetails.remove('bank_id');
+        displayDetails.remove('bank_code');
+        receiptData['payout_details'] = displayDetails;
+        receiptData['option'] = receiptData['option'] is Map
+            ? Map<String, dynamic>.from(receiptData['option'] as Map)
+            : Map<String, dynamic>.from(option);
+        receiptData['wallet_name'] = wallet['label']?.toString() ?? 'Wallet';
+        receiptData['wallet'] = <String, dynamic>{
+          'wallet_type': wallet['type']?.toString(),
+        };
+        receiptData['amount_minor'] = receiptData['amount_minor'] ?? amountMinor;
+        receiptData['fee_minor'] = receiptData['fee_minor'] ?? 0;
+        receiptData['currency'] =
+            receiptData['currency']?.toString() ?? _currency;
+        receiptData['status'] = receiptData['status']?.toString() ?? 'pending';
+        receiptData['requested_at'] =
+            receiptData['requested_at']?.toString() ??
+            DateTime.now().toIso8601String();
+      }
+
       _amount.clear();
       for (final controller in _details.values) {
         controller.clear();
       }
-      showAuthMessage(
-        context,
-        'Withdrawal request submitted for admin approval.',
-      );
+
+      if (receiptData.isNotEmpty) {
+        await showWithdrawalReceiptDialog(
+          context,
+          withdrawal: receiptData,
+          appName: 'TLStore',
+          logoAsset: 'assets/logo.jpg',
+          api: widget.api,
+          token: widget.token,
+          receiptPath: (receipt) => 'withdrawals/${receipt.id}/receipt',
+          onReceiptReady: (receipt, bytes, fileName) =>
+              deliverPdfReceipt(bytes, fileName),
+        );
+      } else {
+        showAuthMessage(
+          context,
+          response['message']?.toString() ??
+              'Withdrawal request submitted for admin approval.',
+        );
+      }
       await _load();
     } on AuthException catch (error) {
       if (mounted) showAuthMessage(context, error.message);

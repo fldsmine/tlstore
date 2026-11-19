@@ -10,6 +10,7 @@ import '../features/marketplace/presentation/widgets/app_review_details_sheet.da
 import '../features/marketplace/presentation/widgets/app_report_dialog.dart';
 import '../features/marketplace/presentation/widgets/listing_components.dart';
 import '../features/marketplace/presentation/screens/review_task_screen.dart';
+import '../features/marketplace/presentation/utils/app_review_reward.dart';
 import '../features/marketplace/presentation/listing_kind.dart';
 import '../services/auth_api.dart';
 import '../services/media_url.dart';
@@ -204,13 +205,11 @@ class _ListingsScreenState extends State<ListingsScreen> {
                     child: widget.kind == ListingKind.appReview
                         ? AppListingCard(
                             item: item,
-                            reward: moneyConverted(
-                              widget.api,
-                              item['review_reward_minor'],
-                              item['currency']?.toString() ?? 'USD',
-                              item['currency_minor_units'],
-                              widget.preferredCurrency,
-                              isMinor: true,
+                            reward: appReviewRewardText(
+                              api: widget.api,
+                              user: widget.user,
+                              listing: item,
+                              preferredCurrency: widget.preferredCurrency,
                             ),
                             onTap: () {
                               Navigator.of(context).push(
@@ -727,14 +726,21 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     final description = _isReview
         ? _app['description']?.toString()
         : _item['description']?.toString();
-    final reward = moneyConverted(
-      widget.api,
-      _isReview ? _item['review_reward_minor'] : _item['share_reward'],
-      _item['currency']?.toString() ?? 'USD',
-      _item['currency_minor_units'],
-      widget.preferredCurrency,
-      isMinor: _isReview,
-    );
+    final reward = _isReview
+        ? appReviewRewardText(
+            api: widget.api,
+            user: widget.user,
+            listing: _item,
+            preferredCurrency: widget.preferredCurrency,
+          )
+        : moneyConverted(
+            widget.api,
+            _item['share_reward'],
+            _item['currency']?.toString() ?? 'USD',
+            _item['currency_minor_units'],
+            widget.preferredCurrency,
+            isMinor: false,
+          );
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(

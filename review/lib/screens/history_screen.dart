@@ -114,6 +114,37 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
   }
 
+  Future<void> _markAllRead() async {
+    final unread = _notifications
+        .where((item) => item['read_at'] == null && item['id'] != null)
+        .toList();
+    if (unread.isEmpty) return;
+    try {
+      await Future.wait(
+        unread.map(
+          (item) => widget.api.patch(
+            'notifications/${item['id']}/read',
+            widget.token,
+            const {},
+          ),
+        ),
+      );
+      if (!mounted) return;
+      final readAt = DateTime.now().toIso8601String();
+      setState(() {
+        for (final item in unread) {
+          item['read_at'] = readAt;
+        }
+      });
+      showAuthMessage(
+        context,
+        '${unread.length} notification${unread.length == 1 ? '' : 's'} marked as read.',
+      );
+    } on AuthException catch (error) {
+      if (mounted) showAuthMessage(context, error.message);
+    }
+  }
+
   Future<void> _loadReviewSubmissions() async {
     setState(() {
       _reviewsLoading = true;
@@ -911,6 +942,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       },
       onRefresh: _loadNotifications,
       onOpen: _markNotificationRead,
+      onMarkAllRead: _markAllRead,
     );
   }
 }

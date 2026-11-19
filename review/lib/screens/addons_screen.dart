@@ -914,6 +914,7 @@ class _AddonsScreenState extends State<AddonsScreen> {
         : _money(amount, currency, units);
     final featureList = proxyFeatures(record);
     final featured = featureList.take(6).toList(growable: false);
+    
     await ProxyAddonsDialog.show<void>(
       context: context,
       plan: ProxyPromptPlan(

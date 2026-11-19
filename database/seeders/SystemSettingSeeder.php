@@ -120,6 +120,11 @@ class SystemSettingSeeder extends Seeder
                 ],
                 'whatsapp' => ['channel' => 20, 'min' => 50],
                 'telegram' => ['join' => 20, 'min' => 50],
+                'others' => [
+                    'visit' => 20,
+                    'register' => 40,
+                    'min' => 50,
+                ],
             ], true],
             'campaign.service_fee_percent' => [5, true],
             'campaign.currency' => ['NGN', true],

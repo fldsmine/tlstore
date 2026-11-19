@@ -1,12 +1,15 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../core/currency/money.dart';
 import '../services/auth_api.dart';
+import '../utils/receipt_delivery.dart';
 
 /// Loads the PDF for one withdrawal. Return null (or throw) to surface an
 /// error inside the dialog.
@@ -65,7 +68,9 @@ Future<bool?> showWithdrawalReceiptDialog(
   AuthApi? api,
   String? token,
   String Function(WithdrawalReceipt receipt)? receiptPath,
+  bool showDownloadButton = true,
   bool barrierDismissible = true,
+  
 }) {
   final receipt = withdrawal is WithdrawalReceipt
       ? withdrawal
@@ -93,6 +98,7 @@ Future<bool?> showWithdrawalReceiptDialog(
       subtitle: subtitle,
       loader: loader,
       onReceiptReady: onReceiptReady,
+      showDownloadButton: showDownloadButton,
     ),
   );
 }
@@ -253,6 +259,7 @@ class WithdrawalReceiptDialog extends StatefulWidget {
     this.subtitle,
     this.loader,
     this.onReceiptReady,
+    this.showDownloadButton = true,
   });
 
   final WithdrawalReceipt receipt;
@@ -262,6 +269,7 @@ class WithdrawalReceiptDialog extends StatefulWidget {
   final String? subtitle;
   final WithdrawalReceiptBytesLoader? loader;
   final WithdrawalReceiptDeliverer? onReceiptReady;
+  final bool showDownloadButton;
 
   @override
   State<WithdrawalReceiptDialog> createState() =>
@@ -271,13 +279,16 @@ class WithdrawalReceiptDialog extends StatefulWidget {
 class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
   bool _downloading = false;
   bool _downloaded = false;
+  bool _downloadingImage = false;
+  bool _downloadedImage = false;
   String? _error;
+  final GlobalKey _receiptImageKey = GlobalKey();
 
   WithdrawalReceipt get _receipt => widget.receipt;
 
-  Future<void> _download() async {
+  Future<void> _downloadPdf() async {
     final WithdrawalReceiptBytesLoader? loader = widget.loader;
-    if (loader == null || _downloading) return;
+    if (loader == null || _downloading || _downloadingImage) return;
 
     FocusScope.of(context).unfocus();
     setState(() {
@@ -298,11 +309,20 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
         return;
       }
 
+      if (!_isPdf(bytes)) {
+        setState(() {
+          _downloading = false;
+          _error = 'The receipt service returned a file that is not a PDF.';
+        });
+        return;
+      }
+
       final String fileName = 'withdrawal-${_receipt.reference}.pdf';
 
-      if (widget.onReceiptReady != null) {
-        await widget.onReceiptReady!(_receipt, bytes, fileName);
-      }
+      final deliver = widget.onReceiptReady ??
+          (WithdrawalReceipt _, Uint8List data, String name) =>
+              deliverPdfReceipt(data, name);
+      await deliver(_receipt, bytes, fileName);
 
       if (!mounted) return;
 
@@ -325,6 +345,59 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
       });
     }
   }
+
+  Future<void> _downloadImage() async {
+    if (_downloadingImage || _downloading) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _downloadingImage = true;
+      _error = null;
+    });
+
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final renderObject = _receiptImageKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderRepaintBoundary) {
+        throw StateError('Receipt image is not ready.');
+      }
+      final ui.Image image = await renderObject.toImage(pixelRatio: 2.5);
+      final ByteData? data;
+      try {
+        data = await image.toByteData(format: ui.ImageByteFormat.png);
+      } finally {
+        image.dispose();
+      }
+      final Uint8List? bytes = data?.buffer.asUint8List();
+      if (bytes == null || bytes.isEmpty) {
+        throw StateError('The receipt image could not be created.');
+      }
+
+      await deliverImageReceipt(
+        bytes,
+        'withdrawal-${_receipt.reference}.png',
+      );
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _downloadingImage = false;
+        _downloadedImage = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _downloadingImage = false;
+        _error = 'Could not create or save the receipt image. Please try again.';
+      });
+    }
+  }
+
+  bool _isPdf(Uint8List bytes) =>
+      bytes.length >= 5 &&
+      bytes[0] == 0x25 && // %
+      bytes[1] == 0x50 && // P
+      bytes[2] == 0x44 && // D
+      bytes[3] == 0x46 && // F
+      bytes[4] == 0x2D; // -
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +442,13 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
                 Flexible(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-                    child: Column(
+                    child: RepaintBoundary(
+                      key: _receiptImageKey,
+                      child: ColoredBox(
+                        color: colors.surface,
+                        child: Padding(
+                          padding: const EdgeInsets.all(1),
+                          child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
@@ -409,14 +488,23 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
                         ],
                       ],
                     ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 _Actions(
-                  downloading: _downloading,
-                  downloaded: _downloaded,
-                  canDownload: widget.loader != null,
-                  onCancel: () => Navigator.of(context).pop(_downloaded),
-                  onDownload: _download,
+                  downloadingImage: _downloadingImage,
+                  downloadedImage: _downloadedImage,
+                  downloadingPdf: _downloading,
+                  downloadedPdf: _downloaded,
+                  canDownloadPdf: widget.loader != null,
+                  showDownloadButton: widget.showDownloadButton,
+                  onCancel: () => Navigator.of(context).pop(
+                    _downloaded || _downloadedImage,
+                  ),
+                  onDownloadImage: _downloadImage,
+                  onDownloadPdf: _downloadPdf,
                   theme: theme,
                 ),
               ],
@@ -1037,24 +1125,33 @@ class _ErrorNote extends StatelessWidget {
 
 class _Actions extends StatelessWidget {
   const _Actions({
-    required this.downloading,
-    required this.downloaded,
-    required this.canDownload,
+    required this.downloadingImage,
+    required this.downloadedImage,
+    required this.downloadingPdf,
+    required this.downloadedPdf,
+    required this.canDownloadPdf,
+    required this.showDownloadButton,
     required this.onCancel,
-    required this.onDownload,
+    required this.onDownloadImage,
+    required this.onDownloadPdf,
     required this.theme,
   });
 
-  final bool downloading;
-  final bool downloaded;
-  final bool canDownload;
+  final bool downloadingImage;
+  final bool downloadedImage;
+  final bool downloadingPdf;
+  final bool downloadedPdf;
+  final bool canDownloadPdf;
+  final bool showDownloadButton;
   final VoidCallback onCancel;
-  final VoidCallback onDownload;
+  final VoidCallback onDownloadImage;
+  final VoidCallback onDownloadPdf;
   final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme colors = theme.colorScheme;
+    final bool busy = downloadingImage || downloadingPdf;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
@@ -1069,97 +1166,114 @@ class _Actions extends StatelessWidget {
             child: SizedBox(
               height: 48,
               child: OutlinedButton(
-                onPressed: downloading ? null : onCancel,
+                onPressed: busy ? null : onCancel,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: colors.onSurface,
                   side: BorderSide(color: colors.outlineVariant),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
+                  padding: EdgeInsets.zero,
                 ),
                 child: const Text(
-                  'Cancel',
+                  'Close',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: SizedBox(
-              height: 48,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[
-                      colors.primary,
-                      Color.lerp(colors.primary, colors.secondary, 0.7) ??
-                          colors.secondary,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: colors.primary.withValues(alpha: 0.26),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(15),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: canDownload && !downloading ? onDownload : null,
-                    child: Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          if (downloading)
-                            SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colors.onPrimary,
-                              ),
-                            )
-                          else
-                            Icon(
-                              downloaded
-                                  ? Icons.check_circle_rounded
-                                  : Icons.download_rounded,
-                              size: 18,
-                              color: colors.onPrimary,
-                            ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              downloading
-                                  ? 'Preparing…'
-                                  : downloaded
-                                      ? 'Downloaded'
-                                      : 'Download PDF',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: colors.onPrimary,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+          if (showDownloadButton) ...<Widget>[
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: busy ? null : onDownloadImage,
+                  icon: downloadingImage
+                      ? SizedBox.square(
+                          dimension: 15,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colors.primary,
                           ),
-                        ],
-                      ),
+                        )
+                      : Icon(
+                          downloadedImage
+                              ? Icons.check_circle_rounded
+                              : Icons.image_outlined,
+                          size: 17,
+                        ),
+                  label: Text(
+                    downloadingImage
+                        ? 'Saving…'
+                        : downloadedImage
+                            ? 'Saved'
+                            : 'Image',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colors.primary,
+                    side: BorderSide(color: colors.primary.withValues(alpha: .5)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+            if (canDownloadPdf) ...<Widget>[
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: busy ? null : onDownloadPdf,
+                    icon: downloadingPdf
+                        ? SizedBox.square(
+                            dimension: 15,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colors.onPrimary,
+                            ),
+                          )
+                        : Icon(
+                            downloadedPdf
+                                ? Icons.check_circle_rounded
+                                : Icons.picture_as_pdf_rounded,
+                            size: 17,
+                          ),
+                    label: Text(
+                      downloadingPdf
+                          ? 'Saving…'
+                          : downloadedPdf
+                              ? 'Saved'
+                              : 'PDF',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );
