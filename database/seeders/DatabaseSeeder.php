@@ -20,12 +20,12 @@ class DatabaseSeeder extends Seeder
 
         // Everything below is demo content. It is only safe to insert in
         // non-production environments.
-        if (! app()->environment(['local', 'testing', 'staging'])) {
+        //if (! app()->environment(['local', 'testing', 'staging'])) {
             // Add-on defaults are feature configuration, not demo activity.
             // Seed them for existing production subscription plan records too.
             $this->call(PackageAddonSeeder::class);
-            return;
-        }
+        //    return;
+        //}
 
         $this->call([
             UserRankLevelSeeder::class,
@@ -47,10 +47,10 @@ class DatabaseSeeder extends Seeder
             BankSeeder::class,
             LegalDocumentSeeder::class,
             AnnouncementSeeder::class,
-            DemoPlatformActivitySeeder::class,
+            //DemoPlatformActivitySeeder::class,
             PaymentOptionSeeder::class,
-			WalletCreditSeeder::class,
-            WalletBalanceSyncSeeder::class,
+			//WalletCreditSeeder::class,
+            //WalletBalanceSyncSeeder::class,
         ]);
     }
 }
