@@ -945,34 +945,6 @@ class DemoPlatformActivitySeeder extends Seeder
             }
         }
 
-        DB::table('audit_logs')->upsert([[
-            'audit_key' => 'audit-campaign-publish',
-            'actor_user_id' => null,
-            'actor_admin_id' => (int) Admin::query()->where('email', 'admin@tlstore.test')->value('id'),
-            'action' => 'campaign.demo_seeded',
-            'entity_type' => 'app_review_campaign',
-            'entity_id' => 'review-fitpulse-ng',
-            'before_values' => null,
-            'after_values' => json_encode(['status' => 'active', 'seed' => true], JSON_THROW_ON_ERROR),
-            'request_id' => 'seed-run',
-            'ip_hash' => null,
-            'created_at' => $now,
-        ]], ['audit_key'], ['actor_user_id', 'actor_admin_id', 'action', 'after_values']);
-
-        DB::table('outbox_events')->upsert([[
-            'event_key' => 'event-review-approved',
-            'event_type' => 'review.submission.approved',
-            'aggregate_type' => 'review_submission',
-            'aggregate_id' => 'seed-sample',
-            'payload' => json_encode(['seed' => true, 'purpose' => 'outbox workflow test'], JSON_THROW_ON_ERROR),
-            'status' => 'pending',
-            'attempts' => 0,
-            'available_at' => $now,
-            'processed_at' => null,
-            'last_error' => null,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]], ['event_key'], ['event_type', 'payload', 'status', 'updated_at']);
     }
 
     private function planKeyForUser(int $number): string
