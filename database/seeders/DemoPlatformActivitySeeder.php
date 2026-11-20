@@ -22,16 +22,16 @@ class DemoPlatformActivitySeeder extends Seeder
             $this->seedAppStoreSnapshots($apps, $now);
             $templateVersionIds = $this->publishedTemplateVersionIds();
             $campaigns = $this->seedReviewCampaigns($apps, $ownerId, $now, $templateVersionIds);
-            $paymentIntents = $this->seedSubscriptionPayments($users, $plans, $now);
-            $subscriptions = $this->seedSubscriptions($users, $plans, $paymentIntents, $now);
-            $this->seedLocationAddons($users, $plans, $now);
-            $wallets = $this->walletIdsByUser($users);
-            $reviewTasks = $this->seedReviewTasks($campaigns, $users, $now);
-            $this->seedReviewSubmissions($reviewTasks, $users, $adminId, $wallets, $now);
-            $this->seedAdShareActivity($users, $wallets, $now);
-            $this->seedTopupsAndManualDeposits($users, $wallets, $now);
-            $this->seedReferralActivity($users, $wallets, $now);
-            $this->seedWithdrawals($users, $wallets, $now);
+            //$paymentIntents = $this->seedSubscriptionPayments($users, $plans, $now);
+            //$subscriptions = $this->seedSubscriptions($users, $plans, $paymentIntents, $now);
+            //$this->seedLocationAddons($users, $plans, $now);
+            //$wallets = $this->walletIdsByUser($users);
+            //$reviewTasks = $this->seedReviewTasks($campaigns, $users, $now);
+            //$this->seedReviewSubmissions($reviewTasks, $users, $adminId, $wallets, $now);
+            //$this->seedAdShareActivity($users, $wallets, $now);
+            //$this->seedTopupsAndManualDeposits($users, $wallets, $now);
+            //$this->seedReferralActivity($users, $wallets, $now);
+            //$this->seedWithdrawals($users, $wallets, $now);
             $this->seedNotificationsAndOperations($users, $now);
         });
     }
@@ -910,7 +910,7 @@ class DemoPlatformActivitySeeder extends Seeder
 
     private function seedNotificationsAndOperations(array $users, $now): void
     {
-        foreach ([3, 4, 5, 6, 8] as $number) {
+        foreach ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as $number) {
             if (!isset($users[$number])) {
                 continue;
             }
@@ -919,10 +919,10 @@ class DemoPlatformActivitySeeder extends Seeder
                 'user_id' => $users[$number],
                 'notification_key' => $key,
                 'type' => 'demo_welcome',
-                'title' => 'Welcome to TrustLens demo',
-                'body' => 'This is a seeded notification for testing the in-app inbox and push delivery flow.',
+				'title' => 'Welcome to TrustLens 🎉',
+				'body' => "Discover, review, and share your favorite apps and ads. Explore new apps, share your experiences, and help others make informed choices through honest reviews and recommendations.\n\nYour opinions matter. Let's discover and share together! 🚀",
                 'data' => json_encode(['seed' => true], JSON_THROW_ON_ERROR),
-                'read_at' => $number === 3 ? $now->copy()->subHours(2) : null,
+                'read_at' => null,
                 'created_at' => $now->copy()->subHours(4),
                 'updated_at' => $now,
             ]], ['notification_key'], ['title', 'body', 'data', 'read_at', 'updated_at']);
