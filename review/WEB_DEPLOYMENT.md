@@ -27,3 +27,11 @@ background notifications while the Flutter page is served at `/`.
 
 The site must be hosted over HTTPS (or localhost during development) for
 browser secure storage and Firebase messaging.
+
+For deployments behind Nginx, do not cache these version-sensitive files:
+`/web/index.html`, `/web/flutter_bootstrap.js`,
+`/web/flutter_service_worker.js`, `/web/version.json`, and
+`/web/main.dart.js`. The Laravel route already sends the app entry response
+with `no-store` headers; direct static requests need the equivalent Nginx
+rule. If a browser continues to show an old build after deployment, clear that
+site's stored data and unregister its old service worker once, then reload.
