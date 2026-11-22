@@ -10,15 +10,12 @@ class DemoAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        if (! app()->environment(['local', 'testing', 'staging'])) {
-            return;
-        }
         $password = (string) config('app.system_account_password');
 
         $admin = Admin::updateOrCreate(
             ['email' => 'admin@tlstore.test'],
             [
-                'full_name' => 'TrustLens Admin',
+                'full_name' => 'Trust Admin',
                 'password' => $password,
                 'role' => 'super_admin',
                 'status' => 'active',
@@ -40,10 +37,7 @@ class DemoAdminSeeder extends Seeder
             ['setting_key' => 'payment.active_payment_currency'],
             ['value' => [
                 'bachs.NGN' => 'NGN',
-                'paystack.NGN' => 'NGN-2',
-                'flutterwave.USD' => 'USD',
                 'bachs.USD' => 'USD',
-                'paystack.GHS' => 'GHS',
                 'korapay.UGX' => 'UGX',
             ], 'is_public' => true, 'updated_by_admin_id' => $admin->id],
         );
