@@ -977,6 +977,9 @@ class _DailyTasksScreenState extends State<DailyTasksScreen>
         ...campaign,
         'id': task['id'],
         'app': app,
+        'currency': task['reward_currency'] ?? campaign['currency'],
+        'currency_minor_units': task['reward_currency_minor_units'] ??
+            campaign['currency_minor_units'],
         'slots_remaining':
             task['slots_remaining'] ?? campaign['slots_remaining'],
         'reserved_reward_minor': task['reserved_reward_minor'],

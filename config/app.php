@@ -52,9 +52,11 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+    'url' => env('APP_URL', 'https://tlstore.org'),
 
     'web_url' => env('WEB_APP_URL', 'https://web.tlstore.org'),
+
+    'admin_url' => env('ADMIN_APP_URL', 'https://app.tlstore.org'),
 
     /*
     |--------------------------------------------------------------------------

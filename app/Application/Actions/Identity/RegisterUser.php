@@ -35,7 +35,7 @@ final class RegisterUser
                 'password' => $data['password'],
                 'country_code' => $country->code,
                 'preferred_currency' => $data['preferred_currency'] ?? $country->default_currency ?? 'USD',
-                'wallet_currency' => strtoupper($data['preferred_currency'] ?? $country->default_currency ?? 'USD'),
+                'wallet_currency' => config('trustlens.default_currency') ?? strtoupper($data['preferred_currency'] ?? $country->default_currency ?? 'USD'),
                 'role' => 'reviewer',
                 'status' => 'active',
             ]);

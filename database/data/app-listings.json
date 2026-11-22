@@ -3,7 +3,7 @@
   "version": 1,
   "source": "Store metadata from Google Play, the Apple App Store and the Samsung Galaxy Store; icons and screenshots gathered from the web and resized into storage/app/public.",
   "notes": [
-    "paid_amount is the campaign budget: review_reward × maximum_review, in the listing currency.",
+    "paid_amount is the campaign budget: review reward × maximum_review, in the listing currency.",
     "Each listing has 2-4 screenshots so the review flow can show a swipeable gallery.",
     "Two listings per country: NG, US, UK, GH and CA, each billed in that country's currency.",
     "review_template_key assigns each app campaign to a published questionnaire template; assignments cycle evenly across the available templates."

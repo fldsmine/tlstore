@@ -67,13 +67,13 @@ class SubscriptionPlanSeeder extends Seeder
                 'plan_key' => 'review-google-play-4m', 'subscription_group_id' => $groups['group_b'],
                 'product_type' => 'marketplace_access', 'name' => 'Playstore review', 'tier_key' => 'playstore_review',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 1215000, 'currency' => 'NGN',
-                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 0, 'task_referral_percent' => 6,
+                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 6,
                 'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Google Play', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday'],
                 'daily_revenue_minor' => 63000, 'task_reward_minor' => 21000, 'daily_task_limit' => 3,
                 'features' => [
-                    'amount' => 12150,
+                    'referral_bonus' => 1215,
                     'minimum_withdrawal' => 3000,
                     'withdrawal_days' => ['Friday'],
                     'daily_revenue' => 630,
@@ -85,13 +85,13 @@ class SubscriptionPlanSeeder extends Seeder
                 'plan_key' => 'review-samsung-store-4m', 'subscription_group_id' => $groups['group_b'],
                 'product_type' => 'marketplace_access', 'name' => 'Samsung store', 'tier_key' => 'samsung_store',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 2485000, 'currency' => 'NGN',
-                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 0, 'task_referral_percent' => 6,
+                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 6,
                 'is_special' => 1, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Samsung Galaxy Store', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday'],
                 'daily_revenue_minor' => 99000, 'task_reward_minor' => 33000, 'daily_task_limit' => 3,
                 'features' => [
-                    'amount' => 24850,
+                    'referral_bonus' => 2485,
                     'minimum_withdrawal' => 3000,
                     'withdrawal_days' => ['Friday'],
                     'daily_revenue' => 990,
@@ -103,13 +103,13 @@ class SubscriptionPlanSeeder extends Seeder
                 'plan_key' => 'review-apple-store-4m', 'subscription_group_id' => $groups['group_c'],
                 'product_type' => 'marketplace_access', 'name' => 'Apple store', 'tier_key' => 'apple_store',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 5775000, 'currency' => 'NGN',
-                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 0, 'task_referral_percent' => 6,
+                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 6,
                 'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Apple App Store', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday', 'Wednesday'],
                 'daily_revenue_minor' => 210000, 'task_reward_minor' => 70000, 'daily_task_limit' => 3,
                 'features' => [
-                    'amount' => 57750,
+                    'referral_bonus' => 5775,
                     'minimum_withdrawal' => 3000,
                     'withdrawal_days' => ['Friday', 'Wednesday'],
                     'daily_revenue' => 2100,
@@ -120,6 +120,12 @@ class SubscriptionPlanSeeder extends Seeder
         ];
 
         foreach ($plans as $plan) {
+            // Each package owns its own editable schedule. These are the
+            // initial defaults; admins can later tune rates per plan.
+            $plan['subscription_referral_tiers'] = json_encode(['1' => 10, '2' => 4, '3' => 1], JSON_THROW_ON_ERROR);
+            $plan['task_referral_tiers'] = json_encode(['1' => 10, '2' => 5, '3' => 2], JSON_THROW_ON_ERROR);
+            $plan['subscription_referral_percent'] = 10;
+            $plan['task_referral_percent'] = 10;
             $features = $plan['features'];
             unset($plan['features']);
             $plan['features'] = json_encode($features, JSON_THROW_ON_ERROR);
@@ -137,6 +143,7 @@ class SubscriptionPlanSeeder extends Seeder
                     'subscription_group_id', 'product_type', 'name', 'tier_key', 'billing_interval', 'duration_count',
                     'price_minor', 'currency', 'discount', 'bonus', 'is_special',
                     'subscription_referral_percent', 'task_referral_percent', 'max_review_tasks', 'max_ad_shares', 'addons',
+                    'subscription_referral_tiers', 'task_referral_tiers',
                     'eligible_app_store', 'eligible_app_category', 'minimum_withdrawal_minor',
                     'withdrawal_days', 'daily_revenue_minor', 'task_reward_minor', 'daily_task_limit', 'features',
                     'is_active', 'updated_at',

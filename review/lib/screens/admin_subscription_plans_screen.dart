@@ -833,6 +833,8 @@ class _SubscriptionPlanEditorState extends State<_SubscriptionPlanEditor> {
     _addons = _plan['addons'] == true || _plan['addons'] == 1;
     final precision = widget.precision(_currency);
     final featureMap = _featureMap(_plan['features']);
+    final subscriptionTiers = widget.map(_plan['subscription_referral_tiers']);
+    final taskTiers = widget.map(_plan['task_referral_tiers']);
     _fields = {
       'plan_key': TextEditingController(text: _text(_plan['plan_key'])),
       'name': TextEditingController(text: _text(_plan['name'])),
@@ -841,8 +843,12 @@ class _SubscriptionPlanEditorState extends State<_SubscriptionPlanEditor> {
       'price': TextEditingController(text: _major(_plan['price_minor'], precision)),
       'discount': TextEditingController(text: _text(_plan['discount'], '0')),
       'bonus': TextEditingController(text: _text(_plan['bonus'], '0')),
-      'subscription_referral_percent': TextEditingController(text: _text(_plan['subscription_referral_percent'], '5')),
-      'task_referral_percent': TextEditingController(text: _text(_plan['task_referral_percent'], '3')),
+      'subscription_referral_tier_1': TextEditingController(text: _text(subscriptionTiers['1'], '10')),
+      'subscription_referral_tier_2': TextEditingController(text: _text(subscriptionTiers['2'], '4')),
+      'subscription_referral_tier_3': TextEditingController(text: _text(subscriptionTiers['3'], '1')),
+      'task_referral_tier_1': TextEditingController(text: _text(taskTiers['1'], '10')),
+      'task_referral_tier_2': TextEditingController(text: _text(taskTiers['2'], '5')),
+      'task_referral_tier_3': TextEditingController(text: _text(taskTiers['3'], '2')),
       'max_review_tasks': TextEditingController(text: _text(_plan['max_review_tasks'])),
       'max_ad_shares': TextEditingController(text: _text(_plan['max_ad_shares'])),
       'eligible_app_store': TextEditingController(text: _text(_plan['eligible_app_store'])),
@@ -925,8 +931,16 @@ class _SubscriptionPlanEditorState extends State<_SubscriptionPlanEditor> {
       'currency': _currency,
       'discount': discount,
       'bonus': bonus,
-      'subscription_referral_percent': _number('subscription_referral_percent') ?? 0,
-      'task_referral_percent': _number('task_referral_percent') ?? 0,
+      'subscription_referral_tiers': {
+        '1': _number('subscription_referral_tier_1') ?? 0,
+        '2': _number('subscription_referral_tier_2') ?? 0,
+        '3': _number('subscription_referral_tier_3') ?? 0,
+      },
+      'task_referral_tiers': {
+        '1': _number('task_referral_tier_1') ?? 0,
+        '2': _number('task_referral_tier_2') ?? 0,
+        '3': _number('task_referral_tier_3') ?? 0,
+      },
       'max_review_tasks': optionalInt('max_review_tasks'),
       'max_ad_shares': optionalInt('max_ad_shares'),
       'eligible_app_store': _fields['eligible_app_store']!.text.trim().isEmpty ? null : _fields['eligible_app_store']!.text.trim(),
@@ -986,10 +1000,14 @@ class _SubscriptionPlanEditorState extends State<_SubscriptionPlanEditor> {
             ]),
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8, children: [for (final day in const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) FilterChip(label: Text(day), selected: _withdrawalDays.contains(day), onSelected: (selected) => setState(() { if (selected) { _withdrawalDays.add(day); } else { _withdrawalDays.remove(day); } }))]),
-            const SizedBox(height: 18), _section('Referral and display', 'Percentages are configured per plan.'),
+            const SizedBox(height: 18), _section('Referral rates by generation', 'Each package has separate subscription and app review referral rates. Ad shares do not generate referral rewards.'),
             _grid([
-              _field('subscription_referral_percent', label: 'Subscription referral (%)', number: true),
-              _field('task_referral_percent', label: 'Task referral (%)', number: true),
+              _field('subscription_referral_tier_1', label: 'Subscription · Level 1 (%)', number: true, required: true),
+              _field('subscription_referral_tier_2', label: 'Subscription · Level 2 (%)', number: true, required: true),
+              _field('subscription_referral_tier_3', label: 'Subscription · Level 3 (%)', number: true, required: true),
+              _field('task_referral_tier_1', label: 'App review · Level 1 (%)', number: true, required: true),
+              _field('task_referral_tier_2', label: 'App review · Level 2 (%)', number: true, required: true),
+              _field('task_referral_tier_3', label: 'App review · Level 3 (%)', number: true, required: true),
             ]),
             const SizedBox(height: 12),
             TextFormField(controller: _fields['features'], minLines: 3, maxLines: 8, decoration: const InputDecoration(labelText: 'Feature details (JSON object)', hintText: '{"daily_revenue_label":"10"}', border: OutlineInputBorder())),

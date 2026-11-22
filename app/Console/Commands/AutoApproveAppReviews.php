@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Application\Actions\Marketplace\ListingEligibility;
 use App\Application\Actions\Moderation\DecideReviewSubmission;
 use App\Application\Money\CurrencyMinorUnits;
-use App\Console\Support\TaskRewardCalculator;
 use App\Models\Admin;
 use App\Models\LedgerEntry;
 use App\Models\ReferralReward;
@@ -28,7 +27,6 @@ class AutoApproveAppReviews extends Command
 
     public function handle(
         ListingEligibility $eligibility,
-        TaskRewardCalculator $rewards,
         DecideReviewSubmission $decide
     ): int {
         $startedAt = microtime(true);
@@ -98,6 +96,7 @@ class AutoApproveAppReviews extends Command
                 'submission_id' => $submission->id,
                 'reviewer_id' => $submission->reviewer_id,
                 'task_id' => $submission->review_task_id,
+                'reward_currency' => $task?->reward_currency,
             ];
 
             try {
@@ -123,19 +122,14 @@ class AutoApproveAppReviews extends Command
                     continue;
                 }
 
-                $rewardMinor = $rewards->forReview(
-                    (int) $task->reserved_reward_minor,
-                    $campaign->currency,
-                    $subscription->plan,
-                );
-
-                if ($rewardMinor === null || $rewardMinor < 1) {
+                $rewardMinor = (int) $task->reserved_reward_minor;
+                if ($rewardMinor < 1) {
                     $report['skipped']++;
 
                     $report['submissions'][] = [
                         ...$baseDetails,
                         'status' => 'skipped',
-                        'reason' => 'Package reward or currency conversion unavailable.',
+                        'reason' => 'The task has no valid reserved package reward.',
                     ];
 
                     continue;
@@ -144,7 +138,6 @@ class AutoApproveAppReviews extends Command
                 $result = DB::transaction(function () use (
                     $task,
                     $submission,
-                    $rewardMinor,
                     $admin,
                     $subscription,
                     $decide
@@ -206,10 +199,6 @@ class AutoApproveAppReviews extends Command
                         }
                     }
 
-                    $lockedTask->update([
-                        'reserved_reward_minor' => $rewardMinor,
-                    ]);
-
                     $decide->handle(
                         $admin,
                         $submission->fresh(),
@@ -231,9 +220,9 @@ class AutoApproveAppReviews extends Command
                     $report['skipped']++;
                 }
 
-                $referralReward = null;
+                $referralRewards = [];
                 if ($resultStatus === 'approved') {
-                    $referralReward = $this->ensureTaskReferralTransaction($submission);
+                    $referralRewards = $this->ensureTaskReferralTransactions($submission);
                 }
 
                 $report['submissions'][] = [
@@ -244,7 +233,7 @@ class AutoApproveAppReviews extends Command
                     'reward_minor' => $resultStatus === 'approved'
                         ? $rewardMinor
                         : null,
-                    'task_referral_reward' => $referralReward,
+                    'task_referral_rewards' => $referralRewards,
                 ];
 
             } catch (Throwable $exception) {
@@ -373,63 +362,70 @@ class AutoApproveAppReviews extends Command
      * Ensure a task referral reward appears in account history even if a
      * ledger observer was unavailable while the reward was posted.
      *
-     * @return array<string, mixed>|null
+     * @return list<array<string, mixed>>
      */
-    private function ensureTaskReferralTransaction(ReviewSubmission $submission): ?array
+    private function ensureTaskReferralTransactions(ReviewSubmission $submission): array
     {
-        $reward = ReferralReward::query()
+        $rewards = ReferralReward::query()
             ->where('reward_type', 'task')
             ->where('source_type', 'review_submission')
             ->where('source_id', $submission->id)
             ->where('status', 'paid')
-            ->first();
+            ->orderBy('referral_level')
+            ->get();
 
-        if (! $reward) {
-            return null;
-        }
+        return $rewards->map(function (ReferralReward $reward) use ($submission): array {
+            $ledger = LedgerEntry::query()->with('wallet')->find($reward->ledger_entry_id);
+            if (! $ledger?->wallet) {
+                return [
+                    'reward_id' => $reward->id,
+                    'referral_level' => $reward->referral_level,
+                    'status' => 'paid',
+                    'transaction_recorded' => false,
+                ];
+            }
 
-        $ledger = LedgerEntry::query()->with('wallet')->find($reward->ledger_entry_id);
-        if (! $ledger?->wallet) {
+            $currency = strtoupper($ledger->wallet->currency);
+            $transaction = Transaction::query()->updateOrCreate(
+                ['reference' => 'ledger:'.$ledger->id],
+                [
+                    'user_id' => $ledger->wallet->user_id,
+                    'type' => 'referral_bonus',
+                    'direction' => 'credit',
+                    'amount' => CurrencyMinorUnits::fromMinor((int) $ledger->amount_minor, $currency),
+                    'fee' => 0,
+                    'wallet' => $ledger->wallet->wallet_type->value,
+                    'status' => $ledger->status->value === 'posted' ? 'completed' : $ledger->status->value,
+                    'description' => $ledger->description ?: 'Referral reward for approved app review',
+                    'meta' => array_merge($ledger->metadata ?? [], [
+                        'currency' => $currency,
+                        'currency_minor_units' => CurrencyMinorUnits::precision($currency),
+                        'amount_minor' => (int) $ledger->amount_minor,
+                        'ledger_entry_id' => $ledger->id,
+                        'referral_reward_id' => $reward->id,
+                        'referral_level' => $reward->referral_level,
+                        'reward_percent' => $reward->reward_percent,
+                        'base_amount_minor' => $reward->base_amount_minor,
+                        'base_currency' => $reward->base_currency,
+                        'subscription_plan_id' => $reward->subscription_plan_id,
+                        'reward_type' => 'task',
+                        'source_type' => 'review_submission',
+                        'source_id' => $submission->id,
+                    ]),
+                ],
+            );
+
             return [
                 'reward_id' => $reward->id,
-                'status' => 'paid',
-                'transaction_recorded' => false,
+                'referral_level' => $reward->referral_level,
+                'beneficiary_user_id' => $reward->beneficiary_user_id,
+                'transaction_id' => $transaction->id,
+                'amount_minor' => (int) $reward->amount_minor,
+                'currency' => strtoupper($reward->currency),
+                'status' => $reward->status,
+                'transaction_recorded' => true,
             ];
-        }
-
-        $currency = strtoupper($ledger->wallet->currency);
-        $transaction = Transaction::query()->updateOrCreate(
-            ['reference' => 'ledger:'.$ledger->id],
-            [
-                'user_id' => $ledger->wallet->user_id,
-                'type' => 'referral_bonus',
-                'direction' => 'credit',
-                'amount' => CurrencyMinorUnits::fromMinor((int) $ledger->amount_minor, $currency),
-                'fee' => 0,
-                'wallet' => $ledger->wallet->wallet_type->value,
-                'status' => $ledger->status->value === 'posted' ? 'completed' : $ledger->status->value,
-                'description' => $ledger->description ?: 'Referral reward for approved app review',
-                'meta' => array_merge($ledger->metadata ?? [], [
-                    'currency' => $currency,
-                    'currency_minor_units' => CurrencyMinorUnits::precision($currency),
-                    'amount_minor' => (int) $ledger->amount_minor,
-                    'ledger_entry_id' => $ledger->id,
-                    'referral_reward_id' => $reward->id,
-                    'reward_type' => 'task',
-                    'source_type' => 'review_submission',
-                    'source_id' => $submission->id,
-                ]),
-            ],
-        );
-
-        return [
-            'reward_id' => $reward->id,
-            'transaction_id' => $transaction->id,
-            'amount_minor' => (int) $reward->amount_minor,
-            'currency' => strtoupper($reward->currency),
-            'status' => $reward->status,
-            'transaction_recorded' => true,
-        ];
+        })->all();
     }
 
     private function writeReport(array $report, float $startedAt): void

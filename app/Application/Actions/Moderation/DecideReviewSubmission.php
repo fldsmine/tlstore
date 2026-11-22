@@ -33,6 +33,7 @@ final class DecideReviewSubmission
             /** @var AppReviewCampaign $campaign */
             $campaign = AppReviewCampaign::query()->lockForUpdate()->findOrFail($submission->task->app_review_campaign_id);
             $app = $submission->task->campaign?->app;
+            $rewardCurrency = strtoupper((string) ($submission->task->reward_currency ?: $campaign->currency));
             $appName = trim((string) $app?->name) !== '' ? trim((string) $app->name) : 'the app';
             $now = now();
             ModerationDecision::query()->create([
@@ -76,6 +77,7 @@ final class DecideReviewSubmission
             $campaign->reserved_reviews = max(0, $campaign->reserved_reviews - 1);
 
             if ($decision === 'approved') {
+                $referralPlan = $submission->task->subscriptionPlan ?? $referralPlan;
                 $campaign->completed_reviews++;
                 $app = StoreApp::query()->lockForUpdate()->findOrFail($campaign->app_id);
                 $app->total_reviews = (int) ($app->total_reviews ?? 0) + 1;
@@ -84,7 +86,7 @@ final class DecideReviewSubmission
                     $submission->reviewer,
                     WalletType::forReviewStore($app->store),
                     (int) $submission->task->reserved_reward_minor,
-                    $campaign->currency,
+                    $rewardCurrency,
                     'review_reward',
                     'review_submission',
                     $submission->id,
@@ -93,7 +95,7 @@ final class DecideReviewSubmission
                     $now,
                 );
                 app(CreditReferralReward::class)->handle(
-                    $submission->reviewer, (int) $submission->task->reserved_reward_minor, $campaign->currency, 'task',
+                    $submission->reviewer, (int) $submission->task->reserved_reward_minor, $rewardCurrency, 'task',
                     'review_submission', $submission->id, 'referral-review:'.$submission->id,
                     'Referral reward for approved app review', $referralPlan, $submission->task->claimed_at,
                 );

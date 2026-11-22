@@ -246,6 +246,8 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                 _buildInviteHero(),
                 const SizedBox(height: 16),
                 _buildStats(),
+                const SizedBox(height: 14),
+                _buildReferralLevelsCard(),
                 const SizedBox(height: 25),
                 _buildSectionHeading(),
                 if (_summaryError != null || _referralsError != null) ...[
@@ -854,6 +856,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
               amount);
     });
     final date = _dateLabel(referral['attributed_at']?.toString());
+    final referralLevel = _asNum(referral['referral_level']).toInt().clamp(1, 3);
     final isQualified = status.toLowerCase() == 'qualified';
 
     return Container(
@@ -902,7 +905,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Invited $date',
+                      'Level $referralLevel · Joined $date',
                       style: TextStyle(color: _muted, fontSize: 10),
                     ),
                   ],
@@ -951,6 +954,8 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                   final rewardType = _pretty(
                     reward['reward_type']?.toString() ?? 'reward',
                   );
+                  final rewardLevel = reward['referral_level'] ?? referralLevel;
+                  final rewardPercent = reward['reward_percent'] ?? '—';
                   final paid = rewardStatus.toLowerCase() == 'paid';
                   return Container(
                     padding: const EdgeInsets.symmetric(
@@ -966,7 +971,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: Text(
-                      '$rewardType · ${_pretty(rewardStatus)}',
+                      '$rewardType · L$rewardLevel · $rewardPercent% · ${_pretty(rewardStatus)}',
                       style: TextStyle(
                         color: paid ? _green : _muted,
                         fontSize: 9,
@@ -978,6 +983,38 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferralLevelsCard() {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Three referral levels',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: colors.onSurface,
+                ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'Earn from direct referrals and up to two generations below them. Subscription and approved app review rewards use separate rates set on the package purchased by the referred user. Ad shares do not earn referral rewards.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  height: 1.4,
+                  color: colors.onSurfaceVariant,
+                ),
+          ),
         ],
       ),
     );

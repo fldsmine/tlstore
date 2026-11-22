@@ -15,7 +15,8 @@ class SubscriptionPlan extends Model
     protected $table = 'subscription_plans';
     protected $fillable = [
         'plan_key', 'product_type', 'name', 'tier_key', 'billing_interval', 'duration_count',
-        'price_minor', 'currency', 'discount', 'bonus', 'is_special', 'addons', 'subscription_referral_percent', 'task_referral_percent', 'max_review_tasks',
+        'price_minor', 'currency', 'discount', 'bonus', 'is_special', 'addons', 'subscription_referral_percent', 'task_referral_percent',
+        'subscription_referral_tiers', 'task_referral_tiers', 'max_review_tasks',
         'max_ad_shares', 'subscription_group_id', 'eligible_app_store',
         'eligible_app_category', 'minimum_withdrawal_minor', 'withdrawal_days', 'daily_revenue_minor',
         'task_reward_minor', 'daily_task_limit', 'features', 'is_active',
@@ -29,6 +30,8 @@ class SubscriptionPlan extends Model
         'bonus' => 'decimal:2',
         'subscription_referral_percent' => 'decimal:2',
         'task_referral_percent' => 'decimal:2',
+        'subscription_referral_tiers' => 'array',
+        'task_referral_tiers' => 'array',
         'is_special' => 'integer',
         'addons' => 'boolean',
         'max_review_tasks' => 'integer',

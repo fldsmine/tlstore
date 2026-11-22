@@ -9,10 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ReviewTask extends Model
 {
+    protected $appends = ['reward_currency_minor_units'];
+
     protected $table = 'review_tasks';
     protected $fillable = [
-        'app_review_campaign_id', 'reviewer_id', 'review_template_version_id', 'status',
-        'idempotency_key', 'reserved_reward_minor', 'claimed_at', 'expires_at', 'completed_at',
+        'app_review_campaign_id', 'reviewer_id', 'subscription_plan_id', 'review_template_version_id', 'status',
+        'idempotency_key', 'reserved_reward_minor', 'reward_currency', 'claimed_at', 'expires_at', 'completed_at',
     ];
     protected $casts = [
         'status' => TaskStatus::class,
@@ -22,9 +24,19 @@ class ReviewTask extends Model
         'completed_at' => 'datetime',
     ];
 
+    public function getRewardCurrencyMinorUnitsAttribute(): int
+    {
+        return \App\Application\Money\CurrencyMinorUnits::precision($this->reward_currency ?: 'USD');
+    }
+
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(AppReviewCampaign::class, 'app_review_campaign_id');
+    }
+
+    public function subscriptionPlan(): BelongsTo
+    {
+        return $this->belongsTo(SubscriptionPlan::class);
     }
 
     public function reviewer(): BelongsTo

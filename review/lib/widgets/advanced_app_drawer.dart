@@ -89,9 +89,6 @@ class AdvancedAppDrawer extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-            child: Image.asset('assets/splash-bg.png', fit: BoxFit.cover),
-          ),
-          Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -104,6 +101,25 @@ class AdvancedAppDrawer extends StatelessWidget {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
+              ),
+            ),
+          ),
+          // This PNG is a transparent decorative layer (white map and
+          // landscape marks), so paint it over the gradient. Painting the
+          // gradient on top makes the artwork too faint to notice in the web
+          // renderer, especially on bright displays.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Image.asset(
+                'assets/splash-bg.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.medium,
+                gaplessPlayback: true,
+                errorBuilder: (context, error, stackTrace) {
+                  debugPrint('Unable to load drawer background asset: $error');
+                  return const SizedBox.shrink();
+                },
               ),
             ),
           ),

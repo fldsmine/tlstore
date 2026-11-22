@@ -569,7 +569,7 @@ class _ModerationCard extends StatelessWidget {
   (String, String, (String, Widget)?) _reviewDetails() {
     final task = _map(row['task']), campaign = _map(task['campaign']), app = _map(campaign['app']);
     final title = _text(app['name'], 'App review');
-    final currency = _text(campaign['currency'], 'USD');
+    final currency = _text(task['reward_currency'], _text(campaign['currency'], 'USD'));
     final reward = money(task['reserved_reward_minor'], currency);
     final submitted = _text(row['submitted_at']);
     final answers = row['answers'] is List ? row['answers'] as List : const [];

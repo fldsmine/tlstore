@@ -50,7 +50,8 @@ final class UserManagementController
             ->latest('id')->limit(30)->get();
         $referrals = ReferralAttribution::query()->where('referrer_user_id', $account->id)
             ->with('referredUser:id,full_name,username,email,status,created_at')
-            ->withCount('rewards')->latest('id')->limit(30)->get();
+            ->withCount(['rewards as rewards_count' => fn ($query) => $query->where('beneficiary_user_id', $account->id)])
+            ->latest('id')->limit(30)->get();
 
         $userData = [
             'id' => $account->id,

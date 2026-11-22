@@ -89,6 +89,17 @@ class ProxyPromptExamplePage extends StatelessWidget {
               label: const Text('Show tall prompt'),
             ),
             const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => ProxyAddonsDialog.show<void>(
+                context: context,
+                plan: _samplePlan,
+                onPurchase: () => _showPurchaseMessage(context, 'Addons'),
+                onReview: () => _showPurchaseMessage(context, 'Addons'),
+              ),
+              icon: const Icon(Icons.view_agenda_rounded),
+              label: const Text('Show addons prompt'),
+            ),
+            const SizedBox(height: 12),
             FilledButton.tonalIcon(
               onPressed: () => ProxyRequirementGridDialog.show<void>(
                 context: context,

@@ -2,7 +2,6 @@
 
 namespace App\Application\Actions\Moderation;
 
-use App\Application\Actions\Referrals\CreditReferralReward;
 use App\Application\Actions\Wallets\CreditUserWallet;
 use App\Enums\WalletType;
 use App\Application\Money\CurrencyMinorUnits;
@@ -13,16 +12,15 @@ use App\Models\Admin;
 use App\Models\AuditLog;
 use App\Models\ModerationDecision;
 use App\Models\Notification;
-use App\Models\SubscriptionPlan;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class DecideAdShare
 {
-    public function handle(Admin $admin, AdShareEvent $event, string $decision, ?string $reasonCode, ?string $reason, ?SubscriptionPlan $referralPlan = null): AdShareEvent
+    public function handle(Admin $admin, AdShareEvent $event, string $decision, ?string $reasonCode, ?string $reason): AdShareEvent
     {
-        return DB::transaction(function () use ($admin, $event, $decision, $reasonCode, $reason, $referralPlan): AdShareEvent {
+        return DB::transaction(function () use ($admin, $event, $decision, $reasonCode, $reason): AdShareEvent {
             $event = AdShareEvent::query()->with('task')->lockForUpdate()->findOrFail($event->id);
             if ($event->status->value !== 'pending_validation') {
                 throw ValidationException::withMessages(['share' => 'This share has already been decided.']);
@@ -86,11 +84,6 @@ final class DecideAdShare
                     'ad-share-approved-'.$event->id,
                     'Approved public ad share reward',
                     $now,
-                );
-                app(CreditReferralReward::class)->handle(
-                    $event->task->user, (int) $event->task->reserved_reward_minor, $ad->currency, 'task',
-                    'ad_share_event', $event->id, 'referral-ad-share:'.$event->id,
-                    'Referral reward for approved ad share', $referralPlan, $event->shared_at,
                 );
             }
 

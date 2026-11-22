@@ -22,16 +22,16 @@ class DemoPlatformActivitySeeder extends Seeder
             $this->seedAppStoreSnapshots($apps, $now);
             $templateVersionIds = $this->publishedTemplateVersionIds();
             $campaigns = $this->seedReviewCampaigns($apps, $ownerId, $now, $templateVersionIds);
-            //$paymentIntents = $this->seedSubscriptionPayments($users, $plans, $now);
-            //$subscriptions = $this->seedSubscriptions($users, $plans, $paymentIntents, $now);
-            //$this->seedLocationAddons($users, $plans, $now);
-            //$wallets = $this->walletIdsByUser($users);
-            //$reviewTasks = $this->seedReviewTasks($campaigns, $users, $now);
-            //$this->seedReviewSubmissions($reviewTasks, $users, $adminId, $wallets, $now);
-            //$this->seedAdShareActivity($users, $wallets, $now);
-            //$this->seedTopupsAndManualDeposits($users, $wallets, $now);
-            //$this->seedReferralActivity($users, $wallets, $now);
-            //$this->seedWithdrawals($users, $wallets, $now);
+            $paymentIntents = $this->seedSubscriptionPayments($users, $plans, $now);
+            $subscriptions = $this->seedSubscriptions($users, $plans, $paymentIntents, $now);
+            $this->seedLocationAddons($users, $plans, $now);
+            $wallets = $this->walletIdsByUser($users);
+            $reviewTasks = $this->seedReviewTasks($campaigns, $users, $now);
+            $this->seedReviewSubmissions($reviewTasks, $users, $adminId, $wallets, $now);
+            $this->seedAdShareActivity($users, $wallets, $now);
+            $this->seedTopupsAndManualDeposits($users, $wallets, $now);
+            $this->seedReferralActivity($users, $wallets, $now);
+            $this->seedWithdrawals($users, $wallets, $now);
             $this->seedNotificationsAndOperations($users, $now);
         });
     }
@@ -823,6 +823,8 @@ class DemoPlatformActivitySeeder extends Seeder
                 $ledgerId = DB::table('ledger_entries')->where('idempotency_key', 'referral-ledger-'.$attributionId)->value('id');
                 DB::table('referral_rewards')->upsert([[
                     'referral_attribution_id' => $attributionId,
+                    'beneficiary_user_id' => $users[$referrerNumber],
+                    'referral_level' => 1,
                     'reward_type' => 'task',
                     'source_type' => 'demo_referral_qualification',
                     'source_id' => $attributionId,
@@ -833,7 +835,7 @@ class DemoPlatformActivitySeeder extends Seeder
                     'status' => 'paid',
                     'created_at' => $now,
                     'updated_at' => $now,
-                ]], ['referral_attribution_id', 'reward_type', 'source_type', 'source_id'], ['wallet_id', 'ledger_entry_id', 'amount_minor', 'status', 'updated_at']);
+                ]], ['referral_attribution_id', 'beneficiary_user_id', 'referral_level', 'reward_type', 'source_type', 'source_id'], ['wallet_id', 'ledger_entry_id', 'amount_minor', 'status', 'updated_at']);
             }
         }
     }
@@ -910,7 +912,7 @@ class DemoPlatformActivitySeeder extends Seeder
 
     private function seedNotificationsAndOperations(array $users, $now): void
     {
-        foreach ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as $number) {
+        foreach ([3, 4, 5, 6, 8] as $number) {
             if (!isset($users[$number])) {
                 continue;
             }
@@ -922,7 +924,7 @@ class DemoPlatformActivitySeeder extends Seeder
 				'title' => 'Welcome to TrustLens 🎉',
 				'body' => "Discover, review, and share your favorite apps and ads. Explore new apps, share your experiences, and help others make informed choices through honest reviews and recommendations.\n\nYour opinions matter. Let's discover and share together! 🚀",
                 'data' => json_encode(['seed' => true], JSON_THROW_ON_ERROR),
-                'read_at' => null,
+                'read_at' => $number === 3 ? $now->copy()->subHours(2) : null,
                 'created_at' => $now->copy()->subHours(4),
                 'updated_at' => $now,
             ]], ['notification_key'], ['title', 'body', 'data', 'read_at', 'updated_at']);
@@ -945,6 +947,34 @@ class DemoPlatformActivitySeeder extends Seeder
             }
         }
 
+        DB::table('audit_logs')->upsert([[
+            'audit_key' => 'audit-campaign-publish',
+            'actor_user_id' => null,
+            'actor_admin_id' => (int) Admin::query()->where('email', 'admin@tlstore.test')->value('id'),
+            'action' => 'campaign.demo_seeded',
+            'entity_type' => 'app_review_campaign',
+            'entity_id' => 'review-fitpulse-ng',
+            'before_values' => null,
+            'after_values' => json_encode(['status' => 'active', 'seed' => true], JSON_THROW_ON_ERROR),
+            'request_id' => 'seed-run',
+            'ip_hash' => null,
+            'created_at' => $now,
+        ]], ['audit_key'], ['actor_user_id', 'actor_admin_id', 'action', 'after_values']);
+
+        DB::table('outbox_events')->upsert([[
+            'event_key' => 'event-review-approved',
+            'event_type' => 'review.submission.approved',
+            'aggregate_type' => 'review_submission',
+            'aggregate_id' => 'seed-sample',
+            'payload' => json_encode(['seed' => true, 'purpose' => 'outbox workflow test'], JSON_THROW_ON_ERROR),
+            'status' => 'pending',
+            'attempts' => 0,
+            'available_at' => $now,
+            'processed_at' => null,
+            'last_error' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]], ['event_key'], ['event_type', 'payload', 'status', 'updated_at']);
     }
 
     private function planKeyForUser(int $number): string

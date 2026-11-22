@@ -1,6 +1,7 @@
 <?php
 
 return [
+	'default_currency' => env('DEFAULT_CURRENCY', 'NGN'),
     'support_email' => env('SUPPORT_EMAIL', 'support@example.com'),
     'payment_return_url' => env('PAYMENT_RETURN_URL', rtrim(env('APP_URL', 'http://localhost'), '/').'/payments/return'),
     'payment_webhook_base_url' => env('PAYMENT_WEBHOOK_BASE_URL', env('APP_URL', 'http://localhost')),

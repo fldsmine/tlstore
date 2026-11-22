@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Keep common app entry links useful when the mobile app is not installed.
-$webAppUrl = static fn (): string => rtrim(config('app.web_url', 'https://web.tlstore.org'), '/');
+$webAppUrl = static fn (): string => rtrim(config('app.web_url'), '/');
 $flutterWebEntry = static function () {
     $entryPoint = public_path('web/index.html');
     abort_unless(is_file($entryPoint), 404, 'Flutter web build is missing.');
@@ -16,15 +16,20 @@ $flutterWebEntry = static function () {
     ]);
 };
 
-Route::get('/', function (Request $request, LandingPageController $landing) use ($flutterWebEntry) {
-    return $request->getHost() === 'web.tlstore.org'
+Route::get('/', function (Request $request, LandingPageController $landing) use ($webAppUrl, $flutterWebEntry) {
+    $webHost = parse_url($webAppUrl(), PHP_URL_HOST);
+	
+    return $request->getHost() === $webHost
         ? $flutterWebEntry()
         : $landing();
 })->name('frontend');
 
 foreach (['login', 'register'] as $appPath) {
     Route::get('/'.$appPath, function (Request $request) use ($appPath, $webAppUrl, $flutterWebEntry) {
-        if ($request->getHost() === 'web.tlstore.org') {
+
+		$webHost = parse_url($webAppUrl(), PHP_URL_HOST);
+		
+        if ($request->getHost() === $webHost) {
             return $flutterWebEntry();
         }
 
@@ -80,8 +85,10 @@ Route::get('/web-app/{path?}', $flutterWebEntry)
 // On the web-app subdomain, send Flutter's client-side routes to the app.
 // The bundle is stored in public/web, so its generated /web/ asset base works
 // from both the subdomain root and nested routes.
-Route::get('/{path}', function (Request $request) use ($flutterWebEntry) {
-    abort_unless($request->getHost() === 'web.tlstore.org', 404);
+Route::get('/{path}', function (Request $request) use ($webAppUrl, $flutterWebEntry) {
+    $webHost = parse_url($webAppUrl(), PHP_URL_HOST);
+
+    abort_unless($request->getHost() === $webHost, 404);
 
     return $flutterWebEntry();
 })->where('path', '^(?!api(?:/|$)|payments/return$|auth/telegram-widget$|firebase-messaging-sw\.js$|up$|storage(?:/|$)).*')

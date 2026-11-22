@@ -23,3 +23,12 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Public user uploads are fetched cross-origin by the Flutter web app.
+# These static media files are public, so wildcard CORS is appropriate.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(avif|gif|jpe?g|png|svg|webp)$">
+        Header always set Access-Control-Allow-Origin "*"
+        Header always set Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+    </FilesMatch>
+</IfModule>

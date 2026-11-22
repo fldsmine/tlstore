@@ -3,7 +3,6 @@
 namespace App\Application\Actions\Reviews;
 
 use App\Application\Actions\Marketplace\ListingEligibility;
-use App\Console\Support\TaskRewardCalculator;
 use App\Models\ReviewAnswer;
 use App\Models\ReviewSubmission;
 use App\Models\ReviewTask;
@@ -17,7 +16,6 @@ final class SubmitReview
 {
     public function __construct(
         private readonly ListingEligibility $eligibility,
-        private readonly TaskRewardCalculator $rewards,
     ) {}
 
     public function handle(User $user, ReviewTask $task, array $answers, ?int $durationSeconds): ReviewSubmission
@@ -40,14 +38,10 @@ final class SubmitReview
                 throw ValidationException::withMessages(['task' => 'An eligible app review package is required to submit this review.']);
             }
             $campaign = $task->campaign;
-            $currency = strtoupper((string) $campaign->currency);
-            $rewardMinor = $this->rewards->forReview(
-                (int) $task->reserved_reward_minor,
-                $currency,
-                $subscription->plan,
-            );
-            if ($rewardMinor === null || $rewardMinor < 1) {
-                throw ValidationException::withMessages(['reward' => 'The package review reward cannot be converted or is unavailable right now.']);
+            $currency = strtoupper((string) ($task->reward_currency ?: $subscription->plan->currency));
+            $rewardMinor = (int) $task->reserved_reward_minor;
+            if ($rewardMinor < 1) {
+                throw ValidationException::withMessages(['reward' => 'The reserved package review reward is unavailable.']);
             }
 
             $questions = $task->templateVersion->questions->keyBy('id');
@@ -80,7 +74,6 @@ final class SubmitReview
             $task->update([
                 'status' => 'submitted',
                 'completed_at' => now(),
-                'reserved_reward_minor' => $rewardMinor,
             ]);
 
             $appName = trim((string) $campaign->app?->name) ?: 'app listing';

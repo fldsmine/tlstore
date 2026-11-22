@@ -61,6 +61,14 @@ final class SubscriptionPlanController
             'bonus' => ['sometimes', 'numeric', 'min:0'],
             'subscription_referral_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'task_referral_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'subscription_referral_tiers' => ['sometimes', 'array'],
+            'subscription_referral_tiers.1' => ['required_with:subscription_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'subscription_referral_tiers.2' => ['required_with:subscription_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'subscription_referral_tiers.3' => ['required_with:subscription_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'task_referral_tiers' => ['sometimes', 'array'],
+            'task_referral_tiers.1' => ['required_with:task_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'task_referral_tiers.2' => ['required_with:task_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'task_referral_tiers.3' => ['required_with:task_referral_tiers', 'numeric', 'min:0', 'max:100'],
             'max_review_tasks' => ['nullable', 'integer', 'min:0'],
             'max_ad_shares' => ['nullable', 'integer', 'min:0'],
             'eligible_app_store' => ['nullable', 'string', 'max:100'],
@@ -79,6 +87,18 @@ final class SubscriptionPlanController
         $data['product_type'] = 'marketplace_access';
         $data['is_active'] = $data['is_active'] ?? true;
         $data['features'] = $data['features'] ?? [];
+        $data['subscription_referral_tiers'] = $this->referralSchedule(
+            $data['subscription_referral_tiers'] ?? [], ['1' => 10, '2' => 4, '3' => 1],
+        );
+        $data['task_referral_tiers'] = $this->referralSchedule(
+            $data['task_referral_tiers'] ?? [], ['1' => 10, '2' => 5, '3' => 2],
+        );
+        if (! array_key_exists('subscription_referral_tiers', $request->all()) && array_key_exists('subscription_referral_percent', $data)) {
+            $data['subscription_referral_tiers']['1'] = (float) $data['subscription_referral_percent'];
+        }
+        if (! array_key_exists('task_referral_tiers', $request->all()) && array_key_exists('task_referral_percent', $data)) {
+            $data['task_referral_tiers']['1'] = (float) $data['task_referral_percent'];
+        }
         if ($group->group_key === 'group_a') {
             $data['task_reward_minor'] = null;
             $data['daily_task_limit'] = null;
@@ -119,6 +139,14 @@ final class SubscriptionPlanController
             'bonus' => ['sometimes', 'numeric', 'min:0'],
             'subscription_referral_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'task_referral_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'subscription_referral_tiers' => ['sometimes', 'array'],
+            'subscription_referral_tiers.1' => ['required_with:subscription_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'subscription_referral_tiers.2' => ['required_with:subscription_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'subscription_referral_tiers.3' => ['required_with:subscription_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'task_referral_tiers' => ['sometimes', 'array'],
+            'task_referral_tiers.1' => ['required_with:task_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'task_referral_tiers.2' => ['required_with:task_referral_tiers', 'numeric', 'min:0', 'max:100'],
+            'task_referral_tiers.3' => ['required_with:task_referral_tiers', 'numeric', 'min:0', 'max:100'],
             'max_review_tasks' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'max_ad_shares' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'subscription_group_id' => ['sometimes', 'exists:subscription_groups,id'],
@@ -136,6 +164,24 @@ final class SubscriptionPlanController
         ]);
         if ($plan->product_type->value !== 'marketplace_access') {
             return response()->json(['message' => 'Location coverage packages have been retired.'], 422);
+        }
+        if (array_key_exists('subscription_referral_tiers', $data)) {
+            $data['subscription_referral_tiers'] = $this->referralSchedule(
+                $data['subscription_referral_tiers'], $plan->subscription_referral_tiers ?? ['1' => 10, '2' => 4, '3' => 1],
+            );
+        }
+        if (array_key_exists('task_referral_tiers', $data)) {
+            $data['task_referral_tiers'] = $this->referralSchedule(
+                $data['task_referral_tiers'], $plan->task_referral_tiers ?? ['1' => 10, '2' => 5, '3' => 2],
+            );
+        }
+        if (! array_key_exists('subscription_referral_tiers', $data) && array_key_exists('subscription_referral_percent', $data)) {
+            $data['subscription_referral_tiers'] = $plan->subscription_referral_tiers ?? ['1' => 10, '2' => 4, '3' => 1];
+            $data['subscription_referral_tiers']['1'] = (float) $data['subscription_referral_percent'];
+        }
+        if (! array_key_exists('task_referral_tiers', $data) && array_key_exists('task_referral_percent', $data)) {
+            $data['task_referral_tiers'] = $plan->task_referral_tiers ?? ['1' => 10, '2' => 5, '3' => 2];
+            $data['task_referral_tiers']['1'] = (float) $data['task_referral_percent'];
         }
         if (isset($data['subscription_group_id']) && (int) $data['subscription_group_id'] !== (int) $plan->subscription_group_id && $plan->subscriptions()->exists()) {
             return response()->json(['message' => 'The subscription group cannot be changed after users have subscribed to this plan.'], 409);
@@ -208,5 +254,17 @@ final class SubscriptionPlanController
             'actor_admin_id' => $admin->id, 'action' => $action, 'entity_type' => $type, 'entity_id' => $id,
             'before_values' => $before, 'after_values' => $after, 'created_at' => now(),
         ]);
+    }
+
+    /** @param array<int|string, mixed> $input @param array<int|string, mixed> $defaults @return array<string, float> */
+    private function referralSchedule(array $input, array $defaults): array
+    {
+        $schedule = array_replace($defaults, $input);
+
+        return [
+            '1' => (float) $schedule['1'],
+            '2' => (float) $schedule['2'],
+            '3' => (float) $schedule['3'],
+        ];
     }
 }

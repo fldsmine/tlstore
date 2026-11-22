@@ -651,7 +651,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
         final campaign = _map(row['campaign']);
         final app = _map(campaign['app']);
         final submission = _map(row['submission']);
-        return ('${_text(app['name'], 'App review')}', 'Task ${row['id']} · ${_text(row['status'])} · Reward ${_minor(row['reserved_reward_minor'], campaign['currency'])}\n${submission.isEmpty ? 'Not submitted' : 'Submission ${_text(submission['status'])} · ${_date(submission['submitted_at'])}'}');
+        return ('${_text(app['name'], 'App review')}', 'Task ${row['id']} · ${_text(row['status'])} · Reward ${_minor(row['reserved_reward_minor'], row['reward_currency'] ?? campaign['currency'])}\n${submission.isEmpty ? 'Not submitted' : 'Submission ${_text(submission['status'])} · ${_date(submission['submitted_at'])}'}');
       }),
       const SizedBox(height: 12),
       _recordSection('Ad share tasks', _list(_detail['ad_share_tasks']), (row) {

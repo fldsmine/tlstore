@@ -42,17 +42,6 @@ final class TaskRewardCalculator
         return max(0, $reward);
     }
 
-    public function forReview(int $taskRewardMinor, string $taskCurrency, SubscriptionPlan $plan): ?int
-    {
-        $packageReward = $this->packageRewardMinor($plan, ['per_survey']);
-        if ($packageReward === null) return $taskRewardMinor;
-        $converted = $this->convertMinor($packageReward, $plan->currency, $taskCurrency);
-
-        // Review packages set the exact earning per completed review. The app
-        // listing reward is not the user's reward for Group B/C packages.
-        return $converted === null ? null : max(0, $converted);
-    }
-
     /** @param list<string> $featureKeys */
     private function packageRewardMinor(SubscriptionPlan $plan, array $featureKeys): ?int
     {

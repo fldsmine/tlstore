@@ -40,8 +40,8 @@ class DatabaseSeeder extends Seeder
             SubscriptionPlanSeeder::class,
             PackageAddonSeeder::class,
             DemoUserSeeder::class,
-            //SocialHandleSeeder::class,
-            //SocialFollowSeeder::class,
+            SocialHandleSeeder::class,
+            SocialFollowSeeder::class,
             TestimonialSeeder::class,
             FaqSeeder::class,
             BankSeeder::class,
@@ -49,8 +49,8 @@ class DatabaseSeeder extends Seeder
             AnnouncementSeeder::class,
             DemoPlatformActivitySeeder::class,
             PaymentOptionSeeder::class,
-			//WalletCreditSeeder::class,
-            //WalletBalanceSyncSeeder::class,
+			WalletCreditSeeder::class,
+            WalletBalanceSyncSeeder::class,
         ]);
     }
 }

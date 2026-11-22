@@ -426,7 +426,12 @@ Future<bool> _checkAddonBeforeSubmit() async {
         top: false,
         child: Column(
           children: [
-            if (!isSummary) _AppOverviewCard(app: _app, task: widget.task),
+            if (!isSummary)
+              _AppOverviewCard(
+                api: widget.api,
+                app: _app,
+                task: widget.task,
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: _ProgressHeader(
@@ -531,15 +536,27 @@ class _ModeChip extends StatelessWidget {
 }
 
 class _AppOverviewCard extends StatelessWidget {
-  const _AppOverviewCard({required this.app, required this.task});
+  const _AppOverviewCard({
+    required this.api,
+    required this.app,
+    required this.task,
+  });
+
+  final AuthApi api;
   final Map<String, dynamic> app;
   final Map<String, dynamic> task;
 
   String _money(dynamic minor, dynamic currency) {
     if (minor is! num) return 'Reward available';
     final code = currency?.toString() ?? 'NGN';
-    final digits = currencyPrecision(code);
-    return formatMajorMoney(minor / math.pow(10, digits), code);
+    return moneyConverted(
+      api,
+      minor,
+      code,
+      task['reward_currency_minor_units'],
+      api.preferredCurrency,
+      isMinor: true,
+    );
   }
 
   @override
@@ -552,10 +569,9 @@ class _AppOverviewCard extends StatelessWidget {
     final category = app['category']?.toString();
     final iconUrl = app['app_icon']?.toString();
     final campaign = task['campaign'];
-    final rewardMinor =
-        task['reserved_reward_minor'] ??
-        (campaign is Map ? campaign['review_reward_minor'] : null);
-    final currency = campaign is Map ? campaign['currency'] : app['currency'];
+    final rewardMinor = task['reserved_reward_minor'];
+    final currency = task['reward_currency'] ??
+        (campaign is Map ? campaign['currency'] : app['currency']);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 2),
