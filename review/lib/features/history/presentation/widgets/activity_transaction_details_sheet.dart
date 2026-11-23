@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
+import '../../../../core/currency/money.dart';
 
 Future<void> showActivityTransactionDetailsSheet({
   required BuildContext context,
@@ -41,6 +45,14 @@ class _ActivityTransactionDetailsSheet extends StatelessWidget {
     final rawType = transaction['type']?.toString() ?? 'transaction';
     final title = description.isNotEmpty ? description : _humanize(rawType);
     final wallet = transaction['wallet']?.toString();
+    final meta = transaction['meta'] is Map
+        ? Map<String, dynamic>.from(transaction['meta'] as Map)
+        : <String, dynamic>{};
+    final currency = transaction['currency']?.toString() ??
+        meta['currency']?.toString() ??
+        'USD';
+    final feeMinor = transaction['fee_minor'] ?? meta['fee_minor'];
+    final payoutMinor = meta['payout_minor'];
     final createdAt = DateTime.tryParse(
       (transaction['created_at'] ?? transaction['date'])?.toString() ?? '',
     )?.toLocal();
@@ -54,6 +66,16 @@ class _ActivityTransactionDetailsSheet extends StatelessWidget {
         ('Wallet', '${_humanize(wallet)} wallet'),
       ('Direction', direction.isEmpty ? '—' : _humanize(direction)),
       ('Status', _humanize(status)),
+      if (rawType == 'withdrawal' && feeMinor is num)
+        ('Fee', formatMajorMoney(
+          feeMinor / math.pow(10, currencyPrecision(currency)),
+          currency,
+        )),
+      if (rawType == 'withdrawal' && payoutMinor is num)
+        ('Estimated payout', formatMajorMoney(
+          payoutMinor / math.pow(10, currencyPrecision(currency)),
+          currency,
+        )),
       ('Date', dateLabel),
       if (transaction['reference']?.toString().trim().isNotEmpty == true)
         ('Reference', transaction['reference'].toString()),

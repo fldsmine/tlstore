@@ -94,9 +94,12 @@ final class RequestWithdrawal
                 throw ValidationException::withMessages(['amount_minor' => 'The requested amount is below the package or payout method minimum.']);
             }
             $feeMinor = (int) round($amountMinor * (float) $option->tax / 100);
-            $debitMinor = $amountMinor + $feeMinor;
-            if ((int) $wallet->balance_minor < $debitMinor) {
-                throw ValidationException::withMessages(['amount_minor' => 'The selected wallet has insufficient available funds for amount and percentage fee.']);
+            $payoutMinor = $amountMinor - $feeMinor;
+            if ($payoutMinor < 1) {
+                throw ValidationException::withMessages(['amount_minor' => 'The withdrawal amount must be greater than its percentage fee.']);
+            }
+            if ((int) $wallet->balance_minor < $amountMinor) {
+                throw ValidationException::withMessages(['amount_minor' => 'The selected wallet has insufficient available funds for the requested withdrawal amount.']);
             }
 
             $withdrawal = Withdrawal::query()->create([
@@ -113,9 +116,15 @@ final class RequestWithdrawal
             ]);
             LedgerEntry::query()->create([
                 'wallet_id' => $wallet->id, 'entry_type' => 'withdrawal_reservation', 'direction' => 'debit',
-                'amount_minor' => $debitMinor, 'status' => 'reserved', 'source_type' => 'withdrawal_request',
+                'amount_minor' => $amountMinor, 'status' => 'reserved', 'source_type' => 'withdrawal_request',
                 'source_id' => $withdrawal->id, 'idempotency_key' => 'withdrawal-reservation:'.hash('sha256', $idempotencyKey),
-                'description' => 'Withdrawal amount plus percentage fee',
+                'description' => 'Withdrawal request',
+                'metadata' => [
+                    'withdrawal_amount_minor' => $amountMinor,
+                    'fee_minor' => $feeMinor,
+                    'payout_minor' => $payoutMinor,
+                    'fee_percent' => (float) $option->tax,
+                ],
             ]);
 
             return $withdrawal->load('option');

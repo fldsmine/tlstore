@@ -30,16 +30,41 @@ final class AccountHistoryController
             ->latest('id')
             ->paginate($perPage);
 
-        $transactions->through(static function (Transaction $transaction): array {
+        $withdrawalIds = $transactions->getCollection()
+            ->filter(fn (Transaction $transaction): bool => $transaction->type->value === 'withdrawal'
+                && ($transaction->meta['source_type'] ?? null) === 'withdrawal_request'
+                && isset($transaction->meta['source_id']))
+            ->map(fn (Transaction $transaction): int => (int) $transaction->meta['source_id'])
+            ->unique()->values();
+        $withdrawalSnapshots = $withdrawalIds->isEmpty()
+            ? collect()
+            : WithdrawalRequest::query()->whereIn('id', $withdrawalIds)->get()->keyBy('id');
+
+        $transactions->through(static function (Transaction $transaction) use ($withdrawalSnapshots): array {
             $meta = $transaction->meta ?? [];
             $currency = strtoupper((string) ($meta['currency'] ?? 'USD'));
+            $amountMinor = CurrencyMinorUnits::toMinor($transaction->amount, $currency);
+            $feeMinor = CurrencyMinorUnits::toMinor($transaction->fee, $currency);
+            if ($transaction->type->value === 'withdrawal'
+                && ($meta['source_type'] ?? null) === 'withdrawal_request') {
+                $withdrawal = $withdrawalSnapshots->get((int) ($meta['source_id'] ?? 0));
+                if ($withdrawal) {
+                    // Older ledger rows reserved amount + fee. Present the
+                    // actual request amount as the debit and fee as a split.
+                    $amountMinor = (int) $withdrawal->amount_minor;
+                    $feeMinor = (int) $withdrawal->fee_minor;
+                    $meta['withdrawal_amount_minor'] = $amountMinor;
+                    $meta['fee_minor'] = $feeMinor;
+                    $meta['payout_minor'] = max(0, $amountMinor - $feeMinor);
+                }
+            }
 
             return [
                 'id' => $transaction->id,
                 'type' => $transaction->type->value,
                 'direction' => $transaction->direction,
-                'amount_minor' => CurrencyMinorUnits::toMinor($transaction->amount, $currency),
-                'fee_minor' => CurrencyMinorUnits::toMinor($transaction->fee, $currency),
+                'amount_minor' => $amountMinor,
+                'fee_minor' => $feeMinor,
                 'currency' => $currency,
                 'currency_minor_units' => $meta['currency_minor_units'] ?? CurrencyMinorUnits::precision($currency),
                 'wallet' => $transaction->wallet,

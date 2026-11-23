@@ -116,17 +116,27 @@ final class LedgerEntryObserver
             default => $transactionStatus,
         };
 
+        $withdrawal = $entry->source_type === 'withdrawal_request' ? $entry->source : null;
+        $withdrawalFeeMinor = $withdrawal ? (int) $withdrawal->fee_minor : 0;
+        $withdrawalAmountMinor = $withdrawal ? (int) $withdrawal->amount_minor : (int) $entry->amount_minor;
+        $withdrawalPayoutMinor = max(0, $withdrawalAmountMinor - $withdrawalFeeMinor);
+        $transactionAmountMinor = $entry->source_type === 'withdrawal_request'
+            ? $withdrawalAmountMinor
+            : (int) $entry->amount_minor;
+
         Transaction::query()->updateOrCreate(
             ['reference' => $reference],
             [
                 'user_id' => $wallet->user_id,
                 'type' => $type,
                 'direction' => $entry->direction->value,
-                'amount' => CurrencyMinorUnits::fromMinor($entry->amount_minor, $currency),
-                'fee' => 0,
+                'amount' => CurrencyMinorUnits::fromMinor($transactionAmountMinor, $currency),
+                'fee' => CurrencyMinorUnits::fromMinor($withdrawalFeeMinor, $currency),
                 'wallet' => $wallet->wallet_type->value,
                 'status' => $activityStatus,
-                'description' => $existing?->description ?: $entry->description,
+                'description' => $entry->source_type === 'withdrawal_request'
+                    ? 'Withdrawal request'
+                    : ($existing?->description ?: $entry->description),
                 'meta' => array_merge($existing?->meta ?? [], $entry->metadata ?? [], [
                     'ledger_entry_id' => $entry->id,
                     'currency' => $currency,
@@ -135,6 +145,11 @@ final class LedgerEntryObserver
                     'entry_type' => $entry->entry_type,
                     'source_type' => $entry->source_type,
                     'source_id' => $entry->source_id,
+                    ...($entry->source_type === 'withdrawal_request' ? [
+                        'withdrawal_amount_minor' => $withdrawalAmountMinor,
+                        'fee_minor' => $withdrawalFeeMinor,
+                        'payout_minor' => $withdrawalPayoutMinor,
+                    ] : []),
                 ]),
             ],
         );

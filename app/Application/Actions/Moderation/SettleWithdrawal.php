@@ -26,6 +26,20 @@ final class SettleWithdrawal
             $now = now();
             $reservation = LedgerEntry::query()->where('source_type', 'withdrawal_request')
                 ->where('source_id', $withdrawal->id)->where('entry_type', 'withdrawal_reservation')->lockForUpdate()->firstOrFail();
+            // Older requests reserved requested amount + fee. Normalize their
+            // reservation to the request amount before posting or releasing it.
+            if ((int) $reservation->amount_minor !== (int) $withdrawal->amount_minor) {
+                $reservation->update([
+                    'amount_minor' => (int) $withdrawal->amount_minor,
+                    'description' => 'Withdrawal request',
+                    'metadata' => array_merge($reservation->metadata ?? [], [
+                        'withdrawal_amount_minor' => (int) $withdrawal->amount_minor,
+                        'fee_minor' => (int) $withdrawal->fee_minor,
+                        'payout_minor' => max(0, (int) $withdrawal->amount_minor - (int) $withdrawal->fee_minor),
+                    ]),
+                ]);
+                $reservation->refresh();
+            }
             if ($decision === 'paid') {
                 $reservation->update(['status' => 'posted', 'posted_at' => $now, 'available_at' => $now]);
             } else {

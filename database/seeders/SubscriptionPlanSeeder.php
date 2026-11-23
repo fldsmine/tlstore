@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\SubscriptionPlan;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -31,6 +32,8 @@ class SubscriptionPlanSeeder extends Seeder
                     'withdrawal_days' => ['Monthly'],
                     'welcome_bonus' => 500,
                 ],
+				'subscription_referral_tiers' => ['1' => 50, '2' => 0, '3' => 0],
+				'task_referral_tiers' => ['1' => 0, '2' => 0, '3' => 0],
             ],
             [
                 'plan_key' => 'market-premium', 'subscription_group_id' => $groups['group_a'],
@@ -46,6 +49,8 @@ class SubscriptionPlanSeeder extends Seeder
                     'minimum_withdrawal' => 11500,
                     'withdrawal_days' => ['Monthly'],
                 ],
+				'subscription_referral_tiers' => ['1' => 50, '2' => 0, '3' => 0],
+				'task_referral_tiers' => ['1' => 0, '2' => 0, '3' => 0],
             ],
             [
                 'plan_key' => 'market-gold', 'subscription_group_id' => $groups['group_a'],
@@ -62,6 +67,8 @@ class SubscriptionPlanSeeder extends Seeder
                     'withdrawal_days' => ['Monthly'],
                     'package_percent_discount' => 12,
                 ],
+				'subscription_referral_tiers' => ['1' => 54.6, '2' => 0, '3' => 0],
+				'task_referral_tiers' => ['1' => 0, '2' => 0, '3' => 0],
             ],
             [
                 'plan_key' => 'review-google-play-4m', 'subscription_group_id' => $groups['group_b'],
@@ -80,6 +87,8 @@ class SubscriptionPlanSeeder extends Seeder
                     'per_survey' => 210,
                     'daily_task_limit' => 3,
                 ],
+				'subscription_referral_tiers' => ['1' => 10, '2' => 3, '3' => 1],
+				'task_referral_tiers' => ['1' => 5, '2' => 0, '3' => 0],
             ],
             [
                 'plan_key' => 'review-samsung-store-4m', 'subscription_group_id' => $groups['group_b'],
@@ -98,6 +107,8 @@ class SubscriptionPlanSeeder extends Seeder
                     'per_survey' => 330,
                     'daily_task_limit' => 3,
                 ],
+				'subscription_referral_tiers' => ['1' => 10, '2' => 3, '3' => 1],
+				'task_referral_tiers' => ['1' => 5, '2' => 0, '3' => 0],
             ],
             [
                 'plan_key' => 'review-apple-store-4m', 'subscription_group_id' => $groups['group_c'],
@@ -116,39 +127,22 @@ class SubscriptionPlanSeeder extends Seeder
                     'per_survey' => 700,
                     'daily_task_limit' => 3,
                 ],
+				'subscription_referral_tiers' => ['1' => 10, '2' => 3, '3' => 1],
+				'task_referral_tiers' => ['1' => 5, '2' => 0, '3' => 0],
             ],
         ];
 
         foreach ($plans as $plan) {
-            // Each package owns its own editable schedule. These are the
-            // initial defaults; admins can later tune rates per plan.
-            $plan['subscription_referral_tiers'] = json_encode(['1' => 10, '2' => 4, '3' => 1], JSON_THROW_ON_ERROR);
-            $plan['task_referral_tiers'] = json_encode(['1' => 10, '2' => 5, '3' => 2], JSON_THROW_ON_ERROR);
-            $plan['subscription_referral_percent'] = 10;
-            $plan['task_referral_percent'] = 10;
             $features = $plan['features'];
-            unset($plan['features']);
-            $plan['features'] = json_encode($features, JSON_THROW_ON_ERROR);
-            $plan['withdrawal_days'] = $plan['withdrawal_days'] === null
-                ? null
-                : json_encode($plan['withdrawal_days'], JSON_THROW_ON_ERROR);
+
             $plan['is_active'] = true;
             $plan['created_at'] = $now;
             $plan['updated_at'] = $now;
 
-            DB::table('subscription_plans')->upsert(
-                [$plan],
-                ['plan_key'],
-                [
-                    'subscription_group_id', 'product_type', 'name', 'tier_key', 'billing_interval', 'duration_count',
-                    'price_minor', 'currency', 'discount', 'bonus', 'is_special',
-                    'subscription_referral_percent', 'task_referral_percent', 'max_review_tasks', 'max_ad_shares', 'addons',
-                    'subscription_referral_tiers', 'task_referral_tiers',
-                    'eligible_app_store', 'eligible_app_category', 'minimum_withdrawal_minor',
-                    'withdrawal_days', 'daily_revenue_minor', 'task_reward_minor', 'daily_task_limit', 'features',
-                    'is_active', 'updated_at',
-                ],
-            );
+			SubscriptionPlan::updateOrCreate(
+				['plan_key' => $plan['plan_key']],
+				$plan
+			);
 
             $planId = DB::table('subscription_plans')->where('plan_key', $plan['plan_key'])->value('id');
             DB::table('subscription_plan_features')->where('subscription_plan_id', $planId)->delete();

@@ -95,6 +95,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/me/vas-orders/{order}/check', [VasOrderController::class, 'check'])->middleware('throttle:6,1')->name('api.v1.me.vas-orders.check');
         Route::get('/me/referral-code', [ReferralController::class, 'code'])->name('api.v1.referral.code');
         Route::get('/me/referrals', [ReferralController::class, 'attributions'])->name('api.v1.referrals.index');
+        Route::get('/me/referral-team', [ReferralController::class, 'team'])->name('api.v1.referrals.team');
         Route::get('/me', [AuthController::class, 'me'])->name('api.v1.me');
         Route::get('/campaigns/config', [CampaignOrderController::class, 'config'])->name('api.v1.campaigns.config');
         Route::post('/campaign-orders', [CampaignOrderController::class, 'store'])->middleware('throttle:10,1')->name('api.v1.campaign-orders.store');

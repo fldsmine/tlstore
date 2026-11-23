@@ -10,6 +10,7 @@ import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 import '../widgets/auth_components.dart';
 import '../widgets/referral_card_share_dialog.dart';
+import 'referral_team_screen.dart';
 
 class ReferralsScreen extends StatefulWidget {
   const ReferralsScreen({
@@ -247,8 +248,8 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                 const SizedBox(height: 16),
                 _buildStats(),
                 const SizedBox(height: 14),
-                _buildReferralLevelsCard(),
-                const SizedBox(height: 25),
+                _buildTeamLink(),
+                const SizedBox(height: 22),
                 _buildSectionHeading(),
                 if (_summaryError != null || _referralsError != null) ...[
                   const SizedBox(height: 12),
@@ -746,6 +747,68 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
     ],
   );
 
+  Widget _buildTeamLink() => Material(
+    color: Theme.of(context).colorScheme.surfaceContainerLow,
+    borderRadius: BorderRadius.circular(17),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(17),
+      onTap: _referralCode == null
+          ? null
+          : () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ReferralTeamScreen(
+                  api: widget.api,
+                  token: widget.token,
+                  referralCode: _referralCode!,
+                  referralLink: _referralUri!,
+                ),
+              ),
+            ),
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: _line),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _paleGreen,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(Icons.groups_rounded, color: _green),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Referral team',
+                    style: TextStyle(
+                      color: _ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Explore members and earnings across all three tiers',
+                    style: TextStyle(color: _muted, fontSize: 10.5),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: _green),
+          ],
+        ),
+      ),
+    ),
+  );
+
   Widget _buildPartialError() {
     final message = _summaryError != null && _referralsError != null
         ? 'Some referral information could not be refreshed.'
@@ -770,7 +833,10 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: Theme.of(context).colorScheme.onTertiaryContainer, fontSize: 11),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onTertiaryContainer,
+                fontSize: 11,
+              ),
             ),
           ),
           TextButton(
@@ -856,7 +922,9 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
               amount);
     });
     final date = _dateLabel(referral['attributed_at']?.toString());
-    final referralLevel = _asNum(referral['referral_level']).toInt().clamp(1, 3);
+    final referralLevel = _asNum(referral['referral_level'])
+        .toInt()
+        .clamp(1, 3);
     final isQualified = status.toLowerCase() == 'qualified';
 
     return Container(
@@ -940,80 +1008,6 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
                 ),
               ),
             ],
-          ),
-          if (rewards.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: rewards.map((reward) {
-                  final rewardStatus =
-                      reward['status']?.toString() ?? 'pending';
-                  final rewardType = _pretty(
-                    reward['reward_type']?.toString() ?? 'reward',
-                  );
-                  final rewardLevel = reward['referral_level'] ?? referralLevel;
-                  final rewardPercent = reward['reward_percent'] ?? '—';
-                  final paid = rewardStatus.toLowerCase() == 'paid';
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: paid
-                          ? _paleGreen
-                          : Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      '$rewardType · L$rewardLevel · $rewardPercent% · ${_pretty(rewardStatus)}',
-                      style: TextStyle(
-                        color: paid ? _green : _muted,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReferralLevelsCard() {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Three referral levels',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: colors.onSurface,
-                ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            'Earn from direct referrals and up to two generations below them. Subscription and approved app review rewards use separate rates set on the package purchased by the referred user. Ad shares do not earn referral rewards.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  height: 1.4,
-                  color: colors.onSurfaceVariant,
-                ),
           ),
         ],
       ),
@@ -1145,4 +1139,3 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
       )
       .join(' ');
 }
-

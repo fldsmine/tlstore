@@ -1,4 +1,5 @@
 <?php
+file_put_contents('PDOErrors.txt', var_export($_SERVER["REQUEST_URI"], true) ."\n\n", FILE_APPEND);
 
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;

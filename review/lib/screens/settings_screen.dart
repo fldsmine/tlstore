@@ -486,6 +486,200 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 28),
           const _SectionHeading(
+            title: 'ADMIN PAGES',
+            icon: Icons.admin_panel_settings_outlined,
+          ),
+          const SizedBox(height: 12),
+          _Panel(
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.app_registration_outlined,
+                  title: 'App listings and review questions',
+                  subtitle: 'Admin access: create apps, campaigns, screenshots and assign questionnaires',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAppListingsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.quiz_outlined,
+                  title: 'Questionnaire templates',
+                  subtitle: 'Admin access: manage question bank, versions and publishing',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AdminReviewTemplatesScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.campaign_rounded,
+                  title: 'Ad listings',
+                  subtitle: 'Admin access: create, edit, approve and remove ad campaigns',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAdsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'App release management',
+                  subtitle: 'Admin access: publish Android/iOS updates',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAppVersionsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.payments_outlined,
+                  title: 'Payment gateway settings',
+                  subtitle:
+                      'Admin access: active gateways and supported currencies',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AdminPaymentGatewaysScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.campaign_outlined,
+                  title: 'Home announcements',
+                  subtitle:
+                      'Admin access: create, schedule, and manage home notices',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAnnouncementsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.flag_outlined,
+                  title: 'App listing reports',
+                  subtitle: 'Admin access: review user reports about apps',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminAppReportsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.campaign_outlined,
+                  title: 'Campaign approvals',
+                  subtitle: 'Admin access: review paid user campaigns and refund rejected orders',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AdminCampaignOrdersScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.manage_accounts_outlined,
+                  title: 'User management',
+                  subtitle:
+                      'Admin access: accounts, wallets, bans and passwords',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminUsersScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.card_giftcard_outlined,
+                  title: 'Reward settings',
+                  subtitle: 'Admin access: enable or pause reward programs',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          AdminRewardSettingsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.military_tech_outlined,
+                  title: 'User ranking management',
+                  subtitle:
+                      'Admin access: ranks, requirements, and monthly rewards',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminUserRankingsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'Subscription plans',
+                  subtitle: 'Admin access: create, edit, activate plans and review subscribers',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminSubscriptionPlansScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.fact_check_outlined,
+                  title: 'Task moderation',
+                  subtitle: 'Admin access: review tasks, ad shares, deposits and withdrawals',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminModerationScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+                const _PanelDivider(),
+                _SettingsTile(
+                  icon: Icons.add_box_outlined,
+                  title: 'Review package add-ons',
+                  subtitle: 'Admin access: monthly prices and availability',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => AdminPackageAddonsScreen(api: widget.api),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 28),
+          const _SectionHeading(
             title: 'ACCOUNT',
             icon: Icons.manage_accounts_outlined,
           ),

@@ -4,6 +4,7 @@ namespace App\Features\Identity\Http\Controllers\Api\V1;
 
 use App\Models\ReferralCode;
 use App\Models\ReferralAttribution;
+use App\Models\ReferralReward;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,12 +47,19 @@ final class ReferralController
 
     public function attributions(Request $request): JsonResponse
     {
+        $requestedLevel = $request->query('level');
+        if ($requestedLevel !== null && ! in_array((string) $requestedLevel, ['1', '2', '3'], true)) {
+            return response()->json(['message' => 'The selected referral tier is invalid.'], 422);
+        }
         $user = $request->user();
         $frontier = [(int) $user->id];
         $seen = [(int) $user->id => true];
         $network = collect();
+        // The referral page is the direct-invite list by default. The team page
+        // passes a tier explicitly and traverses only as far as that tier.
+        $maxLevel = $requestedLevel === null ? 1 : (int) $requestedLevel;
 
-        for ($level = 1; $level <= 3 && $frontier !== []; $level++) {
+        for ($level = 1; $level <= $maxLevel && $frontier !== []; $level++) {
             $rows = ReferralAttribution::query()
                 ->whereIn('referrer_user_id', $frontier)
                 ->with([
@@ -76,7 +84,10 @@ final class ReferralController
         }
 
         $network = $network->sortByDesc('attributed_at')->values();
-        $perPage = 30;
+        if ($requestedLevel !== null && (int) $requestedLevel > 1) {
+            $network = $network->where('referral_level', (int) $requestedLevel)->values();
+        }
+        $perPage = max(1, min(100, (int) $request->query('per_page', 30)));
         $page = LengthAwarePaginator::resolveCurrentPage();
         $paginator = new LengthAwarePaginator(
             $network->forPage($page, $perPage)->values(),
@@ -87,5 +98,51 @@ final class ReferralController
         );
 
         return response()->json(['data' => $paginator]);
+    }
+
+    public function team(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $frontier = [(int) $user->id];
+        $seen = [(int) $user->id => true];
+        $counts = [1 => 0, 2 => 0, 3 => 0];
+
+        for ($level = 1; $level <= 3 && $frontier !== []; $level++) {
+            $rows = ReferralAttribution::query()->whereIn('referrer_user_id', $frontier)->get(['referred_user_id']);
+            $nextFrontier = [];
+            foreach ($rows as $row) {
+                $referredId = (int) $row->referred_user_id;
+                if (isset($seen[$referredId])) {
+                    continue;
+                }
+                $seen[$referredId] = true;
+                $counts[$level]++;
+                $nextFrontier[] = $referredId;
+            }
+            $frontier = $nextFrontier;
+        }
+
+        $rewardTotals = ReferralReward::query()
+            ->where('beneficiary_user_id', $user->id)
+            ->where('status', 'paid')
+            ->selectRaw('referral_level, currency, SUM(amount_minor) as amount_minor, COUNT(*) as reward_count')
+            ->groupBy('referral_level', 'currency')
+            ->get()
+            ->groupBy('referral_level');
+
+        $tiers = [];
+        foreach ([1, 2, 3] as $level) {
+            $tiers[] = [
+                'level' => $level,
+                'member_count' => $counts[$level],
+                'paid_amounts' => ($rewardTotals->get($level) ?? collect())->map(fn ($row) => [
+                    'currency' => $row->currency,
+                    'amount_minor' => (int) $row->amount_minor,
+                    'reward_count' => (int) $row->reward_count,
+                ])->values(),
+            ];
+        }
+
+        return response()->json(['data' => ['tiers' => $tiers]]);
     }
 }

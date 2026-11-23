@@ -19,6 +19,7 @@ import '../services/auth_api.dart';
 import '../widgets/auth_components.dart';
 import '../widgets/advanced_app_drawer.dart';
 import '../widgets/withdrawal_pin_sheet.dart';
+import 'frontend/landing_sreen.dart';
 import 'history_screen.dart';
 import 'daily_tasks_screen.dart';
 import 'faq_screen.dart';
@@ -27,7 +28,6 @@ import 'listings_screen.dart';
 import 'payout_screen.dart';
 import 'profile_screen.dart';
 import 'notifications_screen.dart';
-import 'proxy_prompt_example.dart';
 import 'settings_screen.dart';
 import 'referrals_screen.dart';
 import 'legal_document_screen.dart';
@@ -1251,7 +1251,7 @@ class _HomeScreenState extends State<HomeScreen>
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const ProxyPromptExamplePage(),
+                    builder: (_) => const LandingScreen(),
                   ),
                 );
               },
