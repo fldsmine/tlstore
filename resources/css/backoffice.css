@@ -1,0 +1,72 @@
+/* Admin backoffice styles.
+   Visual identity derived from the design reference (deep-teal palette, Sora font,
+   remixicon icons, rounded-2xl surfaces) and reimplemented for this app — the
+   reference stylesheet and fonts are NOT copied into this tree. */
+@import '@fontsource/sora/400.css';
+@import '@fontsource/sora/500.css';
+@import '@fontsource/sora/600.css';
+@import '@fontsource/sora/700.css';
+@import '@fontsource/sora/800.css';
+@import 'tailwindcss';
+@import 'remixicon/fonts/remixicon.css';
+
+@source '../views/**/*.blade.php';
+@source '../js/backoffice.js';
+
+@theme {
+    --font-sans: 'Sora', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: 'Sora', ui-sans-serif, system-ui, sans-serif;
+
+    /* Brand Colors */
+    --color-primary: #18443E;
+    --color-primary-light: #48948A;
+    --color-secondary: #DCEB6A;
+
+    /* UI Colors */
+    --color-background: #F4F1EA;
+    --color-surface: #FAF9F8;
+    --color-text: #1A1A1A;
+    --color-muted: #8C8C8C;
+    --color-border: #CACACA;
+    --color-success: #34C759;
+    --color-danger: #FF3B30;
+    --color-warning: #FF9500;
+    --color-info: #007AFF;
+}
+
+@layer base {
+    html { @apply scroll-smooth antialiased; }
+    body { @apply bg-background text-text font-sans; }
+    button:not(:disabled), [role='button']:not([aria-disabled='true']) { cursor: pointer; }
+    [x-cloak] { display: none !important; }
+    *:focus-visible { @apply outline-2 outline-offset-2 outline-primary; }
+}
+
+@layer components {
+    .card { @apply bg-surface rounded-[20px] p-5 shadow-[0_4px_9px_rgba(194,194,194,0.07),0_16px_16px_rgba(194,194,194,0.06)]; }
+    .card-sm { @apply bg-surface rounded-2xl p-4 shadow-[0_4px_9px_rgba(194,194,194,0.07),0_16px_16px_rgba(194,194,194,0.06)]; }
+    .input {
+        @apply w-full h-[46px] rounded-[14px] bg-background border border-muted/15 px-4
+               font-sans text-[14px] text-text placeholder:text-muted
+               focus:outline-none focus:ring-2 focus:ring-primary/40 transition;
+    }
+    textarea.input { @apply h-auto py-3; }
+    select.input { @apply pr-9; }
+    .label { @apply font-sans text-text text-[13px]; }
+    .error { @apply font-sans text-[12px] text-danger; }
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 font-sans font-medium rounded-[14px]
+               transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary
+               disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+    .btn-md { @apply h-[46px] px-5 text-[14px]; }
+    .btn-sm { @apply h-[36px] px-4 text-[13px]; }
+    .btn-primary { @apply bg-primary text-white hover:bg-primary-light; }
+    .btn-danger { @apply bg-danger text-white hover:bg-danger/90; }
+    .btn-ghost { @apply text-primary hover:bg-primary/10; }
+    .btn-quiet { @apply bg-background text-text hover:bg-muted/10; }
+    .th { @apply px-5 py-3 font-sans text-[12px] font-medium text-muted text-left; }
+    .th-right { @apply px-5 py-3 font-sans text-[12px] font-medium text-muted text-right; }
+    .td { @apply px-5 py-3 text-[13px] text-text align-middle; }
+    .tr { @apply border-b border-muted/5 last:border-0 hover:bg-background/60 transition-colors; }
+}

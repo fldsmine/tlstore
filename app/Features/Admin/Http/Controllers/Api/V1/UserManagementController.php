@@ -4,13 +4,11 @@ namespace App\Features\Admin\Http\Controllers\Api\V1;
 
 use App\Models\Admin;
 use App\Models\AuditLog;
-use App\Models\LedgerEntry;
 use App\Models\ReferralAttribution;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -193,49 +191,13 @@ final class UserManagementController
                 'currency' => "All wallet adjustments must use this user's wallet currency ({$walletCurrency}).",
             ]);
         }
-        $key = 'admin-wallet:'.hash('sha256', $request->user()->id.'|'.$user->id.'|'.$data['idempotency_key']);
 
-        $entry = DB::transaction(function () use ($request, $user, $data, $key) {
-            $existing = LedgerEntry::query()->where('idempotency_key', $key)->first();
-            if ($existing) return $existing;
+        $entry = app(\App\Application\Actions\Admin\AdjustWalletBalance::class)->handle(
+            $request->user(), $user, $data['wallet_type'], $data['currency'], $data['direction'],
+            (int) $data['amount_minor'], $data['reason'], $data['idempotency_key'],
+        );
 
-            $wallet = Wallet::query()->firstOrCreate([
-                'user_id' => $user->id,
-                'wallet_type' => $data['wallet_type'],
-                'currency' => $data['currency'],
-            ], ['status' => 'active']);
-            $wallet = Wallet::query()->lockForUpdate()->findOrFail($wallet->id);
-            $amount = (int) $data['amount_minor'];
-            if ($data['direction'] === 'debit' && (int) $wallet->balance_minor < $amount) {
-                throw ValidationException::withMessages(['amount_minor' => 'The wallet does not have enough balance for this debit.']);
-            }
-
-            $entry = LedgerEntry::query()->create([
-                'wallet_id' => $wallet->id,
-                'entry_type' => 'admin_adjustment',
-                'direction' => $data['direction'],
-                'amount_minor' => $amount,
-                'status' => 'posted',
-                'source_type' => 'user',
-                'source_id' => $user->id,
-                'idempotency_key' => $key,
-                'description' => $data['reason'],
-                'available_at' => now(),
-                'posted_at' => now(),
-            ]);
-            AuditLog::query()->create([
-                'actor_admin_id' => $request->user()->id,
-                'action' => 'user.wallet_adjusted',
-                'entity_type' => 'user',
-                'entity_id' => (string) $user->id,
-                'after_values' => ['wallet_id' => $wallet->id, 'wallet_type' => $data['wallet_type'], 'currency' => $data['currency'], 'direction' => $data['direction'], 'amount_minor' => $amount, 'reason' => $data['reason'], 'ledger_entry_id' => $entry->id],
-                'created_at' => now(),
-            ]);
-
-            return $entry;
-        });
-
-        return response()->json(['message' => 'Wallet adjusted.', 'data' => $entry->load('wallet')], 201);
+        return response()->json(['message' => 'Wallet adjusted.', 'data' => $entry], 201);
     }
 
     public function resetPassword(Request $request, User $user): JsonResponse
