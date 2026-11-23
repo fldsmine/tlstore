@@ -11,6 +11,10 @@ class Bank extends Model
 {
     use HasFactory, HasUuids;
 
+    protected $fillable = [
+        'name', 'code', 'paystack_code', 'flutterwave_code', 'institution_code', 'tag', 'type', 'country', 'is_active',
+    ];
+
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];

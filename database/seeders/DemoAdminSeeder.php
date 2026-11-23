@@ -10,6 +10,13 @@ class DemoAdminSeeder extends Seeder
 {
     public function run(): void
     {
+        // Never create or reset an administrator to demo credentials while
+        // seeding a production database. Bootstrap production admins with
+        // `php artisan admin:create` instead.
+        if (app()->environment('production')) {
+            return;
+        }
+
         $password = (string) config('app.system_account_password');
 
         $admin = Admin::updateOrCreate(

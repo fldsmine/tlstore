@@ -121,6 +121,17 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     return null;
   }
 
+  Map<String, dynamic>? _subscriptionForGroup(String? groupKey) {
+    if (groupKey == null) return null;
+    for (final subscription in _activeMarketplaces) {
+      final subscriptionGroup =
+          subscription['group_key']?.toString() ??
+          _planForSubscription(subscription)['group_key']?.toString();
+      if (subscriptionGroup == groupKey) return subscription;
+    }
+    return null;
+  }
+
   bool _questionnaireComplete(String? groupKey) {
     if (groupKey != 'group_b' && groupKey != 'group_c') return true;
     final questionnaire = _map(_user['subscription_questionnaire']);
@@ -165,9 +176,44 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       }
       return;
     }
+
+    final groupKey = plan['group_key']?.toString();
+    final currentInGroup = _subscriptionForGroup(groupKey);
+    final switching = currentInGroup != null;
+    if (switching) {
+      final currentPlan = _planForSubscription(currentInGroup);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          final colors = Theme.of(dialogContext).colorScheme;
+          final oldName =
+              currentPlan['name']?.toString() ?? 'your current package';
+          final newName = plan['name']?.toString() ?? 'this package';
+          return AlertDialog(
+            icon: Icon(Icons.swap_horiz_rounded, color: colors.primary),
+            title: const Text('Switch package?'),
+            content: Text(
+              'You are currently active on $oldName in this package group. '
+              'Do you want to switch to $newName?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Keep current'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Switch package'),
+              ),
+            ],
+          );
+        },
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
     setState(() => _purchasing = _asInt(plan['id']));
     try {
-      final groupKey = plan['group_key']?.toString();
       final result = await showPlanPurchaseSheet(
         context: context,
         api: widget.api,
@@ -186,11 +232,64 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
       }
       if (result == 'paid') {
         await _load();
-        if (_isActivePlan(plan)) await _ensureQuestionnaire(groupKey);
+        if (!_isActivePlan(plan)) return;
+        if (groupKey == 'group_a') {
+          await _showJoinedPackage(
+            plan,
+            switching: switching,
+            currentInGroup: currentInGroup,
+          );
+        }
+        if (groupKey != null) await _ensureQuestionnaire(groupKey);
       }
     } finally {
       if (mounted) setState(() => _purchasing = null);
     }
+  }
+
+  Future<void> _showJoinedPackage(
+    Map<String, dynamic> plan, {
+    required bool switching,
+    Map<String, dynamic>? currentInGroup,
+  }) async {
+    if (!mounted) return;
+    final currentPlan = currentInGroup == null
+        ? const <String, dynamic>{}
+        : _planForSubscription(currentInGroup);
+    final newName = plan['name']?.toString() ?? 'your package';
+    final oldName = currentPlan['name']?.toString() ?? 'your previous package';
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final colors = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _CelebrationRibbon(
+                color: colors.primary,
+                accentColor: colors.tertiary,
+              ),
+              const SizedBox(height: 8),
+              Text(switching ? 'Package switched!' : 'Congratulations!'),
+            ],
+          ),
+          content: Text(
+            switching
+                ? 'You have successfully switched from $oldName to $newName.'
+                : 'You have successfully joined the $newName package.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Continue'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showActiveDetails(Map<String, dynamic> subscription) {
@@ -498,6 +597,92 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
   }
 }
 
+class _CelebrationRibbon extends StatelessWidget {
+  const _CelebrationRibbon({required this.color, required this.accentColor});
+
+  final Color color;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 132,
+    height: 68,
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        CircleAvatar(
+          radius: 25,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          child: Icon(Icons.celebration_rounded, color: color, size: 29),
+        ),
+        Positioned(
+          left: 8,
+          top: 17,
+          child: _RibbonStrip(color: accentColor, start: -.75, end: -.25),
+        ),
+        Positioned(
+          right: 8,
+          top: 17,
+          child: _RibbonStrip(color: color, start: .75, end: .25),
+        ),
+        Positioned(
+          left: 27,
+          bottom: 4,
+          child: _RibbonStrip(color: color, start: .65, end: .15, width: 18),
+        ),
+        Positioned(
+          right: 27,
+          bottom: 4,
+          child: _RibbonStrip(
+            color: accentColor,
+            start: -.65,
+            end: -.15,
+            width: 18,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RibbonStrip extends StatelessWidget {
+  const _RibbonStrip({
+    required this.color,
+    required this.start,
+    required this.end,
+    this.width = 28,
+  });
+
+  final Color color;
+  final double start;
+  final double end;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: start, end: end),
+    duration: const Duration(milliseconds: 700),
+    curve: Curves.elasticOut,
+    builder: (context, angle, child) =>
+        Transform.rotate(angle: angle, child: child),
+    child: Container(
+      width: width,
+      height: 7,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: .22),
+            blurRadius: 7,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.api,
@@ -535,7 +720,9 @@ class _PlanCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: active
+            ? colors.primaryContainer.withValues(alpha: .38)
+            : colors.surface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: active
@@ -835,35 +1022,35 @@ class _GroupCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-			Row(
-			  children: [
-				  CircleAvatar(
-					backgroundColor: colors.primaryContainer,
-					child: Icon(
-					  Icons.card_membership_rounded,
-					  color: colors.onPrimaryContainer,
-					),
-				  ),
-				const Spacer(),
-				Container(
-				  padding: const EdgeInsets.symmetric(
-					horizontal: 10,
-					vertical: 6,
-				  ),
-				  decoration: BoxDecoration(
-					color: colors.secondaryContainer,
-					borderRadius: BorderRadius.circular(30),
-				  ),
-				  child: Text(
-					'$planCount ${planCount == 1 ? 'package' : 'packages'}',
-					style: Theme.of(context).textTheme.labelSmall?.copyWith(
-					  color: colors.onSecondaryContainer,
-					  fontWeight: FontWeight.w800,
-					),
-				  ),
-				),
-			  ],
-			),
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: colors.primaryContainer,
+                    child: Icon(
+                      Icons.card_membership_rounded,
+                      color: colors.onPrimaryContainer,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.secondaryContainer,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Text(
+                      '$planCount ${planCount == 1 ? 'package' : 'packages'}',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colors.onSecondaryContainer,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               Text(
                 group['name']?.toString() ?? 'Package group',
@@ -1121,23 +1308,33 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
 
   Map<String, dynamic>? _fundsQuote() {
     final snapshot = _map(widget.user['subscription_context']);
-    final wallets = _rows(snapshot['wallets'])
-        .where((wallet) => wallet['type'] == 'topup_fund')
-        .toList()
-      ..sort((a, b) {
-        final aNative = a['currency']?.toString().toUpperCase() == _currency.toUpperCase();
-        final bNative = b['currency']?.toString().toUpperCase() == _currency.toUpperCase();
-        return (bNative ? 1 : 0).compareTo(aNative ? 1 : 0);
-      });
+    final wallets =
+        _rows(snapshot['wallets'])
+            .where((wallet) => wallet['type'] == 'topup_fund')
+            .toList()
+          ..sort((a, b) {
+            final aNative =
+                a['currency']?.toString().toUpperCase() ==
+                _currency.toUpperCase();
+            final bNative =
+                b['currency']?.toString().toUpperCase() ==
+                _currency.toUpperCase();
+            return (bNative ? 1 : 0).compareTo(aNative ? 1 : 0);
+          });
     Map<String, dynamic>? firstAvailableQuote;
     for (final wallet in wallets) {
-      final walletCurrency = wallet['currency']?.toString().toUpperCase() ?? _currency.toUpperCase();
-      final planMajor = _priceMinor / math.pow(10, currencyPrecision(_currency));
+      final walletCurrency =
+          wallet['currency']?.toString().toUpperCase() ??
+          _currency.toUpperCase();
+      final planMajor =
+          _priceMinor / math.pow(10, currencyPrecision(_currency));
       final walletMajor = walletCurrency == _currency.toUpperCase()
           ? planMajor
           : widget.api.convertMajor(planMajor, _currency, walletCurrency);
       if (walletMajor == null) continue;
-      final requiredMinor = (walletMajor * math.pow(10, currencyPrecision(walletCurrency))).round();
+      final requiredMinor =
+          (walletMajor * math.pow(10, currencyPrecision(walletCurrency)))
+              .round();
       final quote = <String, dynamic>{
         'currency': walletCurrency,
         'required_minor': requiredMinor,
@@ -1154,10 +1351,9 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
     final walletCurrency = quote?['currency']?.toString() ?? _currency;
     if (quote == null || quote['balance_minor']! < quote['required_minor']!) {
       setState(
-        () => _message =
-            quote == null
-                ? 'A current exchange rate or top-up wallet is unavailable. Use Secure payment or fund your wallet first.'
-                : 'Your $walletCurrency top-up wallet needs ${_money(quote['required_minor']!, walletCurrency, currencyPrecision(walletCurrency))}. Use Secure payment or fund your wallet first.',
+        () => _message = quote == null
+            ? 'A current exchange rate or top-up wallet is unavailable. Use Secure payment or fund your wallet first.'
+            : 'Your $walletCurrency top-up wallet needs ${_money(quote['required_minor']!, walletCurrency, currencyPrecision(walletCurrency))}. Use Secure payment or fund your wallet first.',
       );
       return;
     }
@@ -1354,7 +1550,8 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
                       final optionKey = option['option_key']?.toString() ?? '';
 
                       final currency =
-                          option['currency']?.toString().toUpperCase() ?? _currency;
+                          option['currency']?.toString().toUpperCase() ??
+                          _currency;
 
                       final currencyInfo = _currencyInfo(currency);
 
@@ -1376,7 +1573,9 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
 
                       return Material(
                         color: isSelected
-                            ? theme.colorScheme.primaryContainer.withValues(alpha: .45)
+                            ? theme.colorScheme.primaryContainer.withValues(
+                                alpha: .45,
+                              )
                             : theme.colorScheme.surface,
                         borderRadius: BorderRadius.circular(14),
                         child: InkWell(
@@ -1402,7 +1601,9 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
                                   height: 46,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.surfaceContainerHighest
+                                    color: theme
+                                        .colorScheme
+                                        .surfaceContainerHighest
                                         .withValues(alpha: .6),
                                     borderRadius: BorderRadius.circular(13),
                                   ),
@@ -1417,21 +1618,26 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
                                 // Currency and payment information
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         '$currencyName · $currency',
-                                        style: theme.textTheme.bodyLarge?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         '${_humanize(gateway)} · $amount',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                       ),
                                     ],
                                   ),
@@ -1473,9 +1679,11 @@ class _PlanPurchaseSheetState extends State<_PlanPurchaseSheet> {
                 child: OutlinedButton.icon(
                   onPressed: _busy ? null : _payWithFunds,
                   icon: const Icon(Icons.account_balance_wallet_rounded),
-                  label: Text(fundsCurrency == null
-                      ? 'Funds wallet'
-                      : 'Funds wallet · $fundsCurrency'),
+                  label: Text(
+                    fundsCurrency == null
+                        ? 'Funds wallet'
+                        : 'Funds wallet · $fundsCurrency',
+                  ),
                 ),
               ),
               Padding(

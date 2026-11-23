@@ -124,6 +124,7 @@ class AuthApi {
   final http.Client _client;
   final FlutterSecureStorage _storage;
   static const _sessionKey = 'trustlens.auth.session';
+  static const _reviewProgressPrefix = 'trustlens.review.progress.v1';
   static const _spotlightsCacheKey = 'trustlens.spotlights.response.v1';
   static const _spotlightsCachedAtKey = 'trustlens.spotlights.cached_at.v1';
   static const _spotlightsCacheDuration = Duration(minutes: 60);
@@ -254,6 +255,51 @@ class AuthApi {
     await _clearVasCache();
     await _storage.delete(key: _sessionKey);
   }
+
+  Future<Map<String, dynamic>?> readReviewProgress({
+    required Object userId,
+    required Object taskId,
+  }) async {
+    try {
+      final raw = await _storage.read(key: _reviewProgressKey(userId, taskId));
+      if (raw == null || raw.isEmpty) return null;
+      final value = jsonDecode(raw);
+      return value is Map
+          ? value.map((key, value) => MapEntry(key.toString(), value))
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveReviewProgress({
+    required Object userId,
+    required Object taskId,
+    required Map<String, dynamic> progress,
+  }) async {
+    try {
+      await _storage.write(
+        key: _reviewProgressKey(userId, taskId),
+        value: jsonEncode(progress),
+      );
+    } catch (_) {
+      // Continue the review even when secure local storage is unavailable.
+    }
+  }
+
+  Future<void> clearReviewProgress({
+    required Object userId,
+    required Object taskId,
+  }) async {
+    try {
+      await _storage.delete(key: _reviewProgressKey(userId, taskId));
+    } catch (_) {
+      // A stale local draft is harmless after a successful submission.
+    }
+  }
+
+  String _reviewProgressKey(Object userId, Object taskId) =>
+      '$_reviewProgressPrefix.${userId.toString().replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.${taskId.toString().replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}';
 
   Future<Map<String, dynamic>> requestPasswordReset(String email) =>
       postPublic('auth/forgot-password', {'email': email.trim()});

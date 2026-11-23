@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -28,14 +29,22 @@ class ReviewTaskScreen extends StatefulWidget {
   State<ReviewTaskScreen> createState() => _ReviewTaskScreenState();
 }
 
-class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
+class _ReviewTaskScreenState extends State<ReviewTaskScreen>
+    with WidgetsBindingObserver {
   final _pageController = PageController();
-  final DateTime _startedAt = DateTime.now();
+  DateTime _startedAt = DateTime.now();
   final Map<int, dynamic> _answers = {};
   final Map<int, TextEditingController> _textControllers = {};
 
   int _page = 0;
   bool _sending = false;
+  bool _restoringProgress = true;
+  Timer? _saveDebounce;
+
+  Object get _draftUserId =>
+      widget.user['id'] ?? widget.user['user_id'] ?? 'unknown-user';
+
+  Object get _draftTaskId => widget.task['id'] ?? 'unknown-task';
 
   bool get _backLocked =>
       _questions.isNotEmpty && _answeredCount >= (_questions.length / 2).ceil();
@@ -81,6 +90,7 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     for (final question in _questions) {
       if (question['type'] != 'rating') continue;
       final id = _questionId(question);
@@ -89,10 +99,102 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
       final minimum = scale is Map ? scale['min'] : null;
       if (id != null) _answers[id] = minimum is num ? minimum.round() : 1;
     }
+    _restoreProgress();
+  }
+
+  Future<void> _restoreProgress() async {
+    final saved = await widget.api.readReviewProgress(
+      userId: _draftUserId,
+      taskId: _draftTaskId,
+    );
+    if (!mounted) return;
+
+    if (saved != null) {
+      final templateVersion = saved['template_version_id']?.toString();
+      final currentTemplateVersion =
+          widget.task['template_version_id']?.toString() ??
+          _asMap(widget.task['template_version'])['id']?.toString();
+      final answers = saved['answers'];
+      if ((templateVersion == null ||
+              currentTemplateVersion == null ||
+              templateVersion == currentTemplateVersion) &&
+          answers is Map) {
+        final restoredAnswers = <int, dynamic>{};
+        answers.forEach((key, value) {
+          final id = int.tryParse(key.toString());
+          if (id != null) restoredAnswers[id] = value;
+        });
+        _answers
+          ..clear()
+          ..addAll(restoredAnswers);
+        final savedPage = saved['page'] is num
+            ? (saved['page'] as num).toInt()
+            : 0;
+        _page = savedPage.clamp(0, _questions.length).toInt();
+        _startedAt =
+            DateTime.tryParse(saved['started_at']?.toString() ?? '') ??
+            DateTime.now();
+      }
+    }
+
+    setState(() => _restoringProgress = false);
+    if (_page > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients) {
+          _pageController.jumpToPage(_page);
+        }
+      });
+    }
+  }
+
+  void _scheduleProgressSave() {
+    if (_restoringProgress || _sending) return;
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 350), _saveProgress);
+  }
+
+  Future<void> _saveProgress() async {
+    if (_restoringProgress || _sending) return;
+    final answers = <String, dynamic>{};
+    _answers.forEach((id, value) => answers['$id'] = value);
+    await widget.api.saveReviewProgress(
+      userId: _draftUserId,
+      taskId: _draftTaskId,
+      progress: {
+        'page': _page,
+        'answers': answers,
+        'started_at': _startedAt.toIso8601String(),
+        'template_version_id':
+            widget.task['template_version_id'] ??
+            _asMap(widget.task['template_version'])['id'],
+      },
+    );
+  }
+
+  Future<void> _clearProgress() async {
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
+    await widget.api.clearReviewProgress(
+      userId: _draftUserId,
+      taskId: _draftTaskId,
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _saveDebounce?.cancel();
+      unawaited(_saveProgress());
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _saveDebounce?.cancel();
+    if (!_restoringProgress && !_sending) _saveProgress();
     _pageController.dispose();
     for (final controller in _textControllers.values) {
       controller.dispose();
@@ -188,11 +290,12 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
           'answers': answers,
           'duration_seconds': math.max(
             1,
-            DateTime.now().difference(_startedAt).inSeconds,
+            math.min(7200, DateTime.now().difference(_startedAt).inSeconds),
           ),
         },
       );
 
+      await _clearProgress();
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
@@ -222,128 +325,129 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
     );
   }
 
-Future<bool> _checkAddonBeforeSubmit() async {
-  try {
-    final response = await widget.api.reviewAddonCheck(
-      widget.token,
-      widget.task['id'],
-    );
-
-    final data = _asMap(response['data']);
-
-    if (data['required'] != true || data['active'] == true) {
-      return true;
-    }
-
-    if (!mounted) return false;
-
-    final offer = _asMap(data['addon']);
-
-    final currency = offer['currency']?.toString() ?? 'USD';
-
-    final listed =
-        (data['listed_price_minor'] as num?)?.toInt() ??
-        (offer['price_minor'] as num?)?.toInt() ??
-        0;
-
-    final payable =
-        (data['payable_price_minor'] as num?)?.toInt() ?? listed;
-
-    final offerAvailable = data['offer_available'] == true;
-
-    final addonName = offer['name']?.toString() ?? 'Work permit';
-    final planName = data['plan_name']?.toString() ?? 'review';
-
-    final units = data['currency_minor_units'] ?? offer['currency_minor_units'];
-
-    final price = _money(payable, currency, units);
-
-    final featureList = proxyFeatures(data);
-    final featured = featureList
-        .take(6)
-        .toList(growable: false);
-
-    final choice = await ProxyAddonsDialog.show<String>(
-      context: context,
-      plan: ProxyPromptPlan(
-        storeName: 'TrustLens Store',
-        storeWord: 'proxy',
-        titleLead: 'Why do i need a\n',
-        titleHighlight: 'Proxy',
-        titleTail: '?',
-        noticeLead: 'An ',
-        noticeHighlight: 'active $addonName',
-        noticeBody:
-            ' is required to submit $planName reviews on TrustLens Store. Work done without a proxy ',
-        noticeWarning: 'may be rejected.',
-        price: price,
-        billingPeriod: getDuration(data),
-        requiredLabel: 'Required',
-        purchaseLabel: 'ACTIVATE PROXY',
-        trustLabel: 'Secure checkout',
-        footerBrand: 'TrustLens Store',
-        features: featured,
-        reviewAction: true,
-        reviewActionLabel: 'Submit review anyway',
-      ),
-      
-      // Keep the prompt route under explicit control. The shared prompt's
-      // default behavior popped first and then the old callback popped the
-      // review route, making both actions look like they simply closed.
-      closeOnPurchase: false,
-      onPurchase: () async {
-        Navigator.of(context, rootNavigator: true).pop();
-        final purchased = await showModalBottomSheet<bool>(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          builder: (_) => PackageAddonPurchaseSheet(
-            api: widget.api,
-            token: widget.token,
-            addonState: data,
-          ),
-        );
-        if (!mounted || purchased != true) return;
-        // Re-run the server eligibility check, then submit if payment activated
-        // the add-on. This keeps the review submission on its normal path.
-        await _submit();
-      },
-      onReview: () =>
-          Navigator.of(context, rootNavigator: true).pop('submit'),
-    );
-
-
-    if (choice == 'submit') return true;
-
-    if (!mounted) return false;
-
-    return choice == 'buy';
-
-  } on AuthException catch (error) {
-    if (mounted) {
-      showAuthMessage(context, error.message);
-    }
-    return false;
-  } catch (error, stackTrace) {
-    debugPrint('Addon check error: $error');
-    debugPrintStack(stackTrace: stackTrace);
-
-    if (mounted) {
-      showAuthMessage(
-        context,
-        'Could not check this review add-on. Please try again.',
+  Future<bool> _checkAddonBeforeSubmit() async {
+    try {
+      final response = await widget.api.reviewAddonCheck(
+        widget.token,
+        widget.task['id'],
       );
-    }
 
-    return false;
+      final data = _asMap(response['data']);
+
+      if (data['required'] != true || data['active'] == true) {
+        return true;
+      }
+
+      if (!mounted) return false;
+
+      final offer = _asMap(data['addon']);
+
+      final currency = offer['currency']?.toString() ?? 'USD';
+
+      final listed =
+          (data['listed_price_minor'] as num?)?.toInt() ??
+          (offer['price_minor'] as num?)?.toInt() ??
+          0;
+
+      final payable = (data['payable_price_minor'] as num?)?.toInt() ?? listed;
+
+      final offerAvailable = data['offer_available'] == true;
+
+      final addonName = offer['name']?.toString() ?? 'Work permit';
+      final planName = data['plan_name']?.toString() ?? 'review';
+
+      final units =
+          data['currency_minor_units'] ?? offer['currency_minor_units'];
+
+      final price = _money(payable, currency, units);
+
+      final featureList = proxyFeatures(data);
+      final featured = featureList.take(6).toList(growable: false);
+
+      final choice = await ProxyAddonsDialog.show<String>(
+        context: context,
+        plan: ProxyPromptPlan(
+          storeName: 'TrustLens Store',
+          storeWord: 'proxy',
+          titleLead: 'Why do i need a\n',
+          titleHighlight: 'Proxy',
+          titleTail: '?',
+          noticeLead: 'An ',
+          noticeHighlight: 'active $addonName',
+          noticeBody:
+              ' is required to submit $planName reviews on TrustLens Store. Work done without a proxy ',
+          noticeWarning: 'may be rejected.',
+          price: price,
+          billingPeriod: getDuration(data),
+          requiredLabel: 'Required',
+          purchaseLabel: 'ACTIVATE PROXY',
+          trustLabel: 'Secure checkout',
+          footerBrand: 'TrustLens Store',
+          features: featured,
+          reviewAction: true,
+          reviewActionLabel: 'Submit review anyway',
+        ),
+
+        // Keep the prompt route under explicit control. The shared prompt's
+        // default behavior popped first and then the old callback popped the
+        // review route, making both actions look like they simply closed.
+        closeOnPurchase: false,
+        onPurchase: () async {
+          Navigator.of(context, rootNavigator: true).pop();
+          final purchased = await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            builder: (_) => PackageAddonPurchaseSheet(
+              api: widget.api,
+              token: widget.token,
+              addonState: data,
+            ),
+          );
+          if (!mounted || purchased != true) return;
+          // Re-run the server eligibility check, then submit if payment activated
+          // the add-on. This keeps the review submission on its normal path.
+          await _submit();
+        },
+        onReview: () =>
+            Navigator.of(context, rootNavigator: true).pop('submit'),
+      );
+
+      if (choice == 'submit') return true;
+
+      if (!mounted) return false;
+
+      return choice == 'buy';
+    } on AuthException catch (error) {
+      if (mounted) {
+        showAuthMessage(context, error.message);
+      }
+      return false;
+    } catch (error, stackTrace) {
+      debugPrint('Addon check error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (mounted) {
+        showAuthMessage(
+          context,
+          'Could not check this review add-on. Please try again.',
+        );
+      }
+
+      return false;
+    }
   }
-}
 
   TextEditingController _controllerFor(Map<String, dynamic> question) {
     final id = _questionId(question);
     if (id == null) return TextEditingController();
-    return _textControllers.putIfAbsent(id, TextEditingController.new);
+    return _textControllers.putIfAbsent(
+      id,
+      () => TextEditingController(
+        text: _answers[id] is String ? _answers[id] as String : '',
+      ),
+    );
   }
 
   @override
@@ -351,6 +455,13 @@ Future<bool> _checkAddonBeforeSubmit() async {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final total = _questions.length;
+
+    if (_restoringProgress) {
+      return Scaffold(
+        appBar: AppBar(title: Text('App review')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (total == 0) {
       return Scaffold(
@@ -427,11 +538,7 @@ Future<bool> _checkAddonBeforeSubmit() async {
         child: Column(
           children: [
             if (!isSummary)
-              _AppOverviewCard(
-                api: widget.api,
-                app: _app,
-                task: widget.task,
-              ),
+              _AppOverviewCard(api: widget.api, app: _app, task: widget.task),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: _ProgressHeader(
@@ -449,7 +556,10 @@ Future<bool> _checkAddonBeforeSubmit() async {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: total + 1,
-                onPageChanged: (value) => setState(() => _page = value),
+                onPageChanged: (value) {
+                  setState(() => _page = value);
+                  _scheduleProgressSave();
+                },
                 itemBuilder: (context, index) {
                   if (index == total) {
                     return _TrustSummaryPage(
@@ -466,10 +576,13 @@ Future<bool> _checkAddonBeforeSubmit() async {
                     isAttentionCheck: question['is_attention_check'] == true,
                     answer: _answers[_questionId(question)],
                     textController: _controllerFor(question),
-                    onChanged: (value) => setState(() {
-                      final id = _questionId(question);
-                      if (id != null) _answers[id] = value;
-                    }),
+                    onChanged: (value) {
+                      setState(() {
+                        final id = _questionId(question);
+                        if (id != null) _answers[id] = value;
+                      });
+                      _scheduleProgressSave();
+                    },
                   );
                 },
               ),
@@ -491,7 +604,6 @@ Future<bool> _checkAddonBeforeSubmit() async {
 Map<String, dynamic> _asMap(Object? value) => value is Map
     ? value.map((key, value) => MapEntry(key.toString(), value))
     : <String, dynamic>{};
-
 
 int? _questionId(Map<String, dynamic> question) =>
     (question['id'] as num?)?.toInt();
@@ -570,7 +682,8 @@ class _AppOverviewCard extends StatelessWidget {
     final iconUrl = app['app_icon']?.toString();
     final campaign = task['campaign'];
     final rewardMinor = task['reserved_reward_minor'];
-    final currency = task['reward_currency'] ??
+    final currency =
+        task['reward_currency'] ??
         (campaign is Map ? campaign['currency'] : app['currency']);
 
     return Padding(
@@ -927,7 +1040,11 @@ class _QuestionSlide extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline_rounded, size: 18, color: scheme.tertiary),
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: scheme.tertiary,
+                ),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(

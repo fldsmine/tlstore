@@ -1,6 +1,8 @@
 <?php
 
 use App\Features\System\Http\Controllers\Web\LandingPageController;
+use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
+use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +41,29 @@ foreach (['login', 'register'] as $appPath) {
         return redirect()->away($destination.($query ? '?'.$query : ''));
     })->name('frontend.'.$appPath);
 }
+
+Route::prefix('admin')->name('admin.')->group(function (): void {
+    Route::get('/login', [AdminConsoleController::class, 'loginForm'])->name('login');
+    Route::post('/login', [AdminConsoleController::class, 'login'])->middleware('throttle:10,1')->name('login.submit');
+
+    Route::middleware(EnsureAdminWebAccount::class)->group(function (): void {
+        Route::post('/logout', [AdminConsoleController::class, 'logout'])->name('logout');
+        Route::get('/', [AdminConsoleController::class, 'dashboard'])->name('dashboard');
+        Route::get('/review-templates/{template}/versions', [AdminConsoleController::class, 'templateVersions'])->whereNumber('template')->name('review-templates.versions');
+        Route::post('/review-templates/{template}/versions', [AdminConsoleController::class, 'createTemplateVersion'])->whereNumber('template')->name('review-templates.versions.store');
+        Route::post('/review-templates/{template}/versions/{version}/publish', [AdminConsoleController::class, 'publishTemplateVersion'])->whereNumber('template')->whereNumber('version')->name('review-templates.versions.publish');
+        Route::get('/modules/{module}/{record}/proof', [AdminConsoleController::class, 'moderationProof'])->name('modules.proof');
+        Route::get('/users/{user}', [AdminConsoleController::class, 'userDetail'])->whereNumber('user')->name('users.show');
+        Route::post('/users/{user}/actions/{action}', [AdminConsoleController::class, 'userAction'])->whereNumber('user')->name('users.action');
+        Route::get('/modules/{module}', [AdminConsoleController::class, 'index'])->name('modules.index');
+        Route::get('/modules/{module}/create', [AdminConsoleController::class, 'create'])->name('modules.create');
+        Route::post('/modules/{module}', [AdminConsoleController::class, 'store'])->name('modules.store');
+        Route::get('/modules/{module}/{record}/edit', [AdminConsoleController::class, 'edit'])->name('modules.edit');
+        Route::patch('/modules/{module}/{record}', [AdminConsoleController::class, 'update'])->name('modules.update');
+        Route::delete('/modules/{module}/{record}', [AdminConsoleController::class, 'destroy'])->name('modules.destroy');
+        Route::post('/modules/{module}/{record}/actions/{action}', [AdminConsoleController::class, 'moduleAction'])->name('modules.action');
+    });
+});
 
 // Hosted gateways return to this thin bridge, which reopens the mobile app.
 Route::get('/payments/return', function (Request $request) {

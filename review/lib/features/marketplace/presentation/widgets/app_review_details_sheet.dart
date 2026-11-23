@@ -34,6 +34,8 @@ class AppReviewDetailsSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final storeLink = app['store_link']?.toString().trim() ?? '';
+    final appStore = app['store']?.toString();
+
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -173,7 +175,7 @@ class AppReviewDetailsSheet extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: onOpenStore,
                   icon: const Icon(Icons.open_in_new_rounded),
-                  label: const Text('Open app store download page'),
+                  label: Text('Download app on $appStore'),
                 ),
               ],
             ],
