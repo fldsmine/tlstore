@@ -1,6 +1,0 @@
-@extends('errors.layout')
-
-@section('code', '419')
-@section('icon', 'ri-time-line')
-@section('title', 'Page expired')
-@section('message', 'Your session expired for security reasons. Please go back and try again.')
