@@ -48,7 +48,7 @@
         {
           "key": "lr_attn_language",
           "order": 3,
-          "prompt": "Attention check: tick every word below that is written in English.",
+          "prompt": "Tick every word below that is written in English.",
           "hint": "More than one answer is correct. Read each word properly before ticking.",
           "type": "multiple_choice",
           "options": ["Ẹ káàrọ̀", "Good morning", "Barka da safe", "Thank you", "Ẹ ṣé"],
@@ -94,7 +94,7 @@
         {
           "key": "lr_attn_math",
           "order": 3,
-          "prompt": "Attention check: this app charged ₦2,000 for one month. What would two months cost? Select the correct answer.",
+          "prompt": "If this app charged ₦2,000 for one month. What would two months cost? Select the correct answer.",
           "hint": "Do the sum, then pick the option that matches it.",
           "type": "single_choice",
           "options": ["₦2,000", "₦4,000", "₦6,000"],
@@ -124,7 +124,7 @@
         {
           "key": "lr_attn_phrase",
           "order": 2,
-          "prompt": "Attention check: type this sentence exactly — this app is not a bank — then add one more line saying what the app is actually for.",
+          "prompt": "Type this sentence exactly — this app is not a bank — then add one more line saying what the app is actually for.",
           "hint": "At least 10 words in total. Copy the sentence, then answer in your own words.",
           "type": "long_text",
           "min_words": 10,

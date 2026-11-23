@@ -9,6 +9,9 @@ class ActivityTransactionTile extends StatelessWidget {
     required this.displayAmount,
     this.compact = false,
     this.preferDescriptionTitle = false,
+    this.margin = EdgeInsets.zero,
+    this.sizeScale = 1,
+    this.tileHeight = 80,
     this.onTap,
   });
 
@@ -16,6 +19,9 @@ class ActivityTransactionTile extends StatelessWidget {
   final String displayAmount;
   final bool compact;
   final bool preferDescriptionTitle;
+  final EdgeInsetsGeometry margin;
+  final double sizeScale;
+  final double tileHeight;
   final VoidCallback? onTap;
 
   @override
@@ -29,9 +35,8 @@ class ActivityTransactionTile extends StatelessWidget {
     final status = transaction['status']?.toString().toLowerCase();
     final isPending = status == 'pending';
     final isRejected = status == 'rejected';
-    final isApproved = status == 'approved' ||
-        status == 'completed' ||
-        status == 'success';
+    final isApproved =
+        status == 'approved' || status == 'completed' || status == 'success';
     final isDark = theme.brightness == Brightness.dark;
     final credit = direction == 'credit';
     final description = transaction['description']?.toString().trim() ?? '';
@@ -42,12 +47,12 @@ class ActivityTransactionTile extends StatelessWidget {
     final accent = isPending
         ? (isDark ? const Color(0xFFF1C566) : const Color(0xFF8A5A00))
         : isRejected
-            ? (isDark ? const Color(0xFFFF9A94) : const Color(0xFFB3261E))
-            : isApproved
-                ? (isDark ? const Color(0xFF6FD1A0) : const Color(0xFF17593F))
-                : credit
-                    ? colors.primary
-                    : colors.error;
+        ? (isDark ? const Color(0xFFFF9A94) : const Color(0xFFB3261E))
+        : isApproved
+        ? (isDark ? const Color(0xFF6FD1A0) : const Color(0xFF17593F))
+        : credit
+        ? colors.primary
+        : colors.error;
     final background = Color.alphaBlend(
       accent.withValues(alpha: isDark ? .14 : .07),
       colors.surface,
@@ -55,10 +60,10 @@ class ActivityTransactionTile extends StatelessWidget {
     final icon = isPending
         ? Icons.schedule_rounded
         : isRejected
-            ? Icons.close_rounded
-            : isApproved
-                ? Icons.check_rounded
-                : _icon(type, direction);
+        ? Icons.close_rounded
+        : isApproved
+        ? Icons.check_rounded
+        : _icon(type, direction);
     final openDetails =
         onTap ??
         () => showActivityTransactionDetailsSheet(
@@ -67,7 +72,8 @@ class ActivityTransactionTile extends StatelessWidget {
           displayAmount: displayAmount,
         );
 
-    final radius = BorderRadius.circular(20);
+    final scale = sizeScale.clamp(.6, 1.4).toDouble() * (compact ? .86 : 1);
+    final radius = BorderRadius.circular(20 * scale);
     final tile = Material(
       color: background,
       shape: RoundedRectangleBorder(
@@ -76,122 +82,134 @@ class ActivityTransactionTile extends StatelessWidget {
           color: isRejected || isPending
               ? Colors.transparent
               : isApproved
-                  ? accent.withValues(alpha: .42)
-                  : colors.outlineVariant.withValues(alpha: .75),
-          width: isPending || isApproved ? 1.5 : 1,
+              ? accent.withValues(alpha: .42)
+              : colors.outlineVariant.withValues(alpha: .75),
+          width: (isPending || isApproved ? 1.5 : 1) * scale,
         ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: openDetails,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 12 : 14,
-            vertical: compact ? 11 : 14,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: compact ? 42 : 52,
-                height: compact ? 42 : 52,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: accent.withValues(
-                    alpha: isDark ? .22 : .13,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: tileHeight * scale),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: (compact ? 12 : 14) * scale,
+              vertical: (compact ? 11 : 14) * scale,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: (compact ? 42 : 52) * scale,
+                  height: (compact ? 42 : 52) * scale,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: isDark ? .22 : .13),
+                    borderRadius: BorderRadius.circular(16 * scale),
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  child: Icon(icon, size: 25 * scale, color: accent),
                 ),
-                child: Icon(icon, size: 25, color: accent),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                SizedBox(width: 14 * scale),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: colors.onSurface,
+                          fontSize: (compact ? 13 : 15) * scale,
+                        ),
+                      ),
+                      SizedBox(height: 4 * scale),
+                      Text(
+                        '$category · ${_relativeDate(transaction['created_at'] ?? transaction['date'])}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          fontSize: (compact ? 11 : 13) * scale,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 8 * scale),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      '${credit
+                          ? '+'
+                          : direction == 'debit'
+                          ? '−'
+                          : ''}$displayAmount',
+                      textAlign: TextAlign.end,
                       style: theme.textTheme.titleMedium?.copyWith(
+                        color: accent,
                         fontWeight: FontWeight.w800,
-                        color: colors.onSurface,
-                        fontSize: compact ? 13 : 15,
+                        decoration: isRejected
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
+                        fontSize: (compact ? 13 : 16) * scale,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$category · ${_relativeDate(transaction['created_at'] ?? transaction['date'])}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      fontSize: compact ? 11 : 13,
+                    if (status != null && status.isNotEmpty) ...[
+                      SizedBox(height: 6 * scale),
+                      _StatusChip(
+                        label: _statusLabel(status),
+                        color: accent,
+                        background: Color.alphaBlend(
+                          accent.withValues(alpha: isDark ? .24 : .13),
+                          colors.surface,
+                        ),
+                        pulse: isPending,
+                        scale: scale,
                       ),
-                    ),
+                    ],
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${credit
-                        ? '+'
-                        : direction == 'debit'
-                            ? '−'
-                            : ''}$displayAmount',
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w800,
-                      decoration: isRejected
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
-                      fontSize: compact ? 13 : 16,
-                    ),
-                  ),
-                  if (status != null && status.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    _StatusChip(
-                      label: _statusLabel(status),
-                      color: accent,
-                      background: Color.alphaBlend(
-                        accent.withValues(
-                          alpha: isDark ? .24 : .13,
-                        ),
-                        colors.surface,
-                      ),
-                      pulse: isPending,
-                    ),
-                  ],
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
 
+    Widget decoratedTile = tile;
     if (isRejected) {
-      return ClipRRect(
+      decoratedTile = ClipRRect(
         borderRadius: radius,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: accent, width: 6)),
+            border: Border(
+              left: BorderSide(color: accent, width: 6 * scale),
+            ),
             borderRadius: radius,
           ),
-          child: Padding(padding: const EdgeInsets.only(left: 6), child: tile),
+          child: Padding(
+            padding: EdgeInsets.only(left: 6 * scale),
+            child: tile,
+          ),
         ),
       );
-    }
-    if (isPending) {
-      return CustomPaint(
-        foregroundPainter: _DashedRoundedBorderPainter(color: accent),
+    } else if (isPending) {
+      decoratedTile = CustomPaint(
+        foregroundPainter: _DashedRoundedBorderPainter(
+          color: accent,
+          radius: 20 * scale,
+        ),
         child: tile,
       );
     }
-    return tile;
+    return Container(
+      margin: margin,
+      constraints: BoxConstraints(minHeight: tileHeight * scale),
+      child: decoratedTile,
+    );
   }
 
   static String _statusLabel(String status) {
@@ -299,35 +317,41 @@ class _StatusChip extends StatelessWidget {
     required this.label,
     required this.color,
     required this.background,
+    required this.scale,
     this.pulse = false,
   });
 
   final String label;
   final Color color;
   final Color background;
+  final double scale;
   final bool pulse;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10 * scale,
+        vertical: 4 * scale,
+      ),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(999 * scale),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (pulse) ...[
-            _PulsingDot(color: color),
-            const SizedBox(width: 5),
+            _PulsingDot(color: color, scale: scale),
+            SizedBox(width: 5 * scale),
           ],
           Text(
             label,
             style: theme.textTheme.labelMedium?.copyWith(
               color: color,
               fontWeight: FontWeight.w700,
+              fontSize: (theme.textTheme.labelMedium?.fontSize ?? 12) * scale,
             ),
           ),
         ],
@@ -337,9 +361,10 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _PulsingDot extends StatefulWidget {
-  const _PulsingDot({required this.color});
+  const _PulsingDot({required this.color, required this.scale});
 
   final Color color;
+  final double scale;
 
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
@@ -360,25 +385,31 @@ class _PulsingDotState extends State<_PulsingDot>
 
   @override
   Widget build(BuildContext context) => FadeTransition(
-        opacity: Tween<double>(begin: 1, end: .25).animate(_controller),
-        child: Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
-        ),
-      );
+    opacity: Tween<double>(begin: 1, end: .25).animate(_controller),
+    child: Container(
+      width: 7 * widget.scale,
+      height: 7 * widget.scale,
+      decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
+    ),
+  );
 }
 
 class _DashedRoundedBorderPainter extends CustomPainter {
-  const _DashedRoundedBorderPainter({required this.color});
+  const _DashedRoundedBorderPainter({
+    required this.color,
+    required this.radius,
+  });
 
   final Color color;
+  final double radius;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final path = Path()
-      ..addRRect(RRect.fromRectAndRadius(rect.deflate(.75), const Radius.circular(20)));
+      ..addRRect(
+        RRect.fromRectAndRadius(rect.deflate(.75), Radius.circular(radius)),
+      );
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -388,7 +419,9 @@ class _DashedRoundedBorderPainter extends CustomPainter {
       const dashLength = 6.0;
       const gapLength = 4.0;
       while (distance < metric.length) {
-        final end = (distance + dashLength).clamp(0.0, metric.length).toDouble();
+        final end = (distance + dashLength)
+            .clamp(0.0, metric.length)
+            .toDouble();
         canvas.drawPath(metric.extractPath(distance, end), paint);
         distance = end + gapLength;
       }
@@ -397,5 +430,5 @@ class _DashedRoundedBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DashedRoundedBorderPainter oldDelegate) =>
-      oldDelegate.color != color;
+      oldDelegate.color != color || oldDelegate.radius != radius;
 }

@@ -75,6 +75,8 @@ class ActivityGroupedList extends StatelessWidget {
                     ActivityTransactionTile(
                       transaction: items[itemIndex],
                       displayAmount: displayAmount(items[itemIndex]),
+						compact: true,
+						preferDescriptionTitle: true,
                     ),
                   ],
                 ],

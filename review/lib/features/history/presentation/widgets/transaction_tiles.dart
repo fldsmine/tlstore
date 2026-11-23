@@ -22,7 +22,6 @@ class TransactionTiles extends StatelessWidget {
   final bool compact;
   final bool preferDescriptionTitle;
 
-
   /// Space around the tile.
   final EdgeInsetsGeometry margin;
 
@@ -32,18 +31,25 @@ class TransactionTiles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = transaction['status']?.toString().toLowerCase() ?? 'unkonwn';
+    final rawStatus =
+        transaction['status']?.toString().toLowerCase() ?? 'unknown';
+    final status = switch (rawStatus) {
+      'success' || 'completed' => 'approved',
+      _ => rawStatus,
+    };
     final theme = _themeFor(status);
-
     return Container(
       margin: margin,
       child: LayoutBuilder(
         builder: (context, constraints) {
           // Respond to narrow layouts, then apply the requested uniform size.
-          final responsiveScale =
-              (constraints.maxWidth / 886).clamp(0.72, 1.0).toDouble();
-          final scale = responsiveScale *
-              sizeScale.clamp(0.5, 1.2).toDouble();
+          final responsiveScale = (constraints.maxWidth / 886)
+              .clamp(0.72, 1.0)
+              .toDouble();
+          final scale =
+              responsiveScale *
+              sizeScale.clamp(0.5, 1.2).toDouble() *
+              (compact ? 0.82 : 1.0);
 
           final tileHeight = 118.0 * scale;
           final radius = 26.0 * scale;
@@ -73,9 +79,21 @@ class TransactionTiles extends StatelessWidget {
                       gapWidth: 4 * scale,
                       borderRadius: BorderRadius.all(Radius.circular(radius)),
                     ),
-                    child: _buildContents(theme, scale, iconSize, rightColumnWidth),
+                    child: _buildContents(
+                      context,
+                      theme,
+                      scale,
+                      iconSize,
+                      rightColumnWidth,
+                    ),
                   )
-                : _buildContents(theme, scale, iconSize, rightColumnWidth),
+                : _buildContents(
+                    context,
+                    theme,
+                    scale,
+                    iconSize,
+                    rightColumnWidth,
+                  ),
           );
 
           return Stack(
@@ -90,7 +108,9 @@ class TransactionTiles extends StatelessWidget {
                     width: 28 * scale,
                     decoration: BoxDecoration(
                       color: theme.accentColor,
-                      borderRadius: BorderRadius.all(Radius.circular(14 * scale)),
+                      borderRadius: BorderRadius.all(
+                        Radius.circular(14 * scale),
+                      ),
                     ),
                   ),
                 ),
@@ -108,13 +128,52 @@ class TransactionTiles extends StatelessWidget {
   }
 
   Widget _buildContents(
+    BuildContext context,
     _TransactionTheme theme,
     double scale,
     double iconSize,
     double rightColumnWidth,
   ) {
+    final direction = transaction['direction']?.toString().toLowerCase();
+    final description = transaction['description']?.toString().trim() ?? '';
+    final type =
+        '${transaction['type'] ?? ''} ${transaction['wallet'] ?? ''} $description'
+            .toLowerCase();
+    final title = preferDescriptionTitle && description.isNotEmpty
+        ? description
+        : _title(type, direction, description);
+    final category = _category(type, direction);
+    final time = _relativeDate(
+      transaction['created_at'] ?? transaction['date'],
+    );
+    final rawStatus = transaction['status']?.toString().toLowerCase();
+    final status = switch (rawStatus) {
+      'success' || 'completed' => 'approved',
+      _ => rawStatus,
+    };
+    final icon = const ['pending', 'rejected', 'approved'].contains(status)
+        ? theme.icon
+        : _iconFor(type, direction);
+    final handleTap =
+        onTap ??
+        () => showActivityTransactionDetailsSheet(
+          context: context,
+          transaction: transaction,
+          displayAmount: displayAmount,
+        );
+    final amountPrefix = direction == 'credit'
+        ? '+'
+        : direction == 'debit'
+        ? '−'
+        : '';
+
     Widget content = Padding(
-      padding: EdgeInsets.fromLTRB(16 * scale, 16 * scale, 15 * scale, 16 * scale),
+      padding: EdgeInsets.fromLTRB(
+        16 * scale,
+        16 * scale,
+        15 * scale,
+        16 * scale,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -125,11 +184,7 @@ class TransactionTiles extends StatelessWidget {
               color: theme.iconBackground,
               borderRadius: BorderRadius.all(Radius.circular(26 * scale)),
             ),
-            child: Icon(
-              theme.icon,
-              color: theme.iconColor,
-              size: 44 * scale,
-            ),
+            child: Icon(icon, color: theme.iconColor, size: 44 * scale),
           ),
           SizedBox(width: 14 * scale),
           Expanded(
@@ -138,7 +193,7 @@ class TransactionTiles extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'title',
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -150,11 +205,11 @@ class TransactionTiles extends StatelessWidget {
                 ),
                 SizedBox(height: 9 * scale),
                 Text(
-                  'category · time',
+                  '$category · $time',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: const Color(0xFF5B655F),
+                    color: theme.subtitleColor,
                     fontSize: 17 * scale,
                     fontWeight: FontWeight.w400,
                     height: 1.2,
@@ -171,7 +226,7 @@ class TransactionTiles extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'amount',
+                  '$amountPrefix$displayAmount',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -195,20 +250,108 @@ class TransactionTiles extends StatelessWidget {
       ),
     );
 
-    if (onTap == null) return content;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        /*onTap: () => showActivityTransactionDetailsSheet(
-          context: context,
-          transaction: transaction,
-          displayAmount: displayAmount,
-        ),*/
+        onTap: handleTap,
         borderRadius: BorderRadius.all(Radius.circular(26 * scale)),
         child: content,
       ),
     );
+  }
+
+  static String _title(String type, String? direction, String description) {
+    if (description.isNotEmpty) return description;
+    if (type.contains('withdraw')) return 'Withdrawal';
+    if (type.contains('referral')) return 'Referral bonus';
+    if (type.contains('review')) return 'Product review';
+    if (type.contains('social_follow')) return 'Social follow reward';
+    if (type.contains('share')) return 'Ad share reward';
+    if (type.contains('rank_earning')) return 'Ranking reward';
+    if (type.contains('bonus') || type.contains('reward'))
+      return 'Bonus reward';
+    if (type.contains('top_up') ||
+        type.contains('topup') ||
+        type.contains('deposit')) {
+      return 'Wallet top-up';
+    }
+    if (type.contains('subscription') ||
+        type.contains('payment') ||
+        type.contains('purchase')) {
+      return 'Payment';
+    }
+    if (type.contains('transfer')) return 'Wallet transfer';
+    return direction == 'credit' ? 'Account credit' : 'Account debit';
+  }
+
+  static String _category(String type, String? direction) {
+    if (type.contains('review')) return 'Reviews';
+    if (type.contains('share')) return 'Ad shares';
+    if (type.contains('referral')) return 'Referrals';
+    if (type.contains('social_follow')) return 'Tasks';
+    if (type.contains('withdraw')) return 'Withdrawals';
+    if (type.contains('top_up') ||
+        type.contains('topup') ||
+        type.contains('deposit')) {
+      return 'Top ups';
+    }
+    if (type.contains('subscription') ||
+        type.contains('payment') ||
+        type.contains('purchase')) {
+      return 'Payments';
+    }
+    if (type.contains('rank') || type.contains('bonus')) return 'Rewards';
+    if (type.contains('transfer')) return 'Transfers';
+    return direction == 'credit' ? 'Credits' : 'Transactions';
+  }
+
+  static IconData _iconFor(String type, String? direction) {
+    if (type.contains('withdraw')) return Icons.south_west_rounded;
+    if (type.contains('referral')) return Icons.handshake_rounded;
+    if (type.contains('review')) return Icons.star_rounded;
+    if (type.contains('social_follow')) return Icons.check_box_rounded;
+    if (type.contains('share')) return Icons.campaign_rounded;
+    if (type.contains('rank') ||
+        type.contains('bonus') ||
+        type.contains('reward')) {
+      return Icons.card_giftcard_rounded;
+    }
+    if (type.contains('top_up') ||
+        type.contains('topup') ||
+        type.contains('deposit')) {
+      return Icons.account_balance_wallet_rounded;
+    }
+    if (type.contains('subscription') ||
+        type.contains('payment') ||
+        type.contains('purchase')) {
+      return Icons.payment_rounded;
+    }
+    if (type.contains('transfer')) return Icons.swap_horiz_rounded;
+    return direction == 'credit'
+        ? Icons.south_west_rounded
+        : Icons.receipt_long_rounded;
+  }
+
+  static String _relativeDate(dynamic raw) {
+    final date = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
+    if (date == null) return 'Date unavailable';
+    final difference = DateTime.now().difference(date);
+    if (difference.inMinutes < 1) return 'Just now';
+    if (difference.inHours < 1) {
+      return '${difference.inMinutes} ${difference.inMinutes == 1 ? 'minute' : 'minutes'} ago';
+    }
+    if (difference.inDays < 1) {
+      return '${difference.inHours} ${difference.inHours == 1 ? 'hour' : 'hours'} ago';
+    }
+    if (difference.inDays == 1) return 'Yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
+    if (difference.inDays < 14) return '1 week ago';
+    if (difference.inDays < 30)
+      return '${(difference.inDays / 7).floor()} weeks ago';
+    if (difference.inDays < 60) return '1 month ago';
+    if (difference.inDays < 365)
+      return '${(difference.inDays / 30).floor()} months ago';
+    return '${(difference.inDays / 365).floor()} years ago';
   }
 }
 
@@ -335,6 +478,7 @@ class _TransactionTheme {
   const _TransactionTheme({
     required this.background,
     required this.titleColor,
+    this.subtitleColor = const Color(0xFF5B655F),
     required this.amountColor,
     required this.iconBackground,
     required this.iconColor,
@@ -353,6 +497,7 @@ class _TransactionTheme {
 
   final Color background;
   final Color titleColor;
+  final Color subtitleColor;
   final Color amountColor;
   final Color iconBackground;
   final Color iconColor;
@@ -452,11 +597,7 @@ class _DashedBorderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final path = Path()
-      ..addRRect(
-        borderRadius
-            .toRRect(rect)
-            .deflate(strokeWidth / 2),
-      );
+      ..addRRect(borderRadius.toRRect(rect).deflate(strokeWidth / 2));
 
     final paint = Paint()
       ..color = color

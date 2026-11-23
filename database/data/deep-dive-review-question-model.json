@@ -44,7 +44,7 @@
         {
           "key": "dd_attn_colours",
           "order": 3,
-          "prompt": "Attention check: tick every word in this list that is a colour.",
+          "prompt": "Tick every word in this list that is a colour.",
           "hint": "More than one answer is correct. Tick only the colours.",
           "type": "multiple_choice",
           "options": ["Lagos", "Blue", "Seven", "Crimson", "Kite", "Rice"],
@@ -92,7 +92,7 @@
         {
           "key": "dd_attn_write",
           "order": 3,
-          "prompt": "Attention check: write the sentence “I checked it myself” in the box, then use one more sentence to say what you actually tested in this app.",
+          "prompt": "Write this sentence “I checked it myself” in the box, then use one more sentence to say what you actually tested in this app.",
           "hint": "At least 8 words in total. Copy the sentence exactly, then answer in your own words.",
           "type": "long_text",
           "min_words": 8,
@@ -134,7 +134,7 @@
         {
           "key": "dd_attn_count",
           "order": 3,
-          "prompt": "Attention check: this review has three steps and you are on the third. Select “3” below.",
+          "prompt": "This review has three steps and you are on the third. Select “3” below.",
           "hint": "Read the question again before answering.",
           "type": "single_choice",
           "options": ["1", "2", "3", "4"],

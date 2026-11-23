@@ -92,7 +92,7 @@
         {
           "key": "simple_attn_none",
           "order": 3,
-          "prompt": "Attention check: choose “None of these” in the list below.",
+          "prompt": "Choose “None of these” in the list below.",
           "hint": "One of the answers below is exactly what the question asks for.",
           "type": "single_choice",
           "options": ["Bank statement", "None of these", "Passport photo"],
