@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:review/core/links/referral_link.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/currency/money.dart';
 import '../services/auth_api.dart';
@@ -92,13 +93,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           api: widget.api,
           token: widget.token,
           referralCode: referralCode,
-          referralLink: ReferralLink.forCode(referralCode).toString(),
+          referralLink: ReferralLink.referralWebLink(referralCode).toString(),
         ),
       ),
     );
     if (mounted) {
       await _refreshProfile();
     }
+  }
+
+  Future<void> _copyReferralLink() async {
+    final link = ReferralLink.referralWebLink(referralCode);
+    await Clipboard.setData(ClipboardData(text: link));
+    if (mounted) showAuthMessage(context, 'Referral link copied.');
+  }
+
+  Future<void> _shareReferralLink() async {
+    await SharePlus.instance.share(
+      ShareParams(text: ReferralLink.shareMessage(referralCode), subject: 'Join Trust Lens Store'),
+    );
   }
 
   Future<void> _openSubscriptions() async {
@@ -499,10 +512,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (id != null) plansById[id] = Map<String, dynamic>.from(plan);
       }
     }
-    final hasAddonSubscription = activeSubscriptions.any((subscription) {
-      final plan = plansById[subscription['subscription_plan_id']?.toString()];
-      return plan?['addons'] == true || plan?['addons'] == 1;
-    });
 
     return Theme(
       data: theme.copyWith(
@@ -617,7 +626,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _ProfileHero(
                     name: name.isEmpty ? 'Your profile' : name,
                     username: user['username']?.toString() ?? '',
+                    referralCode: referralCode,
                     onTeamClick: _openMyTeam,
+                    onShareClick:_shareReferralLink,
+                    onCopyLink: _copyReferralLink,
                     email: email,
                     avatarUrl: avatar,
                     coverUrl: cover,
@@ -2144,20 +2156,26 @@ class _ProfileHero extends StatelessWidget {
     required this.avatarUrl,
     required this.coverUrl,
     required this.verified,
+    required this.referralCode,
     this.memberSince,
     this.activePlans, 
     required this.onTeamClick,
+    required this.onShareClick,
+    required this.onCopyLink,
   });
 
   final String name;
   final String username;
   final String email;
   final String? avatarUrl;
+  final String referralCode;
   final String? coverUrl;
   final bool verified;
   final String? memberSince;
   final int? activePlans;
   final Future<void> Function() onTeamClick;
+  final Future<void> Function() onShareClick;
+  final Future<void> Function() onCopyLink;
 
 
   static const double _coverHeight = 152;
@@ -2356,6 +2374,77 @@ class _ProfileHero extends StatelessWidget {
               ],
             ),
           ),
+
+          Container(
+          padding: const EdgeInsets.fromLTRB(13, 11, 8, 8),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: .60),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(26),
+              bottomRight: Radius.circular(26),
+            ),
+            border: Border.all(
+            color: Colors.white.withValues(alpha: .16),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text(
+              'YOUR PERSONAL INVITE LINK',
+              style: TextStyle(
+              color: Color(0xFFD9F3DF),
+              fontSize: 9,
+              letterSpacing: .8,
+              fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 5),
+            SelectableText(
+              ReferralLink.referralWebLink(referralCode),
+              style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+              const Spacer(),
+              TextButton.icon(
+                onPressed: onCopyLink,
+                style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.copy_rounded, size: 15),
+                label: Text('Copy link'),
+              ),
+              const SizedBox(width: 5),
+              FilledButton.icon(
+                onPressed: onShareClick,
+                style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.green,
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                ),
+                icon: const Icon(Icons.share_rounded, size: 15),
+                label: Text(
+                'Share',
+                style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              ],
+            ),
+            ],
+          ),
+          ),
+
         ],
       ),
     );

@@ -5,7 +5,7 @@
     |--------------------------------------------------------------------------
     |
     | Rendered by dompdf. Pass a `$receipt` array — either one record straight
-    | from the withdrawals API (``payout_details``, ``option``, ``amount_minor``
+    | from the withdrawals API (``payout_details``, ``option``, ``net_minor``
     | ...) or an already flattened array with the keys used below. Everything is
     | optional; sensible brand defaults keep the page looking finished.
     |
@@ -69,8 +69,8 @@
     $precision = \App\Application\Money\CurrencyMinorUnits::precision($currency);
     $amount = $receipt['amount'] ?? null;
 
-    if ($amount === null && isset($receipt['amount_minor'])) {
-        $amount = ((float) $receipt['amount_minor']) / (10 ** $precision);
+    if ($amount === null && isset($receipt['net_minor'])) {
+        $amount = ((float) $receipt['net_minor']) / (10 ** $precision);
     }
 
     $amount = (float) $amount;
@@ -723,15 +723,6 @@
                             </tr>
                         </table>
                     @endif
-                </td>
-                <td class="sla-cell" align="right">
-                    <div class="sla">
-                        <div class="sla-body">
-                            <div class="sla-value">{{ $processingWindow }}</div>
-                            <div class="sla-note">business days</div>
-                        </div>
-                        <div class="sla-band">{{ $bandLabel }}</div>
-                    </div>
                 </td>
             </tr>
         </table>

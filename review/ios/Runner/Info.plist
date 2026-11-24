@@ -47,6 +47,10 @@
 			<key>NSAllowsArbitraryLoads</key>
 			<true/>
 		</dict>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>TL Store saves your withdrawal receipt image to your photo library.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>TL Store needs photo library access to save your withdrawal receipt image.</string>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>

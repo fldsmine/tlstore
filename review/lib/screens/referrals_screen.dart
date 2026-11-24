@@ -66,7 +66,7 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
 
   String? get _referralUri => _referralCode == null
       ? null
-      : ReferralLink.forCode(_referralCode!).toString();
+      : ReferralLink.referralWebLink(_referralCode!).toString();
 
   int get _invitedCount => _asInt(_summary['attributed_signups']);
   int get _qualifiedCount => _asInt(_summary['qualified_signups']);
@@ -121,10 +121,8 @@ class _ReferralsScreenState extends State<ReferralsScreen> {
   }
 
   Future<void> _shareReferralLink() async {
-    final link = _referralUri;
-    if (link == null) return;
     await SharePlus.instance.share(
-      ShareParams(text: 'Join me on TL Store: $link', subject: 'Join TL Store'),
+      ShareParams(text: ReferralLink.shareMessage(_referralCode!), subject: 'Join Trust Lens Store'),
     );
   }
 

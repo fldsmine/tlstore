@@ -81,7 +81,7 @@ final class SocialLogin
                     ]);
                 }
                 ReferralCode::query()->create([
-                    'user_id' => $user->id, 'code' => Str::upper(Str::random(10)), 'status' => 'active',
+                    'user_id' => $user->id, 'code' => Str::upper(Str::random(5)), 'status' => 'active',
                 ]);
             }
 

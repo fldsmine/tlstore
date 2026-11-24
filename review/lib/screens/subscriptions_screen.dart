@@ -143,6 +143,82 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     return null;
   }
 
+  bool _isDowngrade(
+    Map<String, dynamic> selectedPlan,
+    Map<String, dynamic> activeSubscription,
+  ) {
+    final currentPlan = _planForSubscription(activeSubscription);
+    if (currentPlan.isEmpty) return false;
+    final selectedGroup = selectedPlan['group_key']?.toString();
+    final selectedTier = _groupATier(selectedPlan);
+    final currentTier = _groupATier(currentPlan);
+    if (selectedGroup == 'group_a' &&
+        selectedTier != null &&
+        currentTier != null) {
+      return selectedTier < currentTier;
+    }
+
+    final selectedCurrency =
+        selectedPlan['currency']?.toString().toUpperCase() ?? 'USD';
+    final currentCurrency =
+        currentPlan['currency']?.toString().toUpperCase() ?? 'USD';
+    final comparisonCurrency = selectedCurrency == currentCurrency
+        ? selectedCurrency
+        : 'USD';
+    final selectedMonthly = _monthlyPackagePrice(
+      selectedPlan,
+      comparisonCurrency,
+    );
+    final currentMonthly = _monthlyPackagePrice(
+      currentPlan,
+      comparisonCurrency,
+    );
+    if (selectedMonthly == null || currentMonthly == null) return false;
+    return selectedMonthly < currentMonthly - 0.005;
+  }
+
+  int? _groupATier(Map<String, dynamic> plan) {
+    final key =
+        plan['tier_key']?.toString().toLowerCase() ??
+        plan['name']?.toString().toLowerCase();
+    return switch (key) {
+      'lite' => 0,
+      'premium' => 1,
+      'gold' => 2,
+      _ => null,
+    };
+  }
+
+  double? _monthlyPackagePrice(
+    Map<String, dynamic> plan,
+    String targetCurrency,
+  ) {
+    final currency = plan['currency']?.toString().toUpperCase() ?? 'USD';
+    final digits = _asInt(
+      plan['currency_minor_units'],
+      fallback: currencyPrecision(currency),
+    );
+    final discount = _asDouble(plan['discount']).clamp(0, 100);
+    final amount =
+        _asInt(plan['price_minor']) /
+        math.pow(10, digits) *
+        (100 - discount) /
+        100;
+    final inTarget = currency == targetCurrency
+        ? amount
+        : widget.api.convertMajor(amount, currency, targetCurrency);
+    if (inTarget == null) return null;
+
+    final count = math.max(1, _asInt(plan['duration_count'], fallback: 1));
+    final months = switch (plan['billing_interval']?.toString().toLowerCase()) {
+      'weekly' => count / 4.345,
+      'quarterly' => count * 3,
+      'yearly' || 'annual' => count * 12,
+      _ => count.toDouble(),
+    };
+    return inTarget / months;
+  }
+
   bool _questionnaireComplete(String? groupKey) {
     if (groupKey != 'group_b' && groupKey != 'group_c') return true;
     final questionnaire = _map(_user['subscription_questionnaire']);
@@ -191,6 +267,30 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     final groupKey = plan['group_key']?.toString();
     final currentInGroup = _subscriptionForGroup(groupKey);
     final switching = currentInGroup != null;
+    if (currentInGroup != null && _isDowngrade(plan, currentInGroup)) {
+      final currentPlan = _planForSubscription(currentInGroup);
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: Icon(
+            Icons.trending_down_rounded,
+            color: Theme.of(dialogContext).colorScheme.error,
+          ),
+          title: const Text('Package downgrade unavailable'),
+          content: Text(
+            'You are currently on ${currentPlan['name'] ?? 'a higher package'}. '
+            'You can switch to a package at the same or a higher level, but you cannot downgrade while this package is active.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     if (switching) {
       final currentPlan = _planForSubscription(currentInGroup);
       final confirmed = await showDialog<bool>(
@@ -978,78 +1078,83 @@ class _PlanCard extends StatelessWidget {
                     _PlanFeature(text: dailyAdEarnings, active: active),
                   const SizedBox(height: 18),
 
-SizedBox(
-  width: double.infinity,
-  height: 58,
-  child: Stack(
-    children: [
-      // Dark bottom layer creates the 3D effect
-      Positioned(
-        top: 8,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: active ? const Color(0xFFE8B449) :const Color(0xFFB00035),
-            borderRadius: BorderRadius.circular(23),
-          ),
-        ),
-      ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: Stack(
+                      children: [
+                        // Dark bottom layer creates the 3D effect
+                        Positioned(
+                          top: 8,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? const Color(0xFFE8B449)
+                                  : const Color(0xFFB00035),
+                              borderRadius: BorderRadius.circular(23),
+                            ),
+                          ),
+                        ),
 
-      // Main button face
-      Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 8,
-        child: FilledButton(
-          onPressed: purchasing ? null : onTap,
-          style: FilledButton.styleFrom(
-            backgroundColor: active ?const Color(0xFFF8C764) : const Color(0xFFF50046),
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: active ?const Color(0xFFF8C764) : const Color(0xFFF50046),
-            disabledForegroundColor: Colors.white70,
-            elevation: 0,
-            padding: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(23),
-            ),
-          ),
-          child: purchasing
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+                        // Main button face
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 8,
+                          child: FilledButton(
+                            onPressed: purchasing ? null : onTap,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: active
+                                  ? const Color(0xFFF8C764)
+                                  : const Color(0xFFF50046),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: active
+                                  ? const Color(0xFFF8C764)
+                                  : const Color(0xFFF50046),
+                              disabledForegroundColor: Colors.white70,
+                              elevation: 0,
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(23),
+                              ),
+                            ),
+                            child: purchasing
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        active
+                                            ? 'View current package'
+                                            : 'Join package',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        Icons.arrow_forward_rounded,
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      active
-                          ? 'View current package'
-                          : 'Join package',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 20,
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    ],
-  ),
-),
-                  
                 ],
               ),
             ),
@@ -1164,7 +1269,7 @@ class _PlanFeature extends StatelessWidget {
           Icon(
             Icons.check_circle_rounded,
             size: 18,
-            color: active ? colors.secondary : colors.error,
+            color: active ? colors.secondary : const Color(0xFFF50046),
           ),
           const SizedBox(width: 9),
           Expanded(

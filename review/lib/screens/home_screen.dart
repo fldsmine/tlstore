@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:review/screens/addons_screen.dart';
 import 'package:review/features/vas/presentation/screens/vas_screens.dart';
+import 'package:review/screens/referral_team_screen.dart';
 import 'package:review/widgets/quick_slideshow.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/links/referral_link.dart';
 import '../core/theme/app_colors.dart';
 import '../core/currency/money.dart';
 import '../core/utils/helper.dart';
@@ -1589,7 +1591,11 @@ class _HomeScreenState extends State<HomeScreen>
         ? '${_currencySymbol(_currency)}●●●●●'
         : total;
     final username = _sessionUser['username']?.toString() ?? _displayName;
-    final memberStat = _sessionUser['is_member'] == 1 ? 'Subscribed':'Freebie';
+    final memberStat = switch (_sessionUser['is_member']) {
+      1 => 'Member',
+      2 => 'Reviewer',
+      _ => 'Freebie',
+    };
 
     return SizedBox(
       height: 185,
@@ -2269,6 +2275,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _openWallet(Map<String, dynamic> wallet) {
+    String referralCode = _sessionUser['referral_code']?.toString() ?? '';
+
     final page = switch (wallet['type']?.toString()) {
       'review' || 'review_group_b' || 'review_group_c' => ReviewWalletScreen(
         api: widget.api,
@@ -2280,10 +2288,11 @@ class _HomeScreenState extends State<HomeScreen>
         token: widget.result.token,
         wallet: wallet,
       ),
-      'referral' => ReferralWalletScreen(
+      'referral' => ReferralTeamScreen(
         api: widget.api,
         token: widget.result.token,
-        wallet: wallet,
+        referralCode: referralCode,
+        referralLink: ReferralLink.forCode(referralCode).toString(),
       ),
       'bonus' => BonusWalletScreen(
         api: widget.api,

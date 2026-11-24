@@ -13,16 +13,16 @@ import '../utils/receipt_delivery.dart';
 
 /// Loads the PDF for one withdrawal. Return null (or throw) to surface an
 /// error inside the dialog.
-typedef WithdrawalReceiptBytesLoader =
-    Future<Uint8List?> Function(WithdrawalReceipt receipt);
+typedef WithdrawalReceiptBytesLoader = Future<Uint8List?> Function(
+  WithdrawalReceipt receipt,
+);
 
 /// Where the finished PDF should go: save it, share it or open it.
-typedef WithdrawalReceiptDeliverer =
-    Future<void> Function(
-      WithdrawalReceipt receipt,
-      Uint8List bytes,
-      String fileName,
-    );
+typedef WithdrawalReceiptDeliverer = Future<void> Function(
+  WithdrawalReceipt receipt,
+  Uint8List bytes,
+  String fileName,
+);
 
 /// Opens the reusable withdrawal receipt dialog.
 ///
@@ -70,7 +70,6 @@ Future<bool?> showWithdrawalReceiptDialog(
   String Function(WithdrawalReceipt receipt)? receiptPath,
   bool showDownloadButton = true,
   bool barrierDismissible = true,
-  
 }) {
   final receipt = withdrawal is WithdrawalReceipt
       ? withdrawal
@@ -177,9 +176,8 @@ class WithdrawalReceipt {
 
     return WithdrawalReceipt(
       id: id,
-      reference: providerReference ??
-          _referenceFromKey(idempotencyKey) ??
-          'WD-$id',
+      reference:
+          providerReference ?? _referenceFromKey(idempotencyKey) ?? 'WD-$id',
       amountMinor: _asInt(map['amount_minor']),
       feeMinor: _asInt(map['fee_minor']),
       currency: (_readable(map['currency']) ?? '').toUpperCase(),
@@ -208,8 +206,10 @@ class WithdrawalReceipt {
 
     return rows
         .whereType<Map<dynamic, dynamic>>()
-        .map((Map<dynamic, dynamic> row) =>
-            WithdrawalReceipt.fromMap(Map<String, dynamic>.from(row)))
+        .map(
+          (Map<dynamic, dynamic> row) =>
+              WithdrawalReceipt.fromMap(Map<String, dynamic>.from(row)),
+        )
         .toList(growable: false);
   }
 
@@ -240,8 +240,9 @@ class WithdrawalReceipt {
         ? Map<String, dynamic>.from(map['wallet'] as Map)
         : <String, dynamic>{};
 
-    final String? name = _readable(wallet['name']) ?? _readable(map['wallet_name']);
-    if (name != null) return name;
+    final String? name =
+        _readable(wallet['wallet_type']) ?? _readable(map['wallet_name']);
+    if (name != null) return '$name wallet';
 
     final int walletId = _asInt(map['wallet_id']);
     return walletId > 0 ? 'Wallet #$walletId' : null;
@@ -281,6 +282,8 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
   bool _downloaded = false;
   bool _downloadingImage = false;
   bool _downloadedImage = false;
+  String? _imageDeliveryLabel;
+  bool _capturePdfDesign = false;
   String? _error;
   final GlobalKey _receiptImageKey = GlobalKey();
 
@@ -319,7 +322,8 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
 
       final String fileName = 'withdrawal-${_receipt.reference}.pdf';
 
-      final deliver = widget.onReceiptReady ??
+      final deliver =
+          widget.onReceiptReady ??
           (WithdrawalReceipt _, Uint8List data, String name) =>
               deliverPdfReceipt(data, name);
       await deliver(_receipt, bytes, fileName);
@@ -351,6 +355,7 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
     FocusScope.of(context).unfocus();
     setState(() {
       _downloadingImage = true;
+      _capturePdfDesign = true;
       _error = null;
     });
 
@@ -372,7 +377,7 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
         throw StateError('The receipt image could not be created.');
       }
 
-      await deliverImageReceipt(
+      final deliveryResult = await deliverImageReceipt(
         bytes,
         'withdrawal-${_receipt.reference}.png',
       );
@@ -381,12 +386,20 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
       setState(() {
         _downloadingImage = false;
         _downloadedImage = true;
+        _imageDeliveryLabel = switch (deliveryResult) {
+          ImageReceiptDeliveryResult.gallery => 'Saved to gallery',
+          ImageReceiptDeliveryResult.shared => 'Shared',
+          ImageReceiptDeliveryResult.downloaded => 'Downloaded',
+        };
+        _capturePdfDesign = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _downloadingImage = false;
-        _error = 'Could not create or save the receipt image. Please try again.';
+        _capturePdfDesign = false;
+        _error =
+            'Could not create or save the receipt image. Please try again.';
       });
     }
   }
@@ -405,8 +418,10 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
     final ColorScheme colors = theme.colorScheme;
     final MediaQueryData media = MediaQuery.of(context);
 
-    const EdgeInsets insetPadding =
-        EdgeInsets.symmetric(horizontal: 18, vertical: 24);
+    const EdgeInsets insetPadding = EdgeInsets.symmetric(
+      horizontal: 18,
+      vertical: 24,
+    );
     final double availableHeight =
         media.size.height - media.viewInsets.bottom - insetPadding.vertical - 8;
 
@@ -444,65 +459,90 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
                     child: RepaintBoundary(
                       key: _receiptImageKey,
-                      child: ColoredBox(
-                        color: colors.surface,
-                        child: Padding(
-                          padding: const EdgeInsets.all(1),
-                          child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        _Header(logoAsset: widget.logoAsset, label: widget.appName),
-                        const SizedBox(height: 6),
-                        _RibbonWaveCheck(receipt: _receipt, colors: colors),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.title ?? _defaultTitle(_receipt),
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.4,
-                            color: colors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          widget.subtitle ?? _defaultSubtitle(_receipt),
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            height: 1.45,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        _AmountCard(receipt: _receipt, theme: theme),
-                        const SizedBox(height: 12),
-                        _ReferenceChip(reference: _receipt.reference, theme: theme),
-                        const SizedBox(height: 14),
-                        ..._detailRows(theme, colors),
-                        const SizedBox(height: 6),
-                        _NoteBox(receipt: _receipt, theme: theme),
-                        if (_error != null) ...<Widget>[
-                          const SizedBox(height: 12),
-                          _ErrorNote(message: _error!, theme: theme),
-                        ],
-                      ],
-                    ),
-                        ),
-                      ),
+                      child: _capturePdfDesign
+                          ? _PdfReceiptImage(
+                              receipt: _receipt,
+                              brandName: widget.appName ?? 'TL Store',
+                            )
+                          : ColoredBox(
+                              color: colors.surface,
+                              child: Padding(
+                                padding: const EdgeInsets.all(1),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: <Widget>[
+                                    _Header(
+                                      logoAsset: widget.logoAsset,
+                                      label: widget.appName,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _RibbonWaveCheck(
+                                      receipt: _receipt,
+                                      colors: colors,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      widget.title ?? _defaultTitle(_receipt),
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: -0.4,
+                                            color: colors.onSurface,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      widget.subtitle ??
+                                          _defaultSubtitle(_receipt),
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colors.onSurfaceVariant,
+                                            height: 1.45,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    _AmountCard(
+                                      receipt: _receipt,
+                                      theme: theme,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _ReferenceChip(
+                                      reference: _receipt.reference,
+                                      theme: theme,
+                                    ),
+                                    const SizedBox(height: 14),
+                                    ..._detailRows(theme, colors),
+                                    const SizedBox(height: 6),
+                                    _NoteBox(receipt: _receipt, theme: theme),
+                                    if (_error != null) ...<Widget>[
+                                      const SizedBox(height: 12),
+                                      _ErrorNote(
+                                        message: _error!,
+                                        theme: theme,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                 ),
                 _Actions(
                   downloadingImage: _downloadingImage,
                   downloadedImage: _downloadedImage,
+                  imageDeliveryLabel: _imageDeliveryLabel,
                   downloadingPdf: _downloading,
                   downloadedPdf: _downloaded,
                   canDownloadPdf: widget.loader != null,
                   showDownloadButton: widget.showDownloadButton,
-                  onCancel: () => Navigator.of(context).pop(
-                    _downloaded || _downloadedImage,
-                  ),
+                  onCancel: () =>
+                      Navigator.of(context)
+                          .pop(_downloaded || _downloadedImage),
                   onDownloadImage: _downloadImage,
                   onDownloadPdf: _downloadPdf,
                   theme: theme,
@@ -548,8 +588,6 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
       add(_fieldLabel(key), value);
     });
 
-    add('Fee', _money(_receipt.feeMinor, _receipt.currency));
-
     if (_receipt.requestedAt != null) {
       add(
         'Requested',
@@ -585,6 +623,527 @@ class _WithdrawalReceiptDialogState extends State<WithdrawalReceiptDialog> {
   }
 }
 
+/// Flutter rendering of `resources/views/pdf/withdrawal-receipt.blade.php`.
+/// It is mounted only while the image download is captured, so the PNG shares
+/// the PDF's A4 layout, brand assets, receipt rows, and status colors.
+class _PdfReceiptImage extends StatelessWidget {
+  const _PdfReceiptImage({required this.receipt, required this.brandName});
+
+  final WithdrawalReceipt receipt;
+  final String brandName;
+
+  static const _green = Color(0xFF0F6B4A);
+  static const _greenDark = Color(0xFF0A4B34);
+  static const _greenSoft = Color(0xFFE8F3EC);
+  static const _red = Color(0xFFE2432E);
+  static const _amber = Color(0xFFD9822B);
+  static const _paper = Color(0xFFF7FBF8);
+  static const _card = Color(0xFFEFEFEF);
+  static const _ink = Color(0xFF1B211E);
+  static const _muted = Color(0xFF7C837D);
+  static const _hairline = Color(0xFFDDE6E0);
+  static const _bars = <double>[50, 84, 99, 114, 65, 91, 57, 46];
+
+  Color get _statusTone {
+    if (receipt.isFailed) return _red;
+    if (const {
+      'completed',
+      'paid',
+      'approved',
+      'success',
+      'successful',
+    }.contains(receipt.status)) {
+      return _green;
+    }
+    return _amber;
+  }
+
+  List<Map<String, String>> get _rows {
+    final rows = <Map<String, String>>[];
+    final details = receipt.payoutDetails;
+    final name = details['account_name'] ?? details['name'];
+    final bank = details['bank_name'] ?? details['bank'];
+    final account = details['account_number'];
+
+    void add(String label, String? value) {
+      if (value == null || value.trim().isEmpty) return;
+      rows.add({'label': label, 'value': value.trim()});
+    }
+
+    add('Name', name);
+    add('Bank', bank);
+    if (bank == null || bank.isEmpty) add('Method', receipt.methodLabel);
+    add('Account No.', account);
+    add('Withdrawn From', receipt.sourceLabel);
+    const hidden = {
+      'account_name',
+      'name',
+      'bank_name',
+      'bank',
+      'account_number',
+    };
+    for (final entry in details.entries) {
+      if (hidden.contains(entry.key)) continue;
+      final label = switch (entry.key) {
+        'phone_number' => 'Phone number',
+        'provider' => 'Network',
+        'wallet_address' || 'crypto_address' => 'Wallet address',
+        'network' => 'Network',
+        'sort_code' => 'Sort code',
+        'bank_code' => 'Bank code',
+        _ =>
+          entry.key
+              .replaceAll('_', ' ')
+              .split(' ')
+              .map(
+                (part) => part.isEmpty
+                    ? part
+                    : '${part[0].toUpperCase()}${part.substring(1)}',
+              )
+              .join(' '),
+      };
+      add(label, entry.value);
+    }
+    add('Reference No.', receipt.reference);
+    add('Date', _formattedDate(receipt.requestedAt));
+    add('Status', _statusLabel(receipt.status));
+    add('Processed', _formattedDate(receipt.processedAt));
+    add('Reason', receipt.failureReason);
+    return rows;
+  }
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+    aspectRatio: 595 / 842,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = constraints.maxWidth / 360;
+        final rows = _rows;
+        final dense = rows.length > 7;
+        final tone = _statusTone;
+        final heading = TextStyle(
+          color: _ink,
+          fontSize: 12 * scale,
+          height: 1.2,
+        );
+
+        return ColoredBox(
+          color: _paper,
+          child: Column(
+            children: [
+              Container(height: 5 * scale, color: _red),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    22 * scale,
+                    17 * scale,
+                    22 * scale,
+                    16 * scale,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _header(scale),
+                      SizedBox(height: 17 * scale),
+                      _hero(scale, tone),
+                      SizedBox(height: 15 * scale),
+                      _detailCard(scale, rows, dense, heading),
+                      SizedBox(height: 13 * scale),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _processing(scale),
+                            const Spacer(),
+                            Container(height: scale, color: _hairline),
+                            SizedBox(height: 8 * scale),
+                            Text(
+                              'THANK YOU FOR USING ${brandName.toUpperCase()}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _green,
+                                fontSize: 10.5 * scale,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .4 * scale,
+                              ),
+                            ),
+                            SizedBox(height: 3 * scale),
+                            Text(
+                              'For questions about your withdrawal, visit tlstore.org or contact $brandName support.',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _muted,
+                                fontSize: 8.6 * scale,
+                                height: 1.35,
+                              ),
+                            ),
+                            SizedBox(height: 5 * scale),
+                            Text(
+                              '$brandName. All rights reserved. This receipt confirms a withdrawal request submitted to $brandName. Funds are subject to processing.',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _muted,
+                                fontSize: 6.6 * scale,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 8 * scale,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 62 * scale,
+                      child: ColoredBox(color: _red),
+                    ),
+                    const Expanded(child: ColoredBox(color: _green)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+
+  Widget _header(double scale) => Row(
+    children: [
+      Expanded(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Image.asset(
+            'assets/others/logo-long.png',
+            width: 180 * scale,
+            height: 42 * scale,
+            fit: BoxFit.contain,
+            alignment: Alignment.centerLeft,
+          ),
+        ),
+      ),
+      SizedBox(width: 7 * scale),
+      Text(
+        'Generated on ${_generatedDate(DateTime.now())}',
+        textAlign: TextAlign.right,
+        style: TextStyle(color: _muted, fontSize: 8.3 * scale),
+      ),
+    ],
+  );
+
+  Widget _hero(double scale, Color tone) => Row(
+    crossAxisAlignment: CrossAxisAlignment.end,
+    children: [
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Withdrawal Receipt',
+              style: TextStyle(color: _muted, fontSize: 11 * scale),
+            ),
+            SizedBox(height: 2 * scale),
+            Text(
+              _money(receipt.netMinor, receipt.currency),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: _green,
+                fontSize: 18.5 * scale,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -.3 * scale,
+              ),
+            ),
+          ],
+        ),
+      ),
+      SizedBox(width: 5 * scale),
+      SizedBox(
+        height: 60 * scale,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: _bars
+              .map(
+                (height) => Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 1.2 * scale),
+                  child: Container(
+                    width: 9 * scale,
+                    height: height * .48 * scale,
+                    decoration: BoxDecoration(
+                      color: _greenSoft,
+                      borderRadius: BorderRadius.circular(2 * scale),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+      SizedBox(width: 7 * scale),
+      Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: 10 * scale,
+          vertical: 5 * scale,
+        ),
+        decoration: BoxDecoration(
+          color: tone,
+          borderRadius: BorderRadius.circular(20 * scale),
+        ),
+        child: Text(
+          _statusLabel(receipt.status).toUpperCase(),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 7.5 * scale,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .5 * scale,
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _detailCard(
+    double scale,
+    List<Map<String, String>> rows,
+    bool dense,
+    TextStyle heading,
+  ) => Container(
+    decoration: BoxDecoration(
+      color: _card,
+      borderRadius: BorderRadius.circular(10 * scale),
+    ),
+    child: IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: 3 * scale,
+            decoration: BoxDecoration(
+              color: _red,
+              borderRadius: BorderRadius.horizontal(
+                left: Radius.circular(10 * scale),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 16 * scale,
+                vertical: (dense ? 5 : 7) * scale,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final row in rows)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: (dense ? 2 : 3.2) * scale,
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 105 * scale,
+                            child: Text(
+                              row['label']!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: heading.copyWith(
+                                color: _muted,
+                                fontSize: (dense ? 7.7 : 8.2) * scale,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              row['value']!,
+                              textAlign: TextAlign.right,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: heading.copyWith(
+                                color: row['label'] == 'Status'
+                                    ? _statusTone
+                                    : _ink,
+                                fontSize: (dense ? 7.7 : 8.2) * scale,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _processing(double scale) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: Padding(
+          padding: EdgeInsets.only(right: 8 * scale),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Processing time',
+                style: TextStyle(
+                  color: _ink,
+                  fontSize: 10.5 * scale,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 2 * scale),
+              Text(
+                receipt.isFailed
+                    ? (receipt.failureReason ??
+                          'This withdrawal could not be completed.')
+                    : receipt.isPending
+                    ? 'Your withdrawal request was submitted successfully. You will be notified once it is completed.'
+                    : 'Your withdrawal has been completed. Thank you for using $brandName.',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _muted,
+                  fontSize: 8.2 * scale,
+                  height: 1.3,
+                ),
+              ),
+              SizedBox(height: 4 * scale),
+              Text(
+                'Find us in stores',
+                style: TextStyle(
+                  color: _green,
+                  fontSize: 9 * scale,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 3 * scale),
+              Row(
+                children: [
+                  Image.asset(
+                    'assets/others/withdrawal-google-play-badge.png',
+                    width: 99 * scale,
+                    height: 27 * scale,
+                    fit: BoxFit.contain,
+                  ),
+                  SizedBox(width: 6 * scale),
+                  Image.asset(
+                    'assets/others/withdrawal-app-store-badge.png',
+                    width: 91 * scale,
+                    height: 27 * scale,
+                    fit: BoxFit.contain,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      Container(
+        width: 84 * scale,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: _green, width: 3 * scale),
+          borderRadius: BorderRadius.circular(10 * scale),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 5 * scale),
+            Text(
+              '1–24hrs',
+              style: TextStyle(
+                color: _green,
+                fontSize: 14 * scale,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -.4 * scale,
+              ),
+            ),
+            Text(
+              'business days',
+              style: TextStyle(color: _muted, fontSize: 6.7 * scale),
+            ),
+            SizedBox(height: 6 * scale),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 4 * scale),
+              decoration: BoxDecoration(
+                color: _green,
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(7 * scale),
+                ),
+              ),
+              child: Text(
+                receipt.isPending ? 'PROCESSING' : 'STATUS',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 6.2 * scale,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .4 * scale,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+String _generatedDate(DateTime value) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[value.month - 1]} ${value.day}, ${value.year}';
+}
+
+String _formattedDate(DateTime? value) {
+  if (value == null) return '';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+  final minute = value.minute.toString().padLeft(2, '0');
+  final period = value.hour < 12 ? 'AM' : 'PM';
+  return '${value.day} ${months[value.month - 1]} ${value.year}, $hour:$minute $period';
+}
+
 class _Header extends StatelessWidget {
   const _Header({required this.logoAsset, this.label});
 
@@ -604,25 +1163,26 @@ class _Header extends StatelessWidget {
           height: 45,
           fit: BoxFit.contain,
           filterQuality: FilterQuality.medium,
-          errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
-            return Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[colors.primary, colors.secondary],
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.receipt_long_rounded,
-                size: 28,
-                color: colors.onPrimary,
-              ),
-            );
-          },
+          errorBuilder:
+              (BuildContext context, Object error, StackTrace? stack) {
+                return Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: <Color>[colors.primary, colors.secondary],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.receipt_long_rounded,
+                    size: 28,
+                    color: colors.onPrimary,
+                  ),
+                );
+              },
         ),
         if (label != null && label!.isNotEmpty) ...<Widget>[
           const SizedBox(width: 10),
@@ -690,11 +1250,12 @@ class _RibbonWaveCheckState extends State<_RibbonWaveCheck>
     final Color second = receipt.isFailed
         ? colors.error.withValues(alpha: 0.7)
         : receipt.isPending
-            ? Color.lerp(colors.primary, colors.tertiary, 0.65) ?? colors.secondary
-            : colors.secondary;
+        ? Color.lerp(colors.primary, colors.tertiary, 0.65) ?? colors.secondary
+        : colors.secondary;
 
-    final IconData glyph =
-        receipt.isFailed ? Icons.close_rounded : Icons.check_rounded;
+    final IconData glyph = receipt.isFailed
+        ? Icons.close_rounded
+        : Icons.check_rounded;
 
     return SizedBox(
       height: 156,
@@ -772,7 +1333,10 @@ class _RibbonWavePainter extends CustomPainter {
 
     final Paint glow = Paint()
       ..shader = RadialGradient(
-        colors: <Color>[first.withValues(alpha: 0.16), first.withValues(alpha: 0)],
+        colors: <Color>[
+          first.withValues(alpha: 0.16),
+          first.withValues(alpha: 0),
+        ],
       ).createShader(Rect.fromCircle(center: center, radius: size.width * 0.5));
     canvas.drawCircle(center, size.width * 0.5, glow);
 
@@ -793,10 +1357,14 @@ class _RibbonWavePainter extends CustomPainter {
 
       for (int step = 0; step <= steps; step++) {
         final double angle = (step / steps) * math.pi * 2;
-        final double wave = amplitude *
-            math.sin(6 * angle + t * math.pi * 2 + ribbon * 1.1);
-        final Offset point = center +
-            Offset(math.cos(angle) * (radius + wave), math.sin(angle) * (radius + wave));
+        final double wave =
+            amplitude * math.sin(6 * angle + t * math.pi * 2 + ribbon * 1.1);
+        final Offset point =
+            center +
+            Offset(
+              math.cos(angle) * (radius + wave),
+              math.sin(angle) * (radius + wave),
+            );
 
         if (step == 0) {
           path.moveTo(point.dx, point.dy);
@@ -898,7 +1466,9 @@ class _ReferenceChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.surfaceContainerHighest.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.8)),
+          border: Border.all(
+            color: colors.outlineVariant.withValues(alpha: 0.8),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -921,7 +1491,9 @@ class _ReferenceChip extends StatelessWidget {
                   color: colors.onSurface,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.4,
-                  fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+                  fontFeatures: const <FontFeature>[
+                    FontFeature.tabularFigures(),
+                  ],
                 ),
               ),
             ),
@@ -1009,8 +1581,8 @@ class _StatusPill extends StatelessWidget {
     final Color tone = receipt.isFailed
         ? colors.error
         : receipt.isPending
-            ? colors.tertiary
-            : colors.primary;
+        ? colors.tertiary
+        : colors.primary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
@@ -1127,6 +1699,7 @@ class _Actions extends StatelessWidget {
   const _Actions({
     required this.downloadingImage,
     required this.downloadedImage,
+    required this.imageDeliveryLabel,
     required this.downloadingPdf,
     required this.downloadedPdf,
     required this.canDownloadPdf,
@@ -1139,6 +1712,7 @@ class _Actions extends StatelessWidget {
 
   final bool downloadingImage;
   final bool downloadedImage;
+  final String? imageDeliveryLabel;
   final bool downloadingPdf;
   final bool downloadedPdf;
   final bool canDownloadPdf;
@@ -1207,14 +1781,16 @@ class _Actions extends StatelessWidget {
                     downloadingImage
                         ? 'Saving…'
                         : downloadedImage
-                            ? 'Saved'
-                            : 'Image',
+                        ? (imageDeliveryLabel ?? 'Saved')
+                        : 'Image',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colors.primary,
-                    side: BorderSide(color: colors.primary.withValues(alpha: .5)),
+                    side: BorderSide(
+                      color: colors.primary.withValues(alpha: .5),
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -1252,8 +1828,8 @@ class _Actions extends StatelessWidget {
                       downloadingPdf
                           ? 'Saving…'
                           : downloadedPdf
-                              ? 'Saved'
-                              : 'PDF',
+                          ? 'Saved'
+                          : 'PDF',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1283,9 +1859,9 @@ class _Actions extends StatelessWidget {
 String _defaultTitle(WithdrawalReceipt receipt) {
   if (receipt.isFailed) return 'Withdrawal Failed';
   if (receipt.status == 'completed' || receipt.status == 'paid') {
-    return 'Withdrawal Completed';
+    return 'Withdrawal Approved';
   }
-  return 'Withdrawal Initiated';
+  return 'Withdrawal Completed';
 }
 
 String _defaultSubtitle(WithdrawalReceipt receipt) {
@@ -1316,7 +1892,7 @@ String _noteFor(WithdrawalReceipt receipt) {
 String _statusLabel(String status) {
   switch (status) {
     case 'pending':
-      return 'Pending';
+      return 'Completed';
     case 'processing':
       return 'Processing';
     case 'completed':
@@ -1392,8 +1968,18 @@ String _money(int minor, String currency) {
 
 String _formatDateTime(DateTime value) {
   const List<String> months = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   final int hour24 = value.hour;

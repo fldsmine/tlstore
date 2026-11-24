@@ -42,6 +42,16 @@ foreach (['login', 'register'] as $appPath) {
     })->name('frontend.'.$appPath);
 }
 
+Route::get('/ref/{code}', function (string $code) use ($webAppUrl) {
+    abort_unless(preg_match('/^[A-Za-z0-9_-]{1,64}$/', $code) === 1, 404);
+
+    return response()->view('referral-redirect', [
+        'referralCode' => strtoupper($code),
+        'appUrl' => 'tlstore://register?'.http_build_query(['ref' => strtoupper($code)]),
+        'webUrl' => $webAppUrl().'/register?'.http_build_query(['ref' => strtoupper($code)]),
+    ], 200, ['Cache-Control' => 'no-store, no-cache, must-revalidate']);
+})->name('referral.redirect');
+
 Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::get('/login', [AdminConsoleController::class, 'loginForm'])->name('login');
     Route::post('/login', [AdminConsoleController::class, 'login'])->middleware('throttle:10,1')->name('login.submit');

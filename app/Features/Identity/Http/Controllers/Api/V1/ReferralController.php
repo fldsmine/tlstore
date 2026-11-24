@@ -19,7 +19,7 @@ final class ReferralController
         if (! $code) {
             $code = ReferralCode::query()->create([
                 'user_id' => $user->id,
-                'code' => Str::upper(Str::random(10)),
+                'code' => Str::upper(Str::random(5)),
                 'status' => 'active',
             ]);
         }

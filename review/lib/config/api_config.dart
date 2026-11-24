@@ -6,6 +6,11 @@ class ApiConfig {
     defaultValue: 'https://tlstore.org',
   );
 
+  static const String webAppBaseUrl = String.fromEnvironment(
+    'WEB_APP_URL',
+    defaultValue: 'https://web.tlstore.org',
+  );
+
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://tlstore.org/api/v1/',
@@ -22,6 +27,7 @@ class ApiConfig {
     final configuredHosts = <String>{
       Uri.parse(websiteBaseUrl).host.toLowerCase(),
       Uri.parse(baseUrl).host.toLowerCase(),
+      Uri.parse(webAppBaseUrl).host.toLowerCase(),
     }..removeWhere((host) => host.isEmpty);
 
     return configuredHosts.contains(uri.host.toLowerCase());
