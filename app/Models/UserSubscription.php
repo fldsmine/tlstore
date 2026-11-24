@@ -52,12 +52,13 @@ class UserSubscription extends Model
 					return;
 				}
 
-				if ($plan->addons == 1 && !$user->has_addon) {
-					$user->has_addon = 1;
-				}
-
 				if ($user->is_member != 1) {
 					$user->is_member = 1;
+				}
+
+				if ($plan->addons == 1 && !$user->has_addon) {
+					$user->has_addon = 1;
+					$user->is_member = 2;
 				}
 
 				$user->save();

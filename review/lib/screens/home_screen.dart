@@ -1589,7 +1589,7 @@ class _HomeScreenState extends State<HomeScreen>
         ? '${_currencySymbol(_currency)}●●●●●'
         : total;
     final username = _sessionUser['username']?.toString() ?? _displayName;
-    final memberStat = _sessionUser['is_member'] ? 'Subscribed':'Freebie';
+    final memberStat = _sessionUser['is_member'] == 1 ? 'Subscribed':'Freebie';
 
     return SizedBox(
       height: 185,
