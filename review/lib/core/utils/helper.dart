@@ -480,26 +480,26 @@ Color platformColor(String platform) {
   }
 }
 
-  IconData platformIcon(String platform) {
-    switch (platform) {
-      case 'whatsapp':
-        return Icons.chat_rounded;
-      case 'facebook':
-        return Icons.facebook_rounded;
-      case 'instagram':
-        return Icons.camera_alt_rounded;
-      case 'x':
-        return Icons.alternate_email_rounded;
-      case 'tiktok':
-        return Icons.music_note_rounded;
-      case 'youtube':
-        return Icons.play_arrow_rounded;
-      case 'telegram':
-        return Icons.send_rounded;
-      default:
-        return Icons.public_rounded;
-    }
+IconData platformIcon(String platform) {
+  switch (platform) {
+    case 'whatsapp':
+      return Icons.chat_rounded;
+    case 'facebook':
+      return Icons.facebook_rounded;
+    case 'instagram':
+      return Icons.camera_alt_rounded;
+    case 'x':
+      return Icons.alternate_email_rounded;
+    case 'tiktok':
+      return Icons.music_note_rounded;
+    case 'youtube':
+      return Icons.play_arrow_rounded;
+    case 'telegram':
+      return Icons.send_rounded;
+    default:
+      return Icons.public_rounded;
   }
+}
 
 Map<String, dynamic> _map(dynamic value) {
   if (value is Map<String, dynamic>) return value;
@@ -543,72 +543,72 @@ Map<String, dynamic> applySnapshot(Map<String, dynamic> user) {
   return result;
 }
 
-  Map<String, dynamic> addonInfo(Map<String, dynamic> record) =>
-      _map(record['addon']);
+Map<String, dynamic> addonInfo(Map<String, dynamic> record) =>
+    _map(record['addon']);
 
-  List<ProxyPromptFeature> proxyFeatures(Map<String, dynamic> record) {
-    final addon = addonInfo(record);
-    final features = _map(record['features']).isNotEmpty
-        ? _map(record['features'])
-        : _map(addon['features']);
-    final output = <ProxyPromptFeature>[];
+List<ProxyPromptFeature> proxyFeatures(Map<String, dynamic> record) {
+  final addon = addonInfo(record);
+  final features = _map(record['features']).isNotEmpty
+      ? _map(record['features'])
+      : _map(addon['features']);
+  final output = <ProxyPromptFeature>[];
 
-    final locations = features['location'] ?? features['country_code'];
-    if (locations is List && locations.isNotEmpty) {
-      final labels = locations.map((item) => item.toString()).join(', ');
-      output.add(
-        ProxyPromptFeature(
-          label: 'Locations: $labels',
-          icon: Icons.location_on_rounded,
-        ),
-      );
-    }
-
-    final bandwidth = features['bandwidth'];
-    if (bandwidth is num && bandwidth > 0) {
-      final gigabytes = bandwidth / 1000000000;
-      final label = gigabytes >= 1
-          ? '${gigabytes.toStringAsFixed(gigabytes >= 10 ? 0 : 1)} GB bandwidth'
-          : '${(bandwidth / 1000000).round()} MB bandwidth';
-      output.add(ProxyPromptFeature(label: label, icon: Icons.speed_rounded));
-    }
-
-    const switches = <(String, String, IconData)>[
-      ('SSO_and_SCIM', 'SSO + SCIM', Icons.shield_outlined),
-      ('email_support', 'Email support', Icons.email_outlined),
-      ('phone_no', 'Phone support', Icons.phone_outlined),
-      ('dedicated_ips', 'Dedicated IPs', Icons.dns_outlined),
-      ('encrypted_tunnel', 'Encrypted tunnel', Icons.lock_outlined),
-    ];
-    for (final (key, label, icon) in switches) {
-      if (features[key] == true || features[key] == 1) {
-        output.add(ProxyPromptFeature(label: label, icon: icon));
-      }
-    }
-
-    if (output.isEmpty) {
-      output.add(
-        const ProxyPromptFeature(
-          label: 'Feature details unavailable',
-          icon: Icons.info_outline_rounded,
-        ),
-      );
-    }
-    return output;
+  final locations = features['location'] ?? features['country_code'];
+  if (locations is List && locations.isNotEmpty) {
+    final labels = locations.map((item) => item.toString()).join(', ');
+    output.add(
+      ProxyPromptFeature(
+        label: 'Locations: $labels',
+        icon: Icons.location_on_rounded,
+      ),
+    );
   }
 
-  String getDuration(Map<String, dynamic> addon) {
-    final interval = addon['billing_interval']?.toString().toLowerCase();
-    final countValue = addon['duration_count'];
-    final count = countValue is num
-        ? countValue.toInt()
-        : int.tryParse(countValue?.toString() ?? '') ?? 1;
-    final unit = switch (interval) {
-      'weekly' => 'week',
-      'quarterly' => 'quarter',
-      'yearly' || 'annual' => 'year',
-      'monthly' || null => 'month',
-      _ => interval ?? 'month',
-    };
-    return count == 1 ? '/$unit' : '/$count ${unit}s';
+  final bandwidth = features['bandwidth'];
+  if (bandwidth is num && bandwidth > 0) {
+    final gigabytes = bandwidth / 1000000000;
+    final label = gigabytes >= 1
+        ? '${gigabytes.toStringAsFixed(gigabytes >= 10 ? 0 : 1)} GB bandwidth'
+        : '${(bandwidth / 1000000).round()} MB bandwidth';
+    output.add(ProxyPromptFeature(label: label, icon: Icons.speed_rounded));
   }
+
+  const switches = <(String, String, IconData)>[
+    ('SSO_and_SCIM', 'SSO + SCIM', Icons.shield_outlined),
+    ('email_support', 'Email support', Icons.email_outlined),
+    ('phone_no', 'Phone support', Icons.phone_outlined),
+    ('dedicated_ips', 'Dedicated IPs', Icons.dns_outlined),
+    ('encrypted_tunnel', 'Encrypted tunnel', Icons.lock_outlined),
+  ];
+  for (final (key, label, icon) in switches) {
+    if (features[key] == true || features[key] == 1) {
+      output.add(ProxyPromptFeature(label: label, icon: icon));
+    }
+  }
+
+  if (output.isEmpty) {
+    output.add(
+      const ProxyPromptFeature(
+        label: 'Feature details unavailable',
+        icon: Icons.info_outline_rounded,
+      ),
+    );
+  }
+  return output;
+}
+
+String getDuration(Map<String, dynamic> addon) {
+  final interval = addon['billing_interval']?.toString().toLowerCase();
+  final countValue = addon['duration_count'];
+  final count = countValue is num
+      ? countValue.toInt()
+      : int.tryParse(countValue?.toString() ?? '') ?? 1;
+  final unit = switch (interval) {
+    'weekly' => 'week',
+    'quarterly' => 'quarter',
+    'yearly' || 'annual' => 'year',
+    'monthly' || null => 'month',
+    _ => interval ?? 'month',
+  };
+  return count == 1 ? '/$unit' : '/$count ${unit}s';
+}

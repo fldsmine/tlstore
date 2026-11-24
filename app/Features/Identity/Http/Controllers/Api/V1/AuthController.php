@@ -53,11 +53,18 @@ final class AuthController
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
+            'identifier' => ['required_without:email', 'nullable', 'string', 'max:191'],
+            // Keep accepting email for older clients while newer clients send
+            // the email-or-username identifier explicitly.
+            'email' => ['required_without:identifier', 'nullable', 'string', 'max:191'],
             'password' => ['required', 'string'],
         ]);
 
-        $user = \App\Models\User::withTrashed()->where('email', $credentials['email'])->first();
+        $identifier = trim((string) ($credentials['identifier'] ?? $credentials['email'] ?? ''));
+        $userQuery = \App\Models\User::withTrashed();
+        $user = filter_var($identifier, FILTER_VALIDATE_EMAIL)
+            ? $userQuery->where('email', $identifier)->first()
+            : $userQuery->where('username', $identifier)->first();
         if (! $user || ! Hash::check($credentials['password'], $user->password ?? '')) {
             return response()->json(['message' => 'The provided credentials are invalid or the account is unavailable.'], 422);
         }

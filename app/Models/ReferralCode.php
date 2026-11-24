@@ -21,4 +21,13 @@ class ReferralCode extends Model
     {
         return $this->hasMany(ReferralAttribution::class);
     }
+
+    protected static function booted(): void
+    {
+        static::creating(function (ReferralCode $referral): void {
+
+			User::where('id', $referral->user_id)
+				->update(['referral_code' => $referral->code]);
+        });
+    }
 }

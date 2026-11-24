@@ -29,7 +29,7 @@ class User extends Authenticatable
     protected $fillable = [
         'full_name', 'username', 'email', 'phone', 'email_verified_at', 'password', 'has_addon',
         'country_code', 'preferred_currency', 'wallet_currency', 'role', 'status', 'avatar', 'cover_image',
-        'is_banned', 'ban_reason', 'subscription_questionnaire_answers',
+        'is_banned', 'ban_reason', 'subscription_questionnaire_answers', 'referral_code', 'is_member',
         'subscription_questionnaire_completed_groups', 'subscription_questionnaire_completed_at',
     ];
 

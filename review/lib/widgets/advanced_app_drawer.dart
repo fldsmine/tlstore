@@ -88,6 +88,13 @@ class AdvancedAppDrawer extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // The drawer sits behind the dashboard while it slides in. Its
+          // transparent Scaffold otherwise reveals different route defaults
+          // on Android (dark) and Web (light), which washes out the alpha
+          // gradient on Web. Keep the same dark base on every platform.
+          const Positioned.fill(
+            child: ColoredBox(color: AppColors.darkSurface),
+          ),
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(

@@ -387,8 +387,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
         await showWithdrawalReceiptDialog(
           context,
           withdrawal: receiptData,
-          appName: 'TLStore',
-          logoAsset: 'assets/logo.jpg',
+          appName: 'Receipt',
+          logoAsset: 'assets/others/logolong.png',
           api: widget.api,
           token: widget.token,
           receiptPath: (receipt) => 'withdrawals/${receipt.id}/receipt',

@@ -1589,6 +1589,7 @@ class _HomeScreenState extends State<HomeScreen>
         ? '${_currencySymbol(_currency)}●●●●●'
         : total;
     final username = _sessionUser['username']?.toString() ?? _displayName;
+    final memberStat = _sessionUser['is_member'] ? 'Subscribed':'Freebie';
 
     return SizedBox(
       height: 185,
@@ -1698,7 +1699,7 @@ class _HomeScreenState extends State<HomeScreen>
                         Expanded(
                           child: Row(
                             children: [
-                              Flexible(child: _heroMeta('Account', 'Member')),
+                              Flexible(child: _heroMeta('Account', memberStat)),
                               Container(
                                 width: 1,
                                 height: 41,
@@ -1708,7 +1709,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 color: Colors.white.withValues(alpha: .65),
                               ),
                               Flexible(
-                                child: _heroMeta('Account Holder', username),
+                                child: _heroMeta('Holder', username),
                               ),
                             ],
                           ),

@@ -73,6 +73,17 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     return null;
   }
 
+  String _groupName(Object? groupKey) {
+    final key = groupKey?.toString();
+    for (final group in _groups) {
+      if (group['group_key']?.toString() == key) {
+        final name = group['name']?.toString().trim();
+        if (name != null && name.isNotEmpty) return name;
+      }
+    }
+    return key?.replaceAll('_', ' ').toUpperCase() ?? 'PACKAGE';
+  }
+
   Map<String, dynamic> _planForSubscription(
     Map<String, dynamic>? subscription,
   ) {
@@ -443,7 +454,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                                 ),
                               ),
                               subtitle: Text(
-                                '${plan['group_key']?.toString().replaceAll('_', ' ').toUpperCase() ?? 'PACKAGE'} · until ${_formatDate(subscription['ends_at'])}',
+                                '${_groupName(plan['group_key'])} · until ${_formatDate(subscription['ends_at'])}',
                               ),
                               trailing: const Icon(Icons.chevron_right_rounded),
                               onTap: () => _showActiveDetails(subscription),
@@ -717,16 +728,21 @@ class _PlanCard extends StatelessWidget {
     final features = _planFeatures(plan, api);
     final dailyAdEarnings = _dailyAdEarningsLabel(plan, api, preferredCurrency);
     final name = plan['name']?.toString() ?? 'Plan';
+    final accentForeground =
+        ThemeData.estimateBrightnessForColor(colors.secondary) ==
+            Brightness.dark
+        ? Colors.white
+        : Colors.black87;
 
     return Container(
       decoration: BoxDecoration(
         color: active
-            ? colors.primaryContainer.withValues(alpha: .38)
+            ? colors.secondaryContainer.withValues(alpha: .48)
             : colors.surface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: active
-              ? colors.primary
+              ? colors.secondary
               : special
               ? colors.tertiary
               : colors.outlineVariant,
@@ -752,7 +768,7 @@ class _PlanCard extends StatelessWidget {
                   horizontal: 18,
                   vertical: 8,
                 ),
-                color: active ? colors.primary : colors.tertiaryContainer,
+                color: active ? colors.secondary : colors.tertiaryContainer,
                 child: Row(
                   children: [
                     Icon(
@@ -761,7 +777,7 @@ class _PlanCard extends StatelessWidget {
                           : Icons.auto_awesome_rounded,
                       size: 15,
                       color: active
-                          ? colors.onPrimary
+                          ? accentForeground
                           : colors.onTertiaryContainer,
                     ),
                     const SizedBox(width: 7),
@@ -769,7 +785,7 @@ class _PlanCard extends StatelessWidget {
                       active ? 'CURRENT PACKAGE' : 'RECOMMENDED',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: active
-                            ? colors.onPrimary
+                            ? accentForeground
                             : colors.onTertiaryContainer,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.1,
@@ -906,83 +922,134 @@ class _PlanCard extends StatelessWidget {
                   if (features.isNotEmpty)
                     ...features
                         .take(6)
-                        .map((feature) => _PlanFeature(text: feature))
+                        .map(
+                          (feature) =>
+                              _PlanFeature(text: feature, active: active),
+                        )
                   else ...[
                     if (plan['max_review_tasks'] != null)
                       _PlanFeature(
                         text: 'Up to ${plan['max_review_tasks']} app reviews',
+                        active: active,
                       ),
                     if (plan['max_ad_shares'] != null)
                       if (_asInt(plan['max_ad_shares']) > 0)
                         _PlanFeature(
                           text:
                               'Up to ${plan['max_ad_shares']} ad shares per package period',
+                          active: active,
                         ),
                     if (_asInt(plan['max_review_tasks']) > 0)
                       _PlanFeature(
                         text:
                             'Up to ${plan['max_review_tasks']} app reviews per package period',
+                        active: active,
                       ),
                     if (plan['eligible_app_store'] != null)
                       _PlanFeature(
                         text: 'Review ${plan['eligible_app_store']} apps only',
+                        active: active,
                       ),
                     if (plan['eligible_app_category'] != null)
                       _PlanFeature(
                         text:
                             'Review ${plan['eligible_app_category']} category apps only',
+                        active: active,
                       ),
                     if (plan['minimum_withdrawal_minor'] != null)
                       _PlanFeature(
                         text:
                             'Minimum withdrawal ${moneyConverted(api, plan['minimum_withdrawal_minor'], currency, digits, preferredCurrency, isMinor: true)}',
+                        active: active,
                       ),
                     if (plan['withdrawal_days'] is List)
                       _PlanFeature(
                         text:
                             'Withdraw ${(plan['withdrawal_days'] as List).join(' & ')}',
+                        active: active,
                       ),
                     if (plan['daily_task_limit'] != null)
                       _PlanFeature(
                         text: '${plan['daily_task_limit']} tasks each day',
+                        active: active,
                       ),
                   ],
                   if (dailyAdEarnings != null)
-                    _PlanFeature(text: dailyAdEarnings),
+                    _PlanFeature(text: dailyAdEarnings, active: active),
                   const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton(
-                      onPressed: purchasing ? null : onTap,
-                      style: FilledButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: purchasing
-                          ? const SizedBox(
-                              width: 19,
-                              height: 19,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  active
-                                      ? 'View current package'
-                                      : 'Join Package',
-                                ),
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                    ),
+
+SizedBox(
+  width: double.infinity,
+  height: 58,
+  child: Stack(
+    children: [
+      // Dark bottom layer creates the 3D effect
+      Positioned(
+        top: 8,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFE8B449) :const Color(0xFFB00035),
+            borderRadius: BorderRadius.circular(23),
+          ),
+        ),
+      ),
+
+      // Main button face
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 8,
+        child: FilledButton(
+          onPressed: purchasing ? null : onTap,
+          style: FilledButton.styleFrom(
+            backgroundColor: active ?const Color(0xFFF8C764) : const Color(0xFFF50046),
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: active ?const Color(0xFFF8C764) : const Color(0xFFF50046),
+            disabledForegroundColor: Colors.white70,
+            elevation: 0,
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(23),
+            ),
+          ),
+          child: purchasing
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
                   ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      active
+                          ? 'View current package'
+                          : 'Join package',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 20,
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    ],
+  ),
+),
+                  
                 ],
               ),
             ),
@@ -1082,8 +1149,9 @@ class _GroupCard extends StatelessWidget {
 }
 
 class _PlanFeature extends StatelessWidget {
-  const _PlanFeature({required this.text});
+  const _PlanFeature({required this.text, this.active = false});
   final String text;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
@@ -1093,7 +1161,11 @@ class _PlanFeature extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.check_circle_rounded, size: 18, color: colors.primary),
+          Icon(
+            Icons.check_circle_rounded,
+            size: 18,
+            color: active ? colors.secondary : colors.error,
+          ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(text, style: Theme.of(context).textTheme.bodyMedium),

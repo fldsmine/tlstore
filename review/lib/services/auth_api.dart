@@ -1197,11 +1197,11 @@ class AuthApi {
   }) => _request('GET', 'wallets/$walletId/ledger?page=$page', token: token);
 
   Future<AuthResult> login({
-    required String email,
+    required String identifier,
     required String password,
   }) async {
     return _authRequest('auth/login', {
-      'email': email.trim(),
+      'identifier': identifier.trim(),
       'password': password,
     });
   }

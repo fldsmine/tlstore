@@ -2,12 +2,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:review/core/links/referral_link.dart';
 
 import '../core/currency/money.dart';
 import '../services/auth_api.dart';
 import '../services/media_url.dart';
 import '../widgets/auth_components.dart';
 import '../widgets/withdrawal_pin_sheet.dart';
+import 'referral_team_screen.dart';
 import 'settings_screen.dart';
 import 'subscriptions_screen.dart';
 
@@ -43,6 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _saving = false;
   bool _mediaBusy = false;
   bool _securityBusy = false;
+  String referralCode = '';
 
   Map<String, dynamic> get _user => widget.user;
 
@@ -64,6 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _country.text = countryName == null || countryName.isEmpty
         ? (countryCode.isEmpty ? 'Not set' : countryCode)
         : '$countryName ($countryCode)';
+    referralCode = _user['referral_code']?.toString() ?? '';
   }
 
   Future<void> _refreshProfile() async {
@@ -78,6 +82,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } on AuthException {
       // Keep the session profile visible when the device is offline.
+    }
+  }
+
+  Future<void> _openMyTeam() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ReferralTeamScreen(
+          api: widget.api,
+          token: widget.token,
+          referralCode: referralCode,
+          referralLink: ReferralLink.forCode(referralCode).toString(),
+        ),
+      ),
+    );
+    if (mounted) {
+      await _refreshProfile();
     }
   }
 
@@ -597,6 +617,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _ProfileHero(
                     name: name.isEmpty ? 'Your profile' : name,
                     username: user['username']?.toString() ?? '',
+                    onTeamClick: _openMyTeam,
                     email: email,
                     avatarUrl: avatar,
                     coverUrl: cover,
@@ -2124,7 +2145,8 @@ class _ProfileHero extends StatelessWidget {
     required this.coverUrl,
     required this.verified,
     this.memberSince,
-    this.activePlans,
+    this.activePlans, 
+    required this.onTeamClick,
   });
 
   final String name;
@@ -2135,6 +2157,8 @@ class _ProfileHero extends StatelessWidget {
   final bool verified;
   final String? memberSince;
   final int? activePlans;
+  final Future<void> Function() onTeamClick;
+
 
   static const double _coverHeight = 152;
   static const double _avatarSize = 92;
@@ -2204,52 +2228,92 @@ class _ProfileHero extends StatelessWidget {
                     height: 1.1,
                   ),
                 ),
-                if (username.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.primary.withValues(alpha: 0.09),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: scheme.primary.withValues(alpha: 0.18),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (username.isNotEmpty) ...<Widget>[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.09),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: scheme.primary.withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: Text(
+                                '@$username',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (email.isNotEmpty) ...<Widget>[
+                            const SizedBox(height: 10),
+                            Row(
+                              children: <Widget>[
+                                Icon(
+                                  Icons.mail_outline_rounded,
+                                  size: 15,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 7),
+                                Expanded(
+                                  child: Text(
+                                    email,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    child: Text(
-                      '@$username',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w800,
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      onPressed: onTeamClick,
+                      icon: const Icon(
+                        Icons.groups_rounded,
+                        size: 17,
                       ),
-                    ),
-                  ),
-                ],
-                if (email.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: <Widget>[
-                      Icon(
-                        Icons.mail_outline_rounded,
-                        size: 15,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: Text(
-                          email,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                      label: const Text('My Team'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: scheme.onSurface,
+                        backgroundColor: scheme.onPrimary,
+                        side: BorderSide(
+                          color: scheme.primary,
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 15,
+                          vertical: 13,
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
+
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.symmetric(

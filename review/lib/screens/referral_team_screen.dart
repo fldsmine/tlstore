@@ -72,12 +72,15 @@ class _ReferralTeamScreenState extends State<ReferralTeamScreen> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
-      title: const Text('Referral team'),
+      title: const Text('Referral team', style: TextStyle(fontWeight: FontWeight.w800)),
+      centerTitle: false,
       actions: [
         IconButton(
+          tooltip: 'Refresh team',
           onPressed: _loading ? null : _load,
           icon: const Icon(Icons.refresh_rounded),
         ),
+        const SizedBox(width: 4),
       ],
     ),
     body: _loading
@@ -89,9 +92,18 @@ class _ReferralTeamScreenState extends State<ReferralTeamScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_error!, textAlign: TextAlign.center),
-                  const SizedBox(height: 12),
-                  FilledButton(onPressed: _load, child: const Text('Retry')),
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.cloud_off_rounded, size: 30, color: Theme.of(context).colorScheme.onErrorContainer),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: _muted, height: 1.45)),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
                 ],
               ),
             ),
@@ -99,87 +111,94 @@ class _ReferralTeamScreenState extends State<ReferralTeamScreen> {
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 _inviteCard(),
-                const SizedBox(height: 18),
-                Text(
-                  'Team & members',
-                  style: TextStyle(
-                    color: _ink,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
+                const SizedBox(height: 26),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Your network', style: TextStyle(color: _ink, fontSize: 21, fontWeight: FontWeight.w900, letterSpacing: -.4)),
+                          const SizedBox(height: 5),
+                          Text('Explore your referral tiers and earnings.', style: TextStyle(color: _muted, fontSize: 12, height: 1.4)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                      decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(30)),
+                      child: Text('${_tiers.length} ${_tiers.length == 1 ? 'tier' : 'tiers'}', style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer, fontSize: 11, fontWeight: FontWeight.w800)),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  'Tap a tier to see its members and referral earnings. Rates are set by each subscription package.',
-                  style: TextStyle(color: _muted, fontSize: 12, height: 1.4),
-                ),
-                const SizedBox(height: 14),
-                ..._tiers.map(_tierCard),
+                const SizedBox(height: 15),
+                if (_tiers.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerLow, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
+                    child: Column(children: [Icon(Icons.groups_2_outlined, size: 38, color: _muted), const SizedBox(height: 10), Text('Your team is just getting started', style: TextStyle(color: _ink, fontWeight: FontWeight.w800)), const SizedBox(height: 5), Text('Share your referral code to start growing your network.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 12, height: 1.4))]),
+                  )
+                else
+                  ..._tiers.asMap().entries.map((entry) => _tierCard(entry.value, entry.key)),
               ],
             ),
           ),
   );
 
-  Widget _inviteCard() => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: _line),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.groups_rounded, color: _primary),
-            const SizedBox(width: 9),
-            Text(
-              'Invite friends',
-              style: TextStyle(color: _ink, fontWeight: FontWeight.w800),
-            ),
-          ],
+  Widget _inviteCard() {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.primary, Color.lerp(colors.primary, const Color(0xFF17143D), .42)!],
         ),
-        const SizedBox(height: 14),
-        Center(
-          child: SelectableText(
-            widget.referralCode,
-            style: TextStyle(
-              color: _primary,
-              fontSize: 27,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.3,
-            ),
+        borderRadius: BorderRadius.circular(27),
+        boxShadow: [BoxShadow(color: colors.primary.withOpacity(.23), blurRadius: 24, offset: const Offset(0, 12))],
+      ),
+      child: Stack(
+        children: [
+          Positioned(right: -28, top: -34, child: Container(width: 150, height: 150, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(.10), width: 25)))),
+          Positioned(right: 30, bottom: -65, child: Container(width: 125, height: 125, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.045)))),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(.16))), child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 22)),
+                const SizedBox(width: 12),
+                const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Grow your circle', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('Invite friends. Build your team.', style: TextStyle(color: Colors.white70, fontSize: 11))])),
+                Icon(Icons.auto_awesome_rounded, color: Colors.amber.shade200, size: 23),
+              ]),
+              const SizedBox(height: 22),
+              Text('YOUR REFERRAL CODE', style: TextStyle(color: Colors.white.withOpacity(.72), fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.8)),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: SelectableText(widget.referralCode, style: const TextStyle(color: Colors.white, fontSize: 29, fontWeight: FontWeight.w900, letterSpacing: 2.0))),
+                Material(color: Colors.white, borderRadius: BorderRadius.circular(13), child: InkWell(borderRadius: BorderRadius.circular(13), onTap: () => _copy(widget.referralCode, 'Referral code copied.'), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.copy_rounded, color: colors.primary, size: 16), const SizedBox(width: 7), Text('Copy', style: TextStyle(color: colors.primary, fontSize: 12, fontWeight: FontWeight.w900))])))),
+              ]),
+              const SizedBox(height: 18),
+              Container(height: 1, color: Colors.white.withOpacity(.17)),
+              const SizedBox(height: 14),
+              Text('YOUR INVITE LINK', style: TextStyle(color: Colors.white.withOpacity(.72), fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.6)),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: Text(widget.referralLink, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.4))),
+                const SizedBox(width: 10),
+                IconButton.filledTonal(tooltip: 'Copy invite link', onPressed: () => _copy(widget.referralLink, 'Referral link copied.'), style: IconButton.styleFrom(backgroundColor: Colors.white.withOpacity(.16), foregroundColor: Colors.white), icon: const Icon(Icons.link_rounded)),
+              ]),
+            ]),
           ),
-        ),
-        Center(
-          child: TextButton.icon(
-            onPressed: () =>
-                _copy(widget.referralCode, 'Referral code copied.'),
-            icon: const Icon(Icons.copy_rounded, size: 16),
-            label: const Text('Copy share code'),
-          ),
-        ),
-        const Divider(height: 20),
-        SelectableText(
-          widget.referralLink,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: _primary, fontSize: 12),
-        ),
-        Center(
-          child: TextButton.icon(
-            onPressed: () =>
-                _copy(widget.referralLink, 'Referral link copied.'),
-            icon: const Icon(Icons.link_rounded, size: 16),
-            label: const Text('Copy share link'),
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   Future<void> _copy(String value, String message) async {
     await Clipboard.setData(ClipboardData(text: value));
@@ -188,112 +207,52 @@ class _ReferralTeamScreenState extends State<ReferralTeamScreen> {
           .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Widget _tierCard(Map<String, dynamic> tier) {
+  Widget _tierCard(Map<String, dynamic> tier, int index) {
     final level = _int(tier['level']);
     final count = _int(tier['member_count']);
     final paid = _convertPaid(tier['paid_amounts']);
     final totalRewards = _rewardCount(tier['paid_amounts']);
     final colors = Theme.of(context).colorScheme;
+    final accents = <Color>[colors.primary, colors.tertiary, const Color(0xFFB7791F), const Color(0xFF4776C5)];
+    final accent = accents[index % accents.length];
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
       color: colors.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(19),
-        side: BorderSide(color: _line),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22), side: BorderSide(color: _line.withOpacity(.8))),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(19),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => _ReferralTierMembersScreen(
-              api: widget.api,
-              token: widget.token,
-              level: level,
-            ),
+        borderRadius: BorderRadius.circular(22),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _ReferralTierMembersScreen(api: widget.api, token: widget.token, level: level))),
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 14, 15),
+            child: Row(children: [
+              Container(width: 52, height: 52, decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent.withOpacity(.18), accent.withOpacity(.07)]), borderRadius: BorderRadius.circular(17), border: Border.all(color: accent.withOpacity(.28))), child: Center(child: Text('T$level', style: TextStyle(color: accent, fontSize: 17, fontWeight: FontWeight.w900)))),
+              const SizedBox(width: 13),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Tier $level', style: TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w900)), const SizedBox(height: 5), Row(children: [Icon(Icons.people_alt_rounded, color: _muted, size: 14), const SizedBox(width: 5), Text('$count ${count == 1 ? 'member' : 'members'}', style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w500))])])),
+              Container(padding: const EdgeInsets.all(9), decoration: BoxDecoration(color: colors.surfaceContainerHighest, shape: BoxShape.circle), child: Icon(Icons.arrow_forward_rounded, color: accent, size: 18)),
+            ]),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.primaryContainer,
-                      border: Border.all(color: colors.primary),
-                    ),
-                    child: Text(
-                      'T$level',
-                      style: TextStyle(
-                        color: colors.onPrimaryContainer,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Tier $level',
-                          style: TextStyle(
-                            color: _ink,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '$count ${count == 1 ? 'member' : 'members'}',
-                          style: TextStyle(color: _muted, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 17,
-                    color: colors.secondary,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 13),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 11,
-                ),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(child: _metric('Paid rewards', '$totalRewards')),
-                    Container(width: 1, height: 32, color: _line),
-                    Expanded(
-                      child: _metric(
-                        'Commission paid',
-                        formatMajorMoney(paid, widget.api.preferredCurrency),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+          Container(height: 1, color: _line.withOpacity(.65)),
+          Padding(padding: const EdgeInsets.all(14), child: Row(children: [
+            Expanded(child: _tierMetric(icon: Icons.redeem_rounded, label: 'Paid rewards', value: '$totalRewards', accent: accent)),
+            Container(width: 1, height: 38, color: _line),
+            Expanded(child: _tierMetric(icon: Icons.account_balance_wallet_rounded, label: 'Commission paid', value: formatMajorMoney(paid, widget.api.preferredCurrency), accent: accent)),
+          ])),
+        ]),
       ),
     );
   }
+
+  Widget _tierMetric({required IconData icon, required String label, required String value, required Color accent}) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 5),
+    child: Row(children: [
+      Container(width: 34, height: 34, decoration: BoxDecoration(color: accent.withOpacity(.10), borderRadius: BorderRadius.circular(11)), child: Icon(icon, size: 17, color: accent)),
+      const SizedBox(width: 9),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 9, fontWeight: FontWeight.w600)), const SizedBox(height: 4), Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900))])),
+    ]),
+  );
 
   Widget _metric(String label, String value) => Column(
     children: [
@@ -423,7 +382,7 @@ class _ReferralTierMembersScreenState
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text('Tier ${widget.level} members'),
+      title: Text('Tier ${widget.level} members', style: const TextStyle(fontWeight: FontWeight.w800)),
       actions: [
         IconButton(
           onPressed: _loading ? null : _load,
@@ -449,16 +408,10 @@ class _ReferralTierMembersScreenState
             child: _members.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(22, 30, 22, 32),
                     children: [
-                      const SizedBox(height: 100),
-                      Icon(Icons.group_outlined, size: 48, color: _muted),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Text(
-                          'No members in this tier yet.',
-                          style: TextStyle(color: _muted),
-                        ),
-                      ),
+                      const SizedBox(height: 28),
+                      _emptyTierState(),
                     ],
                   )
                 : ListView.separated(
@@ -494,6 +447,136 @@ class _ReferralTierMembersScreenState
                   ),
           ),
   );
+
+  Widget _emptyTierState() {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _line.withOpacity(.75)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withOpacity(.045),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 104,
+            height: 104,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [colors.primaryContainer, colors.secondaryContainer],
+              ),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(Icons.groups_rounded, size: 48, color: colors.onPrimaryContainer),
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _line.withOpacity(.65)),
+                    ),
+                    child: Icon(Icons.add_rounded, size: 19, color: _primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: colors.primaryContainer.withOpacity(.65),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              'TIER ${widget.level}',
+              style: TextStyle(
+                color: colors.onPrimaryContainer,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Your team is just getting started',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _ink,
+              fontSize: 21,
+              height: 1.2,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -.35,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'There are no members recorded in Tier ${widget.level} yet. When referrals are attributed to this tier, their profiles, status, rewards and paid commissions will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _muted, fontSize: 13, height: 1.65),
+          ),
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest.withOpacity(.55),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.lightbulb_outline_rounded, color: _primary, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Tip: head back to your referral team and share your invite code or link to help grow your network.',
+                    style: TextStyle(color: _ink, fontSize: 12, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.rocket_launch_rounded, size: 18),
+              label: const Text('Back to referral team'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('Refresh members'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _memberTile(Map<String, dynamic> row) {
     final user = row['referred_user'];
@@ -618,8 +701,9 @@ class _ReferralTierMembersScreenState
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _line.withOpacity(.8)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(.025), blurRadius: 14, offset: const Offset(0, 5))],
       ),
       child: Column(
         children: [

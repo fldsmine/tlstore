@@ -39,17 +39,29 @@ class UserSubscription extends Model
         return $this->belongsTo(PaymentIntent::class, 'payment_intent_id');
     }
 
-    protected static function booted(): void
-    {
-        static::creating(function (UserSubscription $subscription): void {
+	protected static function booted(): void
+	{
+		static::creating(function (UserSubscription $subscription): void {
 
-            $plan = SubscriptionPlan::find($subscription->subscription_plan_id);
+			$plan = SubscriptionPlan::find($subscription->subscription_plan_id);
 
-            if ($plan && $plan->addons == 1) {
-                User::where('id', $subscription->user_id)
-                    ->update(['has_addon' => 1]);
-            }
+			if ($plan) {
+				$user = User::find($subscription->user_id);
 
-        });
-    }
+				if (!$user) {
+					return;
+				}
+
+				if ($plan->addons == 1 && !$user->has_addon) {
+					$user->has_addon = 1;
+				}
+
+				if ($user->is_member != 1) {
+					$user->is_member = 1;
+				}
+
+				$user->save();
+			}
+		});
+	}
 }

@@ -844,7 +844,7 @@ class _AmountCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Text(
-            'AMOUNT',
+            'YOU RECEIVE',
             style: theme.textTheme.labelSmall?.copyWith(
               color: colors.onSurfaceVariant,
               letterSpacing: 2.2,
@@ -856,7 +856,7 @@ class _AmountCard extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              _money(receipt.amountMinor, receipt.currency),
+              _money(receipt.netMinor, receipt.currency),
               style: theme.textTheme.headlineMedium?.copyWith(
                 color: colors.primary,
                 fontWeight: FontWeight.w900,
@@ -864,7 +864,7 @@ class _AmountCard extends StatelessWidget {
               ),
             ),
           ),
-          if (receipt.feeMinor > 0) ...<Widget>[
+          /*if (receipt.feeMinor > 0) ...<Widget>[
             const SizedBox(height: 8),
             Text(
               'Fee ${_money(receipt.feeMinor, receipt.currency)}  ·  '
@@ -875,7 +875,7 @@ class _AmountCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-          ],
+          ],*/
         ],
       ),
     );

@@ -26,7 +26,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   final _api = AuthApi();
   final _social = SocialAuthClient();
@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     _telegramLinkSubscription?.cancel();
     super.dispose();
@@ -50,8 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _emailController.text = "demo.user02@tlstore.test";
-    _passwordController.text = "meandmyson";
 
     unawaited(
       _social.initializeWebFacebook(_api).catchError((Object error) {
@@ -82,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final result = await _api.login(
-        email: _emailController.text,
+        identifier: _identifierController.text,
         password: _passwordController.text,
       );
       await _completeSignIn(result);
@@ -346,16 +344,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       children: [
                         AuthField(
-                          controller: _emailController,
-                          label: 'Email address',
-                          hint: 'you@example.com',
+                          controller: _identifierController,
+                          label: 'Email or username',
+                          hint: 'you@example.com or username',
                           icon: Icons.mail_outline_rounded,
-                          keyboardType: TextInputType.emailAddress,
+                          keyboardType: TextInputType.text,
                           textInputAction: TextInputAction.next,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty)
-                              return 'Enter your email address.';
-                            if (!RegExp(r'^.+@.+\..+$').hasMatch(value.trim()))
+                              return 'Enter your email or username.';
+                            if (value.trim().contains('@') &&
+                                !RegExp(r'^.+@.+\..+$').hasMatch(value.trim()))
                               return 'Enter a valid email address.';
                             return null;
                           },
@@ -384,7 +383,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         MaterialPageRoute<void>(
                           builder: (_) => ForgotPasswordScreen(
                             api: _api,
-                            initialEmail: _emailController.text,
+                            initialEmail:
+                                _identifierController.text.contains('@')
+                                ? _identifierController.text
+                                : '',
                           ),
                         ),
                       ),

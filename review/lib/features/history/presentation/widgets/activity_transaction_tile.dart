@@ -62,7 +62,7 @@ class ActivityTransactionTile extends StatelessWidget {
         : isRejected
         ? Icons.close_rounded
         : isApproved
-        ? Icons.check_rounded
+        ? Icons.star_rounded
         : _icon(type, direction);
     final openDetails =
         onTap ??

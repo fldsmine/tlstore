@@ -34,6 +34,8 @@ class UserResource extends JsonResource
             'has_password' => filled($this->password),
             'security_pin_set' => filled($this->security_pin),
             'has_addon' => $this->has_addon,
+            'referral_code' => $this->referral_code,
+            'is_member' => $this->is_member,
             'two_factor' => (bool) $this->two_factor,
             'created_at' => $this->created_at,
             'subscription_context' => $subscriptionContext,
