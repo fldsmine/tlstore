@@ -26,6 +26,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $general        = gs();
+		config(['settings' => $general]);
+
         RateLimiter::for('withdrawal-request', function (Request $request): Limit {
             $userId = $request->user()?->getAuthIdentifier();
 

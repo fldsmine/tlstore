@@ -12,17 +12,14 @@ use App\Models\PaymentOption;
 use App\Models\Testimonial;
 use App\Models\Faq;
 use App\Models\Region;
-use App\Application\Actions\Marketplace\ListEligibleListings;
 use App\Application\Money\CurrencyMinorUnits;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
+use App\Services\PublicFrontService;
 
 final class PublicCatalogController
 {
-	private const CACHE_KEY = 'api:login-spot:v4';
-	private const CACHE_TTL = 60; // minutes
 
     public function countries(): JsonResponse
     {
@@ -44,79 +41,10 @@ final class PublicCatalogController
             ->orderBy('name')->get(['id', 'code', 'name'])]);
     }
 
-    public function spotlights(ListEligibleListings $listings): JsonResponse
+    public function spotlights(PublicFrontService $sports): JsonResponse
     {
-		Cache::forget(self::CACHE_KEY);
-		$data = Cache::remember(
-			self::CACHE_KEY,
-			now()->addMinutes(self::CACHE_TTL),
-			function () use ($listings) {
-                return [
-				'products' => $listings->app_sport(10)->getCollection()
-                    ->map(fn ($campaign) => [
-                        'id' => $campaign->app->id,
-                        'campaign_id' => $campaign->id,
-                        'featured' => (bool) $campaign->app->featured,
-                        'title' => $campaign->app->store,
-                        'description' => $campaign->app->description,
-                        'price' => (float) $campaign->app->review_reward,
-                        'review_reward_minor' => $campaign->review_reward_minor,
-                        'currency' => $campaign->app->currency ?? 'NGN',
-                        'currency_minor_units' => $campaign->currency_minor_units,
-                        'name' => $campaign->app->name,
-                        'rating' => $campaign->app->rating,
-                        'total_reviews' => $campaign->app->total_reviews,
-                        'location' => $campaign->location,
-                        'app' => $campaign->app->toArray(),
-                        'cover_image' => \App\Application\Support\Media::url(
-                            $campaign->app->app_icon
-                        ),
-                    ])
-					->values()->all(),
-				'ads' => $listings->featuredAds(10)->map(fn ($ad) => [
-					'id' => $ad->id,
-					'featured' => (bool) $ad->featured,
-					'title' => $ad->title,
-					'description' => $ad->description,
-					'share_message' => $ad->share_message,
-					'currency' => $ad->currency,
-					'share_reward' => $ad->share_reward,
-					'currency_minor_units' => $ad->currency_minor_units,
-					'location' => $ad->location,
-					'destination_url' => $ad->destination_url,
-					'creative_path' => \App\Application\Support\Media::url($ad->creative_path),
-				])->values()->all(),
-
-                    'testimonies' => Testimonial::query()
-						->join('users', 'users.id', '=', 'testimonials.user_id')
-						->where('testimonials.status', 'approved')->where('testimonials.is_featured', true)
-						->select([
-							'testimonials.id','testimonials.content', 'testimonials.rating', 'users.avatar', 'users.full_name',
-						])
-						->take(6)
-						->get()
-						->map(fn ($t) => [
-							'id' => $t->id,
-							'content' => $t->content,
-							'name' => $t->full_name,
-							'avatar' => \App\Application\Support\Media::url($t->avatar),
-							'rating' => (int) $t->rating,
-						])->values()->all(),
-
-                    'pay_option' => PaymentOption::select(['id', 'name', 'currency', 'symbol', 'method_code', 'gateway_alias', 
-							   'percent_charge', 'fixed_charge', 'rate', 'description', 'logo', 'addresses', 'status'])->active()
-						->orderBy('order')
-						->get()
-						->map(fn ($o) => array_merge(
-							$o->only(['id', 'name', 'currency', 'symbol', 'method_code', 'gateway_alias',
-							  'percent_charge', 'fixed_charge', 'rate', 'description', 'addresses', 'status']),
-							['logo' => \App\Application\Support\Media::url($o->logo)],
-						))->values()->all(),
-
-				];
-			}
-		);
-
+		$data = $sports->getSportlight();
+		
         return response()->json(['data' => $data]);
     }
 

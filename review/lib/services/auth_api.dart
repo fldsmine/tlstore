@@ -128,6 +128,9 @@ class AuthApi {
   static const _spotlightsCacheKey = 'trustlens.spotlights.response.v1';
   static const _spotlightsCachedAtKey = 'trustlens.spotlights.cached_at.v1';
   static const _spotlightsCacheDuration = Duration(minutes: 60);
+  static const _frontendCacheKey = 'trustlens.frontend.response.v1';
+  static const _frontendCachedAtKey = 'trustlens.frontend.cached_at.v1';
+  static const _frontendCacheDuration = Duration(minutes: 10);
 
   static const _countriesCacheKey = 'trustlens.countries.response.v1';
   static const _countriesCachedAtKey = 'trustlens.countries.cached_at.v1';
@@ -142,6 +145,7 @@ class AuthApi {
   Map<String, double>? _usdRates;
   DateTime? _ratesLoadedAt;
   Future<Map<String, dynamic>>? _spotlightsInFlight;
+  Future<Map<String, dynamic>>? _frontendInFlight;
   Future<List<CountryOption>>? _countriesInFlight;
   Future<Map<String, dynamic>>? _currenciesInFlight;
   final Map<String, Future<Map<String, dynamic>>> _legalInFlight = {};
@@ -692,6 +696,55 @@ class AuthApi {
   }
 
   Future<Map<String, dynamic>> getPublic(String path) => _request('GET', path);
+
+  Future<Map<String, dynamic>> frontend() {
+    final pending = _frontendInFlight;
+    if (pending != null) return pending;
+    final request = _loadFrontend();
+    _frontendInFlight = request;
+    return request.whenComplete(() {
+      if (identical(_frontendInFlight, request)) _frontendInFlight = null;
+    });
+  }
+
+  Future<Map<String, dynamic>> _loadFrontend() async {
+    String? cachedJson;
+    String? cachedAtText;
+    try {
+      cachedJson = await _storage.read(key: _frontendCacheKey);
+      cachedAtText = await _storage.read(key: _frontendCachedAtKey);
+    } catch (_) {
+      // The network response remains available if storage is unavailable.
+    }
+
+    final cachedAt = DateTime.tryParse(cachedAtText ?? '')?.toUtc();
+    final cacheAge = cachedAt == null
+        ? null
+        : DateTime.now().toUtc().difference(cachedAt);
+    if (cachedJson != null &&
+        cacheAge != null &&
+        !cacheAge.isNegative &&
+        cacheAge < _frontendCacheDuration) {
+      try {
+        final decoded = jsonDecode(cachedJson);
+        if (decoded is Map<String, dynamic>) return decoded;
+      } on FormatException {
+        // Discard malformed cache data and fetch a fresh response.
+      }
+    }
+
+    final response = await getPublic('frontend');
+    try {
+      await _storage.write(key: _frontendCacheKey, value: jsonEncode(response));
+      await _storage.write(
+        key: _frontendCachedAtKey,
+        value: DateTime.now().toUtc().toIso8601String(),
+      );
+    } catch (_) {
+      // Return the live response even if it could not be cached.
+    }
+    return response;
+  }
 
   Future<Map<String, dynamic>> about() => getPublic('about');
 

@@ -2,7 +2,6 @@
   {
     "campaign_key": "clean-water-ng",
     "type": "Facebook",
-    "featured": true,
     "title": "Help bring clean water closer",
     "description": "Learn how community water projects are supporting households across Nigeria.",
     "share_message": "See how local clean-water projects are helping communities. Learn more:",
@@ -22,7 +21,6 @@
   {
     "campaign_key": "financial-literacy-gh",
     "type": "WhatsApp",
-    "featured": true,
     "title": "Simple money habits for Ghana",
     "description": "Share a short guide to budgeting, saving, and planning everyday expenses.",
     "share_message": "A useful guide to everyday budgeting and saving in Ghana:",
@@ -61,6 +59,7 @@
   {
     "campaign_key": "local-food-za",
     "type": "TikTok",
+    "featured": true,
     "title": "Discover local food markets",
     "description": "Explore a directory of independent food markets and small producers in South Africa.",
     "share_message": "Find independent food markets and local producers near you:",
@@ -99,6 +98,7 @@
   {
     "campaign_key": "digital-skills-us",
     "type": "YouTube",
+    "featured": true,
     "title": "Build practical digital skills",
     "description": "An introductory program with self-paced lessons for people building workplace digital skills.",
     "share_message": "Explore self-paced lessons for practical digital skills:",
@@ -137,6 +137,7 @@
   {
     "campaign_key": "community-library-gh",
     "type": "Telegram",
+    "featured": true,
     "title": "Support a community reading club",
     "description": "Help a community reading club connect with volunteers and book donors.",
     "share_message": "Learn how to support a community reading club:",
@@ -175,6 +176,7 @@
   {
     "campaign_key": "online-wellbeing-global",
     "type": "Others",
+    "featured": true,
     "title": "Everyday wellbeing resources",
     "description": "A collection of general educational resources about rest, routines, and wellbeing.",
     "share_message": "Browse these general educational wellbeing resources:",

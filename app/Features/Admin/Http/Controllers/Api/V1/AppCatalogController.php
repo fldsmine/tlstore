@@ -62,7 +62,7 @@ final class AppCatalogController
             );
         }
         $this->audit($request->user(), 'app_listing.created', 'app', (string) $app->id, null, ['name' => $app->name]);
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['data' => $app->load(['screenshots', 'storeListingSnapshots'])], 201);
     }
@@ -101,7 +101,7 @@ final class AppCatalogController
             ]);
         }
         $this->audit($request->user(), 'app_listing.updated', 'app', (string) $app->id, $before, $app->only(array_keys($data)));
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['data' => $app->refresh()->load(['screenshots', 'storeListingSnapshots'])]);
     }

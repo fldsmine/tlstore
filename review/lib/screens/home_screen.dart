@@ -68,8 +68,6 @@ class _HomeScreenState extends State<HomeScreen>
   String? _error;
   List<Map<String, dynamic>> _wallets = const [];
   List<Map<String, dynamic>> _transactions = const [];
-  List<Map<String, dynamic>> _featuredApps = const [];
-  List<Map<String, dynamic>> _featuredAds = const [];
   List<Map<String, dynamic>> _announcements = const [];
   Map<String, dynamic> _sessionUser = const {};
   final Set<int> _dismissedAnnouncements = {};
@@ -134,7 +132,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
     _loadDashboard();
     _loadUnreadNotificationCount();
-    _loadFeatured();
     _loadAnnouncements();
     _notificationTapSubscription = PushNotificationService
         .instance
@@ -410,28 +407,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _loadFeatured() async {
-    try {
-      await widget.api.loadExchangeRates(widget.result.token);
-      final response = await widget.api.spotlights();
-      final data = response['data'];
-      if (!mounted || data is! Map<String, dynamic>) return;
-      setState(() {
-        _featuredApps = data['products'] is List
-            ? (data['products'] as List)
-                  .whereType<Map<String, dynamic>>()
-                  .toList()
-            : const [];
-        _featuredAds = data['ads'] is List
-            ? (data['ads'] as List).whereType<Map<String, dynamic>>().toList()
-            : const [];
-        _featuredLoading = false;
-      });
-    } on AuthException {
-      if (mounted) setState(() => _featuredLoading = false);
-    }
-  }
-
   Future<void> _loadAnnouncements() async {
     try {
       final response = await widget.api.get(
@@ -690,7 +665,6 @@ class _HomeScreenState extends State<HomeScreen>
     await Future.wait([
       _loadDashboard(),
       _loadUnreadNotificationCount(),
-      _loadFeatured(),
       _loadAnnouncements(),
     ]);
   }
@@ -771,7 +745,7 @@ class _HomeScreenState extends State<HomeScreen>
       } on AuthException {
         // Keep the cached account snapshot available while the server is offline.
       }
-      await Future.wait([_loadDashboard(), _loadFeatured()]);
+      await Future.wait([_loadDashboard()]);
     }
   }
 
@@ -1253,7 +1227,7 @@ class _HomeScreenState extends State<HomeScreen>
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const LandingScreen(),
+                    builder: (_) => LandingScreen(api: widget.api),
                   ),
                 );
               },
@@ -2309,79 +2283,6 @@ class _HomeScreenState extends State<HomeScreen>
     if (page != null) unawaited(_pushPage(page, 0));
   }
 
-  Widget _buildFeaturedSection() {
-    final items = <(ListingKind, Map<String, dynamic>)>[
-      ..._featuredApps.map((item) => (ListingKind.appReview, item)),
-      ..._featuredAds.map((item) => (ListingKind.adShare, item)),
-    ];
-    if (_featuredLoading || items.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Featured for you',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-              ),
-            ),
-            Text(
-              '${items.length} listings',
-              style: const TextStyle(
-                color: mutedInk,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, index) => _FeaturedHomeCard(
-              api: widget.api,
-              preferredCurrency: _currency,
-              kind: items[index].$1,
-              item: items[index].$2,
-              onTap: () {
-                final kind = items[index].$1;
-                final featured = items[index].$2;
-                final detailItem = kind == ListingKind.appReview
-                    ? <String, dynamic>{
-                        'id': featured['campaign_id'],
-                        'app': featured['app'],
-                        'review_reward_minor': featured['review_reward_minor'],
-                        'currency': featured['currency'],
-                        'currency_minor_units':
-                            featured['currency_minor_units'],
-                        'location': featured['location'],
-                      }
-                    : featured;
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ListingDetailScreen(
-                      api: widget.api,
-                      token: widget.result.token,
-                      user: _sessionUser,
-                      kind: kind,
-                      item: detailItem,
-                      preferredCurrency: _currency,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildRecentHeading() => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -2400,7 +2301,11 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           label: const Text(
             'View more',
-            style: TextStyle(color: brandGreen, fontSize: 12, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: brandGreen,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
     ],
@@ -2624,162 +2529,6 @@ class _HomeScreenState extends State<HomeScreen>
           onTap: onPressed,
           customBorder: const CircleBorder(),
           child: Icon(icon, size: 23, color: scheme.onSurface),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeaturedHomeCard extends StatelessWidget {
-  const _FeaturedHomeCard({
-    required this.api,
-    required this.preferredCurrency,
-    required this.kind,
-    required this.item,
-    required this.onTap,
-  });
-  final AuthApi api;
-  final String preferredCurrency;
-  final ListingKind kind;
-  final Map<String, dynamic> item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isApp = kind == ListingKind.appReview;
-    final app = item['app'] is Map<String, dynamic>
-        ? item['app'] as Map<String, dynamic>
-        : const <String, dynamic>{};
-    final title = isApp
-        ? item['name']?.toString() ?? app['name']?.toString() ?? 'Featured app'
-        : item['title']?.toString() ?? 'Featured ad';
-    final subtitle = isApp
-        ? item['title']?.toString() ?? app['store']?.toString() ?? 'App review'
-        : 'Sponsored share';
-    final image = isApp
-        ? item['cover_image']?.toString()
-        : item['creative_path']?.toString();
-    final sourceCurrency = item['currency']?.toString() ?? 'USD';
-    final sourceAmount = isApp
-        ? ((item['review_reward_minor'] as num?)?.toDouble() ??
-                  ((item['price'] as num?)?.toDouble() ?? 0) * 100) /
-              math.pow(10, (item['currency_minor_units'] as num?)?.toInt() ?? 2)
-        : double.tryParse(item['share_reward']?.toString() ?? '') ?? 0;
-    final converted = api.convertMajor(
-      sourceAmount,
-      sourceCurrency,
-      preferredCurrency,
-    );
-    final shownCurrency = converted == null
-        ? sourceCurrency
-        : preferredCurrency;
-    final shownAmount = converted ?? sourceAmount;
-    final reward =
-        '${_formatMajor(shownAmount, shownCurrency)} ${isApp ? 'review' : 'share'} reward';
-    return SizedBox(
-      width: 265,
-      child: Material(
-        color: Theme.of(context).colorScheme.onSecondary
-            .withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(15),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(15),
-          child: Container(
-            padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant
-                    .withValues(alpha: 0.45),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 66,
-                  height: 66,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface
-                        .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: image != null && image.startsWith('http')
-                      ? Image.network(
-                          image,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Icon(
-                            isApp
-                                ? Icons.apps_rounded
-                                : Icons.campaign_outlined,
-                            color: brandGreen,
-                          ),
-                        )
-                      : Icon(
-                          isApp ? Icons.apps_rounded : Icons.campaign_outlined,
-                          color: brandGreen,
-                        ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.outlineVariant
-                              .withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'FEATURED',
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: .5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: mutedInk, fontSize: 9),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        reward,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: brandGreen,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: mutedInk),
-              ],
-            ),
-          ),
         ),
       ),
     );

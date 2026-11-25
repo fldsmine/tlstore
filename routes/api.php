@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Features\System\Http\Controllers\Api\V1\HealthController;
 use App\Features\System\Http\Controllers\Api\V1\AppVersionController;
 use App\Features\System\Http\Controllers\Api\V1\LegalDocumentController;
-use App\Features\System\Http\Controllers\Api\V1\AboutController;
+use App\Features\System\Http\Controllers\Api\V1\FrontendController;
 use App\Features\Identity\Http\Controllers\Api\V1\AuthController;
 use App\Features\Identity\Http\Controllers\Api\V1\TwoFactorChallengeController;
 use App\Features\Identity\Http\Controllers\Api\V1\AdminAuthController;
@@ -52,7 +52,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('api.v1.health');
     Route::get('/app/version', [AppVersionController::class, 'check'])->name('api.v1.app.version');
     Route::get('/legal/{slug}', [LegalDocumentController::class, 'show'])->name('api.v1.legal.show');
-    Route::get('/about', [AboutController::class, 'show'])->name('api.v1.about.show');
+    Route::get('/about', [FrontendController::class, 'about'])->name('api.v1.front.about');
+    Route::get('/frontend', [FrontendController::class, 'frontend'])->name('api.v1.front.index');
 
     Route::prefix('auth')->name('api.v1.auth.')->group(function (): void {
         Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:6,1')->name('register');

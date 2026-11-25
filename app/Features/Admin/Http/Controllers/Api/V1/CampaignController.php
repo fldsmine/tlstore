@@ -59,7 +59,7 @@ final class CampaignController
             'maximum_review' => $campaign->maximum_review,
         ]);
         $this->audit($request->user(), 'app_review_campaign.created', 'app_review_campaign', (string) $campaign->id, null, $campaign->only(['status', 'paid_amount_minor', 'maximum_review', 'location']));
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['data' => $campaign->load('app')], 201);
     }
@@ -104,7 +104,7 @@ final class CampaignController
             'maximum_review' => $campaign->maximum_review,
         ]);
         $this->audit($request->user(), 'app_review_campaign.updated', 'app_review_campaign', (string) $campaign->id, $before, $campaign->only(array_keys($data)));
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['data' => $campaign->refresh()->load('app')]);
     }
@@ -142,7 +142,7 @@ final class CampaignController
             'status' => $data['status'] ?? 'draft',
         ]);
         $this->audit($request->user(), 'ad_campaign.created', 'ad', (string) $ad->id, null, $ad->only(['status', 'paid_amount', 'maximum_share', 'location']));
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['data' => $ad], 201);
     }
@@ -198,7 +198,7 @@ final class CampaignController
             Storage::disk('public')->delete($creativeToDelete);
         }
         $this->audit($request->user(), 'ad_campaign.updated', 'ad', (string) $ad->id, $before, $ad->only(array_keys($data)));
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['data' => $ad->refresh()]);
     }
@@ -209,7 +209,7 @@ final class CampaignController
         $before = ['status' => $ad->status->value];
         $ad->update(['status' => 'active']);
         $this->audit($request->user(), 'ad_campaign.approved', 'ad', (string) $ad->id, $before, ['status' => 'active']);
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['data' => $ad->refresh(), 'message' => 'Ad approved and activated.']);
     }
@@ -219,7 +219,7 @@ final class CampaignController
         $before = $ad->only(['title', 'type', 'status', 'total_share', 'reserved_share']);
         $ad->delete();
         $this->audit($request->user(), 'ad_campaign.deleted', 'ad', (string) $ad->id, $before, ['deleted_at' => now()->toISOString()]);
-        Cache::forget('api:login-spot:v3');
+        Cache::forget('api:spotlight:v2');
 
         return response()->json(['message' => 'Ad listing deleted.']);
     }

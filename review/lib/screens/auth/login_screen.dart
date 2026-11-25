@@ -10,6 +10,7 @@ import '../../services/auth_api.dart';
 import '../../services/social_auth_client.dart';
 import '../../widgets/auth_components.dart';
 import '../../widgets/auth_provider_buttons.dart';
+import '../../widgets/auth_spotlight_panel.dart';
 import '../../widgets/google_web_sign_in_button.dart';
 import '../home_screen.dart';
 import 'account_access_screen.dart';
@@ -286,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final countries = await _api.countries();
       if (!mounted || countries.isEmpty) return null;
-      return showDialog<String>(
+      return await showDialog<String>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Choose your country'),
@@ -322,151 +323,184 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const AuthBrandHeader(),
-                  const SizedBox(height: 31),
-                  const _WelcomeCard(),
-                  const SizedBox(height: 27),
-                  const AuthIntro(
-                    title: 'Welcome back',
-                    subtitle: 'Sign in to find your next task and keep track of your rewards.',
-                  ),
-                  const SizedBox(height: 23),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        AuthField(
-                          controller: _identifierController,
-                          label: 'Email or username',
-                          hint: 'you@example.com or username',
-                          icon: Icons.mail_outline_rounded,
-                          keyboardType: TextInputType.text,
-                          textInputAction: TextInputAction.next,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty)
-                              return 'Enter your email or username.';
-                            if (value.trim().contains('@') &&
-                                !RegExp(r'^.+@.+\..+$').hasMatch(value.trim()))
-                              return 'Enter a valid email address.';
-                            return null;
-                          },
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final desktop = constraints.maxWidth >= 1000;
+            return Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: desktop ? 40 : 20,
+                  vertical: 24,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: desktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: _form()),
+                            const SizedBox(width: 72),
+                            Expanded(child: AuthSpotlightPanel(api: _api)),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _form(),
+                            const SizedBox(height: 46),
+                            AuthSpotlightPanel(api: _api),
+                          ],
                         ),
-                        const SizedBox(height: 17),
-                        AuthField(
-                          controller: _passwordController,
-                          label: 'Password',
-                          hint: 'Enter your password',
-                          icon: Icons.lock_outline_rounded,
-                          obscureText: _hidePassword,
-                          onToggleVisibility: () =>
-                              setState(() => _hidePassword = !_hidePassword),
-                          textInputAction: TextInputAction.done,
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Enter your password.'
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ForgotPasswordScreen(
-                            api: _api,
-                            initialEmail:
-                                _identifierController.text.contains('@')
-                                ? _identifierController.text
-                                : '',
-                          ),
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: brandGreen,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 2,
-                          vertical: 8,
-                        ),
-                      ),
-                      child: const Text(
-                        'Forgot password?',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  AuthPrimaryButton(
-                    label: 'Sign in',
-                    loading: _loading,
-                    onPressed: _signIn,
-                  ),
-                  const SizedBox(height: 21),
-                  const AuthDivider(),
-                  const SizedBox(height: 15),
-                  AuthProviderButtons(
-                    loadingProvider: _loading
-                        ? (_loadingProvider ?? 'email')
-                        : null,
-                    onGoogle: () => unawaited(_googleSignIn()),
-                    onFacebook: () => unawaited(_facebookSignIn()),
-                    onTelegram: () => unawaited(_telegramSignIn()),
-                    googleWebButton: GoogleWebSignInButton(
-                      api: _api,
-                      enabled: !_loading,
-                      onIdToken: (idToken) => unawaited(
-                        _submitSocial('google', {'id_token': idToken}),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'New to TrustLens?',
-                        style: TextStyle(fontSize: 13, color: mutedInk),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const RegisterScreen(),
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: brandGreen,
-                        ),
-                        child: const Text(
-                          'Create account',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  const AuthFooter(),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
+
+  Widget _form() {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 500),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AuthBrandHeader(),
+            const SizedBox(height: 31),
+            const _WelcomeCard(),
+            const SizedBox(height: 27),
+            const AuthIntro(
+              title: 'Welcome back',
+              subtitle: 'Sign in to find your next task and keep track of your rewards.',
+            ),
+            const SizedBox(height: 23),
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  AuthField(
+                    controller: _identifierController,
+                    label: 'Email or username',
+                    hint: 'you@example.com or username',
+                    icon: Icons.mail_outline_rounded,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty)
+                        return 'Enter your email or username.';
+                      if (value.trim().contains('@') &&
+                          !RegExp(r'^.+@.+\..+$').hasMatch(value.trim()))
+                        return 'Enter a valid email address.';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 17),
+                  AuthField(
+                    controller: _passwordController,
+                    label: 'Password',
+                    hint: 'Enter your password',
+                    icon: Icons.lock_outline_rounded,
+                    obscureText: _hidePassword,
+                    onToggleVisibility: () =>
+                        setState(() => _hidePassword = !_hidePassword),
+                    textInputAction: TextInputAction.done,
+                    validator: (value) => value == null || value.isEmpty
+                        ? 'Enter your password.'
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ForgotPasswordScreen(
+                      api: _api,
+                      initialEmail:
+                          _identifierController.text.contains('@')
+                          ? _identifierController.text
+                          : '',
+                    ),
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: brandGreen,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 8,
+                  ),
+                ),
+                child: const Text(
+                  'Forgot password?',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            AuthPrimaryButton(
+              label: 'Sign in',
+              loading: _loading,
+              onPressed: _signIn,
+            ),
+            const SizedBox(height: 21),
+            const AuthDivider(),
+            const SizedBox(height: 15),
+            AuthProviderButtons(
+              loadingProvider: _loading
+                  ? (_loadingProvider ?? 'email')
+                  : null,
+              onGoogle: () => unawaited(_googleSignIn()),
+              onFacebook: () => unawaited(_facebookSignIn()),
+              onTelegram: () => unawaited(_telegramSignIn()),
+              googleWebButton: GoogleWebSignInButton(
+                api: _api,
+                enabled: !_loading,
+                onIdToken: (idToken) => unawaited(
+                  _submitSocial('google', {'id_token': idToken}),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'New to TrustLens?',
+                  style: TextStyle(fontSize: 13, color: mutedInk),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const RegisterScreen(),
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: brandGreen,
+                  ),
+                  child: const Text(
+                    'Create account',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const AuthFooter(),
+          ],
+        ),
+      ),
+    );
+  }
+
 }
 
 class _WelcomeCard extends StatelessWidget {
