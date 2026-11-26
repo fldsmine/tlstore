@@ -7,6 +7,7 @@ use App\Models\SystemSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 final class SystemSettingController
 {
@@ -174,6 +175,8 @@ final class SystemSettingController
 
             return $setting;
         });
+
+        Cache::forget('api:frontend:v2');
 
         return response()->json(['data' => $setting]);
     }

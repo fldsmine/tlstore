@@ -2,6 +2,7 @@
 
 use App\Features\System\Http\Controllers\Web\LandingPageController;
 use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
+use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
 use Illuminate\Http\Request;
@@ -59,6 +60,10 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::middleware(EnsureAdminWebAccount::class)->group(function (): void {
         Route::post('/logout', [AdminConsoleController::class, 'logout'])->name('logout');
         Route::get('/', [AdminConsoleController::class, 'dashboard'])->name('dashboard');
+        Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])->name('support-tickets.index');
+        Route::get('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
+        Route::post('/support-tickets/{ticket}/messages', [AdminSupportTicketController::class, 'reply'])->whereNumber('ticket')->name('support-tickets.reply');
+        Route::patch('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'update'])->whereNumber('ticket')->name('support-tickets.update');
         Route::get('/review-templates/{template}/versions', [AdminConsoleController::class, 'templateVersions'])->whereNumber('template')->name('review-templates.versions');
         Route::post('/review-templates/{template}/versions', [AdminConsoleController::class, 'createTemplateVersion'])->whereNumber('template')->name('review-templates.versions.store');
         Route::post('/review-templates/{template}/versions/{version}/publish', [AdminConsoleController::class, 'publishTemplateVersion'])->whereNumber('template')->whereNumber('version')->name('review-templates.versions.publish');

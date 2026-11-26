@@ -34,7 +34,7 @@ import 'settings_screen.dart';
 import 'referrals_screen.dart';
 import 'legal_document_screen.dart';
 import 'subscriptions_screen.dart';
-import 'support_ticket_demo_screen.dart';
+import 'support_ticket_screen.dart';
 import 'about_screen.dart';
 import 'topup_screen.dart';
 import 'wallet_transfer_screen.dart';
@@ -73,7 +73,6 @@ class _HomeScreenState extends State<HomeScreen>
   final Set<int> _dismissedAnnouncements = {};
   bool _announcementDialogShowing = false;
   bool _announcementPromptShown = false;
-  bool _featuredLoading = true;
   bool _socialPromptShown = false;
   bool _currencyUpdating = false;
   int _selectedTab = 1;
@@ -1197,7 +1196,14 @@ class _HomeScreenState extends State<HomeScreen>
       case AppDrawerDestination.about:
         _pushPage(AboutScreen(api: widget.api), 0);
       case AppDrawerDestination.support:
-        _pushPage(SupportTicketDemoScreen(user: _sessionUser), 0);
+        _pushPage(
+          SupportTicketsScreen(
+            api: widget.api,
+            token: widget.result.token,
+            user: _sessionUser,
+          ),
+          0,
+        );
       case AppDrawerDestination.signOut:
         _logout();
     }
@@ -1227,7 +1233,11 @@ class _HomeScreenState extends State<HomeScreen>
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => LandingScreen(api: widget.api),
+                    builder: (_) => LandingScreen(
+                      api: widget.api,
+                      isUser: _sessionUser,
+                      token: widget.result.token,
+                    ),
                   ),
                 );
               },
@@ -1688,9 +1698,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                                 color: Colors.white.withValues(alpha: .65),
                               ),
-                              Flexible(
-                                child: _heroMeta('Holder', username),
-                              ),
+                              Flexible(child: _heroMeta('Holder', username)),
                             ],
                           ),
                         ),
@@ -2044,7 +2052,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             0,
           );
-        } else if (index == 3) { 
+        } else if (index == 3) {
           _pushPage(
             DailyTasksScreen(
               api: widget.api,
@@ -2204,10 +2212,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Expanded(
                   child: Text(
                     'Users Wallets [${wallets.length}]',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
                 ),
                 Text(

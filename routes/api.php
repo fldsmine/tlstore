@@ -47,6 +47,7 @@ use App\Features\Vas\Http\Controllers\Api\V1\VasCatalogController;
 use App\Features\Vas\Http\Controllers\Api\V1\VasPurchaseController;
 use App\Features\Vas\Http\Controllers\Api\V1\VasOrderController;
 use App\Features\Vas\Http\Controllers\Api\V1\VtpassWebhookController;
+use App\Features\Support\Http\Controllers\Api\V1\SupportTicketController;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('api.v1.health');
@@ -82,6 +83,11 @@ Route::prefix('v1')->group(function (): void {
     });
 
     Route::middleware(['auth:sanctum', 'user.account', 'user.two-factor'])->group(function (): void {
+        Route::get('/support-tickets', [SupportTicketController::class, 'index'])->name('api.v1.support-tickets.index');
+        Route::post('/support-tickets', [SupportTicketController::class, 'store'])->middleware('throttle:10,1')->name('api.v1.support-tickets.store');
+        Route::get('/support-tickets/{ticket}', [SupportTicketController::class, 'show'])->name('api.v1.support-tickets.show');
+        Route::post('/support-tickets/{ticket}/messages', [SupportTicketController::class, 'reply'])->middleware('throttle:20,1')->name('api.v1.support-tickets.reply');
+        Route::post('/support-tickets/{ticket}/close', [SupportTicketController::class, 'close'])->name('api.v1.support-tickets.close');
         Route::get('/announcements', [PublicAnnouncementController::class, 'index'])->name('api.v1.announcements.index');
         Route::post('/announcements/{announcement}/dismiss', [PublicAnnouncementController::class, 'dismiss'])->name('api.v1.announcements.dismiss');
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
@@ -170,6 +176,10 @@ Route::prefix('v1')->group(function (): void {
     });
 
     Route::middleware(['auth:sanctum', 'admin.account'])->prefix('admin')->name('api.v1.admin.')->group(function (): void {
+        Route::get('/support-tickets', [SupportTicketController::class, 'adminIndex'])->name('support-tickets.index');
+        Route::get('/support-tickets/{ticket}', [SupportTicketController::class, 'adminShow'])->name('support-tickets.show');
+        Route::post('/support-tickets/{ticket}/messages', [SupportTicketController::class, 'adminReply'])->middleware('throttle:30,1')->name('support-tickets.reply');
+        Route::patch('/support-tickets/{ticket}', [SupportTicketController::class, 'adminUpdate'])->name('support-tickets.update');
         Route::get('/announcements', [AdminAnnouncementController::class, 'index'])->name('announcements.index');
         Route::post('/announcements', [AdminAnnouncementController::class, 'store'])->name('announcements.store');
         Route::patch('/announcements/{announcement}', [AdminAnnouncementController::class, 'update'])->name('announcements.update');

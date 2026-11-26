@@ -1,22 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:review/config/api_config.dart';
+import 'package:review/services/auth_api.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../widgets/auth_components.dart';
+import '../../home_screen.dart';
+import '../../support_ticket_screen.dart';
+
 class ContactUs extends StatefulWidget {
-  final Map<String, dynamic> contact;
-  final List<String> support;
 
   const ContactUs({
-    super.key, 
-    required this.contact, 
-    required this.support, 
+    super.key,
+    required this.api,
+    required this.token,
+    required this.contact,
+    required this.support,
+    required this.user,
   });
+
+  final AuthApi api;
+  final String token;
+  final Map<String, dynamic> contact;
+  final List<String> support;
+  final Map<String, dynamic> user;
 
   @override
   State<ContactUs> createState() => _ContactUsState();
 }
 
 class _ContactUsState extends State<ContactUs> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _subjectController = TextEditingController();
+  final _messageController = TextEditingController();
+  final _api = AuthApi();
+  bool _showForm = false;
+  bool _submitting = false;
+
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _subjectController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  void _openTickets(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            SupportTicketsScreen(api: widget.api, token: widget.token, user: widget.user),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _submitting = true);
+
+    try {
+      final result = await _api.support(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          subject: _subjectController.text.trim(),
+          message: _messageController.text.trim(),
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => HomeScreen(result: result, api: _api),
+        ),
+        (_) => false,
+      );
+    } on AuthException catch (error) {
+      if (mounted) showAuthMessage(context, error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   Future<void> _openLink(String value) async {
     final raw = value.trim();
@@ -43,6 +109,8 @@ class _ContactUsState extends State<ContactUs> {
     final theme = Theme.of(context);
     final contact = widget.contact;
     final colors = theme.colorScheme;
+    final isUser = false;
+
     final social = _asMap(contact['social_links']);
     final email = _text(contact['email'], '');
     final phone = _text(contact['phone'], '');
@@ -74,6 +142,7 @@ class _ContactUsState extends State<ContactUs> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+
                 Row(
                   children: [
                     Icon(
@@ -161,6 +230,7 @@ class _ContactUsState extends State<ContactUs> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+
                   Row(
                     children: [
                       Container(
@@ -176,60 +246,178 @@ class _ContactUsState extends State<ContactUs> {
                           color: colors.primary,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Support',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text(
-                              'Need help? Message us',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                        'Support',
+                        style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
                         ),
+                        Text(
+                        'Need help? Message us',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                      ),
+                    ),
+                    if (!_showForm)
+                      GestureDetector(
+                      onTap: () => isUser ? _openTickets(context) : setState(() => _showForm = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                        color: colors.primary,
+                        borderRadius:
+                          BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                        isUser ? '+ Ticket':'+ Message us',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        ),
+                      ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (
-                          var index = 0;
-                          index < supportLinks.length;
-                          index++
-                        )
-                          FilledButton(
-                            onPressed: () => _openLink(supportLinks[index]),
-                            style: FilledButton.styleFrom(
-                              shape: const StadiumBorder(),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 9,
+
+                // Form
+                  if (_showForm) ...[
+                    const SizedBox(height: 24),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(
+                              hintText: 'Your Name',
+                              prefixIcon: Icon(Icons.person_outline),
+                            ),
+                            validator: (v) =>
+                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              hintText: 'Email Address',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            validator: (v) =>
+                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _subjectController,
+                            decoration: const InputDecoration(
+                              hintText: 'Subject',
+                              prefixIcon: Icon(Icons.subject),
+                            ),
+                            validator: (v) =>
+                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _messageController,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              hintText: 'Your Message',
+                              prefixIcon: Icon(Icons.message_outlined),
+                            ),
+                            validator: (v) =>
+                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                          ),
+                          const SizedBox(height: 30),
+                    Row(
+                    children: [
+                      Expanded(
+                      child: ElevatedButton(
+                        onPressed: _submitting ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 5,
+                           side: BorderSide(
+                            color: colors.primary, 
+                            width: 0.5,
+                          ),
+                        ),
+                        child: _submitting
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                            ),
+                          )
+                          : const Text('Submit'),
+                      ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                      onPressed: () => setState(() => _showForm = false),
+                      child: const Text('Cancel'),
+                      ),
+                    ],
+                    ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 22),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const spacing = 8.0;
+                      const buttonsPerRow = 2;
+
+                      final buttonWidth =
+                          (constraints.maxWidth - spacing) / buttonsPerRow;
+
+                      return Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: spacing,
+                        runSpacing: 8,
+                        children: [
+                          for (var index = 0; index < supportLinks.length; index++)
+                            SizedBox(
+                              width: buttonWidth,
+                              child: FilledButton(
+                                onPressed: () => _openLink(supportLinks[index]),
+                                style: FilledButton.styleFrom(
+                                  shape: const StadiumBorder(),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 9,
+                                  ),
+                                ),
+                                child: Text(
+                                  supportLinks.length == 1
+                                      ? '+ Ticket'
+                                      : index == 0
+                                          ? '+ Community'
+                                          : '+ Ticket',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              supportLinks.length == 1
-                                  ? '+ Ticket'
-                                  : index == 0
-                                  ? '+ Community'
-                                  : '+ Ticket',
-                            ),
-                          ),
-                      ],
-                    ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

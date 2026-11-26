@@ -128,8 +128,8 @@ class AuthApi {
   static const _spotlightsCacheKey = 'trustlens.spotlights.response.v1';
   static const _spotlightsCachedAtKey = 'trustlens.spotlights.cached_at.v1';
   static const _spotlightsCacheDuration = Duration(minutes: 60);
-  static const _frontendCacheKey = 'trustlens.frontend.response.v1';
-  static const _frontendCachedAtKey = 'trustlens.frontend.cached_at.v1';
+  static const _frontendCacheKey = 'trustlens.frontend.response.v2';
+  static const _frontendCachedAtKey = 'trustlens.frontend.cached_at.v2';
   static const _frontendCacheDuration = Duration(minutes: 10);
 
   static const _countriesCacheKey = 'trustlens.countries.response.v1';
@@ -707,6 +707,12 @@ class AuthApi {
     });
   }
 
+  /// Drops the locally cached public landing payload after an admin edit.
+  Future<void> clearFrontendCache() async {
+    await _storage.delete(key: _frontendCacheKey);
+    await _storage.delete(key: _frontendCachedAtKey);
+  }
+
   Future<Map<String, dynamic>> _loadFrontend() async {
     String? cachedJson;
     String? cachedAtText;
@@ -1230,6 +1236,83 @@ class AuthApi {
 
   String _dateQuery(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  //Guest contact us message api submit
+  Future<AuthResult> support({
+    required String name,
+    required String subject,
+    required String email,
+    required String message,
+  }) async {
+    return _authRequest('guest-support', {
+      'name': name.trim(),
+      'subject': subject.trim(),
+      'email': email.trim(),
+      'message': message.trim(),
+    });
+  }
+
+  Future<Map<String, dynamic>> supportTickets(
+    String token, {
+    String status = 'all',
+    int page = 1,
+  }) => get('support-tickets?status=$status&page=$page', token);
+
+  Future<Map<String, dynamic>> supportTicket(String token, Object ticketId) =>
+      get('support-tickets/$ticketId', token);
+
+  Future<Map<String, dynamic>> createSupportTicket(
+    String token, {
+    required String subject,
+    required String category,
+    required String message,
+  }) => post('support-tickets', token, {
+    'subject': subject.trim(),
+    'category': category,
+    'message': message.trim(),
+  });
+
+  Future<Map<String, dynamic>> replySupportTicket(
+    String token,
+    Object ticketId,
+    String message,
+  ) => post('support-tickets/$ticketId/messages', token, {
+    'message': message.trim(),
+  });
+
+  Future<Map<String, dynamic>> closeSupportTicket(
+    String token,
+    Object ticketId,
+  ) => post('support-tickets/$ticketId/close', token, const {});
+
+  Future<Map<String, dynamic>> adminSupportTickets(
+    String token, {
+    String status = 'all',
+    String search = '',
+    int page = 1,
+  }) => get(
+    'admin/support-tickets?status=$status&search=${Uri.encodeQueryComponent(search)}&page=$page',
+    token,
+  );
+
+  Future<Map<String, dynamic>> adminSupportTicket(
+    String token,
+    Object ticketId,
+  ) => get('admin/support-tickets/$ticketId', token);
+
+  Future<Map<String, dynamic>> adminReplySupportTicket(
+    String token,
+    Object ticketId,
+    String message,
+  ) => post('admin/support-tickets/$ticketId/messages', token, {
+    'message': message.trim(),
+  });
+
+  Future<Map<String, dynamic>> updateAdminSupportTicket(
+    String token,
+    Object ticketId,
+    Map<String, dynamic> changes,
+  ) => patch('admin/support-tickets/$ticketId', token, changes);
 
   Future<List<Map<String, dynamic>>> walletLedger(
     String token,

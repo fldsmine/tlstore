@@ -30,4 +30,9 @@ class Admin extends Authenticatable
     {
         return $this->hasMany(SystemSetting::class, 'updated_by_admin_id');
     }
+
+    public function supportTicketMessages(): HasMany
+    {
+        return $this->hasMany(SupportTicketMessage::class, 'sender_admin_id');
+    }
 }

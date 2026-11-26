@@ -24,15 +24,15 @@
                 'Workspace' => ['admin.dashboard' => 'Overview', 'users' => 'Users', 'admins' => 'Admin accounts'],
                 'Marketplace' => ['apps' => 'App catalog', 'review-campaigns' => 'Review campaigns', 'ads' => 'Ads listings'],
                 'Packages & rewards' => ['subscription-groups' => 'Subscription groups', 'subscription-plans' => 'Subscription plans', 'package-addons' => 'Package addons', 'rank-levels' => 'Ranking levels', 'referrals' => 'Referrals'],
-                'Moderation' => ['review-moderation' => 'App reviews', 'share-moderation' => 'Ad shares', 'social-follow-activity' => 'Social follow rewards', 'deposit-moderation' => 'Manual deposits', 'withdrawal-moderation' => 'Withdrawals', 'campaign-orders' => 'Campaign orders', 'app-reports' => 'App reports'],
+                'Moderation' => ['review-moderation' => 'App reviews', 'share-moderation' => 'Ad shares', 'social-follow-activity' => 'Social follow rewards', 'deposit-moderation' => 'Manual deposits', 'withdrawal-moderation' => 'Withdrawals', 'campaign-orders' => 'Campaign orders', 'app-reports' => 'App reports', 'admin.support-tickets.index' => 'Support tickets'],
                 'Platform content' => ['review-questions' => 'Review questions', 'review-templates' => 'Question templates', 'announcements' => 'Announcements', 'faqs' => 'FAQs', 'testimonials' => 'Testimonials', 'legal-documents' => 'Privacy & terms'],
                 'Configuration' => ['system-settings' => 'System settings', 'payment-options' => 'Payment gateways', 'withdrawal-options' => 'Withdrawal methods', 'banks' => 'Banks', 'countries' => 'Countries', 'regions' => 'Regions', 'region-countries' => 'Region coverage', 'social-handles' => 'Social platforms', 'app-versions' => 'App versions', 'exchange-rates' => 'Exchange rates', 'vtu-orders' => 'VAS orders', 'audit-logs' => 'Audit log'],
             ];
             $roleModules = match ($role) {
-                'super_admin' => array_keys(config('admin.modules')),
-                'admin' => array_values(array_diff(array_keys(config('admin.modules')), ['admins', 'system-settings'])),
+                'super_admin' => [...array_keys(config('admin.modules')), 'admin.support-tickets.index'],
+                'admin' => [...array_values(array_diff(array_keys(config('admin.modules')), ['admins', 'system-settings'])), 'admin.support-tickets.index'],
                 'content_admin' => ['apps','review-campaigns','ads','subscription-groups','subscription-plans','package-addons','review-questions','review-templates','announcements','faqs','testimonials','legal-documents','countries','regions','region-countries','social-handles','app-versions'],
-                'moderator' => ['review-moderation','share-moderation','social-follow-activity','app-reports','campaign-orders','users'],
+                'moderator' => ['review-moderation','share-moderation','social-follow-activity','app-reports','campaign-orders','users','admin.support-tickets.index'],
                 'finance' => ['deposit-moderation','withdrawal-moderation','payment-options','withdrawal-options','banks','users'],
                 default => [],
             };
@@ -45,6 +45,8 @@
                     @foreach($visible as $key => $label)
                         @if($key === 'admin.dashboard')
                             <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}"><span class="nav-icon">⌂</span>{{ $label }}</a>
+                        @elseif($key === 'admin.support-tickets.index')
+                            <a class="nav-link {{ request()->routeIs('admin.support-tickets.*') ? 'active' : '' }}" href="{{ route('admin.support-tickets.index') }}"><span class="nav-icon">✉</span>{{ $label }}</a>
                         @else
                             <a class="nav-link {{ $module === $key ? 'active' : '' }}" href="{{ route('admin.modules.index', $key) }}"><span class="nav-icon">{{ match($key) {'users'=>'♙','apps'=>'▣','ads'=>'◈','review-moderation'=>'✓','share-moderation'=>'↗','deposit-moderation'=>'＋','withdrawal-moderation'=>'↙','system-settings'=>'⚙','audit-logs'=>'☷',default=>'·'} }}</span>{{ $label }}</a>
                         @endif

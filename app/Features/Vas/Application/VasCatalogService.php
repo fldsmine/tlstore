@@ -12,14 +12,14 @@ final class VasCatalogService
     /** @var array<string,array<string,mixed>> */
     private const CATALOG = [
         'airtime' => [
-            'label' => 'Airtime', 'pricing' => 'amount', 'recipient_label' => 'Phone number', 'requires_verification' => false,
+            'label' => 'Airtime', 'description' => 'Top up mobile airtime across supported networks.', 'icon' => 'phone_android', 'pricing' => 'amount', 'recipient_label' => 'Phone number', 'requires_verification' => false,
             'providers' => [
                 ['id' => 'mtn', 'label' => 'MTN'], ['id' => 'glo', 'label' => 'Glo'],
                 ['id' => 'airtel', 'label' => 'Airtel'], ['id' => '9mobile', 'label' => '9mobile'],
             ],
         ],
         'data' => [
-            'label' => 'Data', 'pricing' => 'plan', 'recipient_label' => 'Phone number', 'requires_verification' => false,
+            'label' => 'Data', 'description' => 'Buy data bundles for supported mobile and internet providers.', 'icon' => 'wifi', 'pricing' => 'plan', 'recipient_label' => 'Phone number', 'requires_verification' => false,
             'providers' => [
                 ['id' => 'mtn-data', 'label' => 'MTN'], ['id' => 'glo-data', 'label' => 'Glo'],
                 ['id' => 'airtel-data', 'label' => 'Airtel'], ['id' => 'etisalat-data', 'label' => '9mobile'],
@@ -27,7 +27,7 @@ final class VasCatalogService
             ],
         ],
         'tv' => [
-            'label' => 'TV', 'pricing' => 'plan', 'recipient_label' => 'Smartcard number', 'requires_verification' => true,
+            'label' => 'TV', 'description' => 'Renew or change a supported television subscription.', 'icon' => 'tv', 'pricing' => 'plan', 'recipient_label' => 'Smartcard number', 'requires_verification' => true,
             'subscription_actions' => [['id' => 'renew', 'label' => 'Renew'], ['id' => 'change', 'label' => 'Change plan']],
             'providers' => [
                 ['id' => 'dstv', 'label' => 'DStv'], ['id' => 'gotv', 'label' => 'GOtv'],
@@ -35,7 +35,7 @@ final class VasCatalogService
             ],
         ],
         'electricity' => [
-            'label' => 'Electricity', 'pricing' => 'amount', 'recipient_label' => 'Meter number', 'requires_verification' => true,
+            'label' => 'Electricity', 'description' => 'Purchase prepaid or postpaid electricity for supported providers.', 'icon' => 'bolt', 'pricing' => 'amount', 'recipient_label' => 'Meter number', 'requires_verification' => true,
             'meter_types' => [['id' => 'prepaid', 'label' => 'Prepaid'], ['id' => 'postpaid', 'label' => 'Postpaid']],
             'providers' => [
                 ['id' => 'ikeja-electric', 'label' => 'Ikeja (IKEDC)'], ['id' => 'eko-electric', 'label' => 'Eko (EKEDC)'],
@@ -46,7 +46,7 @@ final class VasCatalogService
             ],
         ],
         'education' => [
-            'label' => 'Education', 'pricing' => 'plan', 'recipient_label' => 'Phone number', 'requires_verification' => false,
+            'label' => 'Education', 'description' => 'Access supported examination pins, registration and education services.', 'icon' => 'school', 'pricing' => 'plan', 'recipient_label' => 'Phone number', 'requires_verification' => false,
             'providers' => [
                 ['id' => 'waec', 'label' => 'WAEC Result Checker'],
                 ['id' => 'waec-registration', 'label' => 'WAEC Registration'],
@@ -80,6 +80,26 @@ final class VasCatalogService
             'provider_ready' => $this->vtpass->configured(),
             'currency' => 'NGN',
             'services' => $this->enabled() ? $services : [],
+        ];
+    }
+
+    /** Public, presentation-safe summary for the marketing landing page. */
+    public function publicInfo(): array
+    {
+        $flags = $this->serviceFlags();
+        $enabled = $this->enabled();
+        return [
+            'enabled' => $enabled,
+            'currency' => 'NGN',
+            'services' => collect(self::CATALOG)->map(function (array $definition, string $key) use ($flags, $enabled): array {
+                return [
+                    'key' => $key,
+                    'label' => $definition['label'],
+                    'description' => $definition['description'],
+                    'icon' => $definition['icon'],
+                    'available' => $enabled && ($flags[$key] ?? false) === true,
+                ];
+            })->values()->all(),
         ];
     }
 

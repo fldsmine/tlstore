@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:review/screens/frontend/widgets/contact_us.dart';
 
 import '../../services/auth_api.dart';
 import 'widgets/ads_share.dart';
 import 'widgets/app_features.dart';
 import 'widgets/banner_section.dart';
 import 'widgets/faq_section.dart';
-import 'widgets/featured_apps.dart';
+import 'widgets/featured_app.dart';
 import 'widgets/footer_section.dart';
 import 'widgets/how_it_works.dart';
 import 'widgets/leaderboard.dart';
 import 'widgets/platform_stats.dart';
+import 'widgets/payment_options.dart';
 import 'widgets/testimonies_list.dart';
+import 'widgets/contact_us.dart';
+import 'widgets/vas_services.dart';
 
 class LandingScreen extends StatefulWidget {
-  const LandingScreen({super.key, required this.api});
+  const LandingScreen({
+    super.key,
+    required this.api,
+    required this.isUser,
+    required this.token,
+  });
 
   final AuthApi api;
+  final Map<String, dynamic> isUser;
+  final String token;
 
   @override
   State<LandingScreen> createState() => _LandingScreenState();
@@ -84,8 +93,11 @@ class _LandingScreenState extends State<LandingScreen> {
   List<Map<String, dynamic>> get _ads => _rows(_payload['ads']);
   List<Map<String, dynamic>> get _testimonies => _rows(_payload['testimonies']);
   List<Map<String, dynamic>> get _stats => _rows(_payload['platform_stats']);
+  List<Map<String, dynamic>> get _paymentOptions =>
+      _rows(_payload['pay_option']);
   List<Map<String, dynamic>> get _leaders => _rows(_payload['leaderboard']);
   List<Map<String, dynamic>> get _steps => _rows(_payload['how_it_works']);
+  Map<String, dynamic> get _vasServices => _asMap(_payload['vas_services']);
   List<String> get _supportLinks {
     final value = _payload['support_link'];
     if (value is List) {
@@ -162,51 +174,60 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = _landingTheme(context);
 
-    return  Scaffold(
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1180),
-            child: _loading && _payload.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null && _payload.isEmpty
-                ? _loadError(theme)
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    child: ListView(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        BannerSection(banner: _banner),
-                        const SizedBox(height: 24),
-                        FeaturedApps(apps: _apps),
-                        const SizedBox(height: 24),
-                        Leaderboard(leaders:_leaders),
-                        const SizedBox(height: 24),
-                        HowItWorks(steps:_steps),
-                        const SizedBox(height: 24),
-                        AdShare(ads: _ads, api: widget.api),
-                        const SizedBox(height: 24),
-                        AppFeatures(features: _features),
-                        const SizedBox(height: 24),
-                        PlatformStats(stats: _stats),
-                        const SizedBox(height: 24),
-                        TestimoniesList(testimonies: _testimonies),
-                        const SizedBox(height: 24),
-                        FaqSection(faqs: _faqs),
-                        const SizedBox(height: 24),
-                        ContactUs(contact: _contact, support: _supportLinks),
-                        const SizedBox(height: 24),
-                        FooterSection(footer: _footerData, api: widget.api),
-                      ],
-                    ),
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1180),
+          child: _loading && _payload.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null && _payload.isEmpty
+              ? _loadError(theme)
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      BannerSection(banner: _banner, user: widget.isUser),
+                      const SizedBox(height: 24),
+                      FeaturedApp(apps: _apps),
+                      const SizedBox(height: 24),
+                      PaymentOptions(options: _paymentOptions),
+                      const SizedBox(height: 24),
+                      Leaderboard(leaders: _leaders),
+                      const SizedBox(height: 24),
+                      HowItWorks(steps: _steps),
+                      const SizedBox(height: 24),
+                      AdShare(ads: _ads, api: widget.api),
+                      const SizedBox(height: 24),
+                      AppFeatures(features: _features),
+                      const SizedBox(height: 24),
+                      VasServicesSection(data: _vasServices),
+                      const SizedBox(height: 24),
+                      PlatformStats(stats: _stats),
+                      const SizedBox(height: 24),
+                      TestimoniesList(testimonies: _testimonies),
+                      const SizedBox(height: 24),
+                      FaqSection(faqs: _faqs),
+                      const SizedBox(height: 24),
+                      ContactUs(
+                        api: widget.api,
+                        token: widget.token,
+                        contact: _contact,
+                        support: _supportLinks,
+                        user: widget.isUser,
+                      ),
+                      const SizedBox(height: 24),
+                      FooterSection(footer: _footerData, api: widget.api),
+                    ],
                   ),
-          ),
+                ),
         ),
+      ),
     );
   }
 
@@ -236,5 +257,4 @@ class _LandingScreenState extends State<LandingScreen> {
       ),
     ),
   );
-
 }

@@ -4,10 +4,12 @@ import 'package:review/services/media_url.dart';
 
 class BannerSection extends StatelessWidget {
   final Map<String, dynamic> banner;
+  final Map<String, dynamic> user;
 
   const BannerSection({
     super.key, 
     required this.banner, 
+    required this.user, 
   });
 
   @override
@@ -16,6 +18,7 @@ class BannerSection extends StatelessWidget {
     final colors = theme.colorScheme;
 
     final image = _image(banner['image']);
+    final isLoggin = user['status'] == 'active';
 
     return Container(
       width: double.infinity,
@@ -128,7 +131,8 @@ class BannerSection extends StatelessWidget {
                 Row(
                   children: [
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () { },
+                      //onPressed: () { isLoggin ? dashboard : register },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: colors.primary,
@@ -138,7 +142,7 @@ class BannerSection extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        'Dashboard',
+                        isLoggin ? 'Dashboard':  _text(banner['cta_text'],'Register'),
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -157,7 +161,7 @@ class BannerSection extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        'Sign In',
+                        isLoggin ? 'Profile' : 'Sign In',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,

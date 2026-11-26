@@ -2,6 +2,7 @@
 
 namespace App\Features\System\Http\Controllers\Api\V1;
 
+use App\Features\Vas\Application\VasCatalogService;
 use Illuminate\Support\Facades\Cache;
 use App\Services\PublicFrontService;
 use Illuminate\Http\JsonResponse;
@@ -18,7 +19,7 @@ use App\Models\Faq;
 
 final class FrontendController
 {
-	private const CACHE_KEY = 'api:frontend:v2';
+	private const CACHE_KEY = 'api:frontend:v3';
 	private const CACHE_TTL = 10; // minutes
 
     public function about(): JsonResponse
@@ -53,38 +54,35 @@ final class FrontendController
         ]);
     }
 
-    public function frontend(Request $request, PublicFrontService $sports)
+    public function frontend(Request $request, PublicFrontService $sports, VasCatalogService $vasCatalog)
     {
-		//$data = Cache::get(self::CACHE_KEY);
 
-		//if (!$data) {
-			
-			$data = $sports->getSportlight();
-			
-			$settings = SystemSetting::query()
-				->where('is_public', true)
-				->where('setting_key', 'like', 'about.%')
-				->get(['setting_key', 'value'])
-				->mapWithKeys(fn (SystemSetting $setting) => [substr($setting->setting_key, 6) => $setting->value]);
+		$data = $sports->getSportlight();
 
-			$data['banner'] = $this->getBannerData($settings);
-			$data['how_it_works'] = $this->howItWorks();
-			$data['contact_info'] = $this->getContactInfo($settings);
-			$data['features'] = $settings['features'];
-			$data['platform_stats'] = $this->getPlatformStats();
-			$data['leaderboard'] = $this->getLeaderboard();
-			$data['faqs'] = $this->getFaqs();
-			$data['support_link'] = [
-				getValue($settings, 'supports.link1', 'https://t.me/tlstore_general'),
-				getValue($settings, 'supports.link2', 'https://t.me/tlstore_help'),
-			];
-			$data['footer'] = [
-				'copyright' => $settings['footer_copyright'],
-				'note' => $settings['footer_note'],
-			];
-			
-		//	Cache::put(self::CACHE_KEY, $data);
-		//}
+		$settings = SystemSetting::query()
+			->where('is_public', true)
+			->where('setting_key', 'like', 'about.%')
+			->get(['setting_key', 'value'])
+			->mapWithKeys(fn (SystemSetting $setting) => [substr($setting->setting_key, 6) => $setting->value]);
+
+		$data['banner'] = $this->getBannerData($settings);
+		$data['how_it_works'] = $this->howItWorks($settings);
+		$data['vas_services'] = $vasCatalog->publicInfo();
+		$data['contact_info'] = $this->getContactInfo($settings);
+		$data['features'] = getValue($settings, 'features', [
+			'App reviews', 'Sponsored sharing', 'Earn rewards', 'Referral rewards',
+		]);
+		$data['platform_stats'] = $this->getPlatformStats();
+		$data['leaderboard'] = $this->getLeaderboard();
+		$data['faqs'] = $this->getFaqs();
+		$data['support_link'] = [
+			$this->setting($settings, 'supports.link1', 'https://t.me/tlstore_general'),
+			$this->setting($settings, 'supports.link2', 'https://t.me/tlstore_help'),
+		];
+		$data['footer'] = [
+			'copyright' => $this->setting($settings, 'footer_copyright', '© TLStore. All rights reserved.'),
+			'note' => $this->setting($settings, 'footer_note', 'Review • Share • Earn'),
+		];
 
         return response()->json(['data' => $data]);
 
@@ -103,7 +101,7 @@ final class FrontendController
                 'referral_task_reward', 'subscription_bonus', 'social_follow_reward',
             ])
             ->count();
-	
+
 		return [
             [
                 'key' => 'stats_members',
@@ -132,9 +130,9 @@ final class FrontendController
         ];
     }
 
-	private function howItWorks()
+	private function howItWorks(array|\Illuminate\Support\Collection $settings): array
 	{
-		return [
+		$defaults = [
 			[
 				'number' => '1',
 				'icon' => 'person_add_alt_1_rounded',
@@ -168,8 +166,29 @@ final class FrontendController
 				'hasline' => false,
 			],
 		];
+
+		$configured = $this->setting($settings, 'how_it_works');
+		if (! is_array($configured) || $configured === []) {
+			return $defaults;
+		}
+
+		return collect($configured)
+			->filter(fn ($step) => is_array($step))
+			->values()
+			->map(function (array $step, int $index) use ($defaults): array {
+				$default = $defaults[$index] ?? $defaults[0];
+				return [
+					'number' => (string) ($index + 1),
+					'icon' => (string) ($default['icon']),
+					'title' => trim((string) ($step['title'] ?? '')) ?: $default['title'],
+					'description' => trim((string) ($step['description'] ?? '')) ?: $default['description'],
+					'color' => (string) ($default['color']),
+					'hasline' => $index < count($configured) - 1,
+				];
+			})
+			->all();
 	}
-	
+
 	private function getLeaderboard(string $period = 'all_time')
 	{
 		$startDate = match ($period) {
@@ -229,41 +248,50 @@ final class FrontendController
 			});
 	}
 
-	
+
 	private function getBannerData(array|\Illuminate\Support\Collection $settings): array
 	{
 		return [
-			'title' => getValue($settings, 'hero_tagline', 'Welcome to Trust lens store'),
-			'subtitle' => getValue($settings, 'what_we_do_body', 'Built for people who make apps better'),
-			'description' => getValue(
+			'title' => $this->setting($settings, 'hero_tagline', 'Welcome to Trust lens store'),
+			'subtitle' => $this->setting($settings, 'what_we_do_body', 'Built for people who make apps better'),
+			'description' => $this->setting(
 				$settings,
 				'mission_body',
 				'A community marketplace for app feedback and sponsored sharing.'
 			),
-			'image' => getValue(
+			'image' => $this->setting(
 				$settings,
 				'hero_image_url',
 				'https://picsum.photos/seed/701/600/800'
 			),
-			'cta_text' => 'Get Started',
-			'cta_link' => '/register',
+			'cta_text' => $this->setting($settings, 'hero_cta_text', 'Get Started'),
+			'cta_link' => $this->setting($settings, 'hero_cta_link', '/register'),
 		];
 	}
 
 	private function getContactInfo(array|\Illuminate\Support\Collection $settings): array
 	{
         return [
-            'email' => getValue($settings, 'contact_email', 'support@tlstore.org'),
-            'phone' => getValue($settings, 'contact_phone', '+1 394 567 8900'),
-            'address' => getValue($settings, 'contact_address', '123 AI Street, Tech City'),
+			'email' => $this->setting($settings, 'contact_email', 'support@tlstore.org'),
+			'phone' => $this->setting($settings, 'contact_phone', '+1 394 567 8900'),
+			'address' => $this->setting($settings, 'contact_address', '123 AI Street, Tech City'),
             'social_links' => [
-                'facebook' => getValue($settings, 'social_links.facebook', 'https://facebook.com'),
-                'twitter' => getValue($settings, 'social_links.twitter' ,''),
-                'instagram' => getValue($settings, 'social_links.instagram' ,''),
-                'tiktok' => getValue($settings, 'social_links.tiktok' ,''),
-                'telegram' => getValue($settings, 'social_links.telegram' ,'https://telegram.com'),
+				'facebook' => $this->setting($settings, 'social_links.facebook', 'https://facebook.com'),
+				'twitter' => $this->setting($settings, 'social_links.twitter', ''),
+				'instagram' => $this->setting($settings, 'social_links.instagram', ''),
+				'tiktok' => $this->setting($settings, 'social_links.tiktok', ''),
+				'telegram' => $this->setting($settings, 'social_links.telegram', 'https://telegram.com'),
             ],
         ];
+	}
+
+	private function setting(array|\Illuminate\Support\Collection $settings, string $key, mixed $default = null): mixed
+	{
+		$value = $settings instanceof \Illuminate\Support\Collection
+			? $settings->get($key)
+			: ($settings[$key] ?? null);
+
+		return $value === null || $value === '' ? $default : $value;
 	}
 
     private function getFaqs()

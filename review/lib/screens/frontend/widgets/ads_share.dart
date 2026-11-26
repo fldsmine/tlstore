@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:review/services/auth_api.dart';
 import 'package:review/services/media_url.dart';
 import '../../../../core/currency/money.dart';
+import 'auto_marquee.dart';
 
 class AdShare extends StatelessWidget {
 
@@ -30,112 +31,128 @@ class AdShare extends StatelessWidget {
           'Featured tasks',
           description: 'See a sample of the public sharing opportunities.',
         ),
-        SizedBox(
+        AutoMarquee(
+          itemCount: ads.length,
           height: 226,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            scrollDirection: Axis.horizontal,
-            itemCount: ads.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final ad = ads[index];
-              final image = _image(ad['creative_path']);
-              final currency = _text(ad['currency'], 'USD');
-              final price = double.tryParse(ad['price']?.toString() ?? '') ?? 0;
-              return SizedBox(
-                width: 285,
-                child: Card(
-                  margin: EdgeInsets.zero,
-                  clipBehavior: Clip.antiAlias,
-                  elevation: 0,
-                  color: colors.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    side: BorderSide(color: colors.outlineVariant),
-                  ),
-                  child: InkWell(
-                    //onTap: () => _openAd(ad),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          height: 124,
-                          width: double.infinity,
-                          child: image.isEmpty
-                              ? ColoredBox(
+          speed: 30,
+          itemSpacing: 12,
+          pauseOnTouch: true,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+
+          itemBuilder: (context, index) {
+            final ad = ads[index];
+            final image = _image(ad['creative_path']);
+            final currency = _text(ad['currency'], 'USD');
+            final price =
+                double.tryParse(ad['price']?.toString() ?? '') ?? 0;
+
+            return SizedBox(
+              width: 285,
+              child: Card(
+                margin: EdgeInsets.zero,
+                clipBehavior: Clip.antiAlias,
+                elevation: 0,
+                color: colors.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  side: BorderSide(color: colors.outlineVariant),
+                ),
+                child: InkWell(
+                  // onTap: () => _openAd(ad),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 124,
+                        width: double.infinity,
+                        child: image.isEmpty
+                            ? ColoredBox(
+                                color: colors.secondaryContainer,
+                                child: Icon(
+                                  Icons.campaign_rounded,
+                                  size: 38,
+                                  color: colors.onSecondaryContainer,
+                                ),
+                              )
+                            : CachedNetworkImage(
+                                imageUrl: image,
+                                fit: BoxFit.cover,
+                                errorWidget: (context, url, error) =>
+                                    ColoredBox(
                                   color: colors.secondaryContainer,
                                   child: Icon(
                                     Icons.campaign_rounded,
-                                    size: 38,
                                     color: colors.onSecondaryContainer,
                                   ),
-                                )
-                              :  CachedNetworkImage(
-                                  imageUrl: image,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) => ColoredBox(
-                                    color: colors.secondaryContainer,
-                                    child: Icon(
-                                      Icons.campaign_rounded,
-                                      color: colors.onSecondaryContainer,
-                                    ),
-                                  ),
                                 ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _text(ad['title'], 'Sponsored task'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _text(
-                                  ad['description'],
-                                  'Share this campaign publicly.',
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _text(ad['title'], 'Sponsored task'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+
+                            const SizedBox(height: 4),
+
+                            Text(
+                              _text(
+                                ad['description'],
+                                'Share this campaign publicly.',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                            ),
+
+                            const SizedBox(height: 6),
+
+                            Row(
+                              children: [
+                                Text(
+                                  formatMajorMoney(price, currency),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(
+                                        color: colors.primary,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: colors.onSurfaceVariant),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Text(
-                                    formatMajorMoney(price, currency),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(
-                                          color: colors.primary,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                  ),
-                                  const Spacer(),
-                                  Icon(
-                                    Icons.open_in_new_rounded,
-                                    size: 17,
-                                    color: colors.primary,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                                const Spacer(),
+                                Icon(
+                                  Icons.open_in_new_rounded,
+                                  size: 17,
+                                  color: colors.primary,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 18),
       ],
