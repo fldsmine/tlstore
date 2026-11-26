@@ -24,13 +24,13 @@ class MediaUrl {
     path = path.replaceFirst(RegExp(r'^(\./)?/?storage/'), '');
     path = path.replaceFirst(RegExp(r'^/?storage/'), '');
     path = path.replaceFirst(RegExp(r'^/+'), '');
-    if (!path.startsWith('images/') &&
+    /*if (!path.startsWith('images/') &&
         !path.startsWith('app-icons/') &&
         !path.startsWith('ads/') &&
         !path.startsWith('avatars/') &&
         !path.startsWith('covers/')) {
       path = 'images/$path';
-    }
+    }*/
     return origin.resolve('storage/$path').toString();
   }
 }
