@@ -6,6 +6,7 @@ use App\Application\Actions\Marketplace\ListingEligibility;
 use App\Models\ReviewAnswer;
 use App\Models\ReviewSubmission;
 use App\Models\ReviewTask;
+use App\Models\Notification;
 use App\Models\Transaction;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\User;
@@ -77,6 +78,16 @@ final class SubmitReview
             ]);
 
             $appName = trim((string) $campaign->app?->name) ?: 'app listing';
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'review-submitted-'.$submission->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'review_submitted',
+                    'title' => 'Review received: '.$appName,
+                    'body' => 'Your review of '.$appName.' was submitted and is awaiting human review.',
+                    'data' => ['review_submission_id' => $submission->id, 'app_id' => $campaign->app_id, 'app_name' => $appName, 'status' => 'pending_review'],
+                ],
+            );
             Transaction::query()->updateOrCreate(
                 ['reference' => 'review-submission:'.$submission->id],
                 [

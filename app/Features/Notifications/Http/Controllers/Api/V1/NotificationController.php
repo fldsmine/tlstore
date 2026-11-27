@@ -5,6 +5,7 @@ namespace App\Features\Notifications\Http\Controllers\Api\V1;
 use App\Models\Notification;
 use App\Models\UserDevice;
 use App\Models\UserNotificationPreference;
+use App\Models\SystemSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,6 +44,11 @@ final class NotificationController
     public function preferences(Request $request): JsonResponse
     {
         $user = $request->user();
+        $emailSetting = SystemSetting::query()->where('setting_key', 'notifications.email.enabled')->first()?->value ?? false;
+        $pushSetting = SystemSetting::query()->where('setting_key', 'notifications.push.enabled')->first()?->value ?? true;
+        $configuredMailer = (string) (SystemSetting::query()->where('setting_key', 'notifications.email.mailer')->first()?->value ?? config('mail.default', 'smtp'));
+        $emailEnabled = filter_var(is_array($emailSetting) ? ($emailSetting['enabled'] ?? false) : $emailSetting, FILTER_VALIDATE_BOOLEAN);
+        $pushEnabled = filter_var(is_array($pushSetting) ? ($pushSetting['enabled'] ?? true) : $pushSetting, FILTER_VALIDATE_BOOLEAN);
         $stored = $user->notificationPreferences()->get()->keyBy('category');
         $categories = [];
         foreach (self::CATEGORIES as $key => $meta) {
@@ -50,15 +56,18 @@ final class NotificationController
             $categories[] = [
                 'key' => $key,
                 ...$meta,
-                'push' => $preference?->push_enabled ?? true,
+                'push' => $preference?->push_enabled ?? $pushEnabled,
                 'email' => $preference?->email_enabled ?? false,
             ];
         }
 
         return response()->json(['data' => [
             'categories' => $categories,
-            'push_available' => (bool) config('services.fcm.enabled'),
-            'email_available' => config('mail.default') !== 'log',
+            'push_available' => $pushEnabled && (bool) config('services.fcm.enabled'),
+            'email_available' => $emailEnabled && $configuredMailer !== 'log' && array_key_exists($configuredMailer, config('mail.mailers', [])),
+            'email_mailer' => $configuredMailer,
+            'email_global_enabled' => $emailEnabled,
+            'push_global_enabled' => $pushEnabled,
         ]]);
     }
 
@@ -74,8 +83,14 @@ final class NotificationController
         foreach ($data['categories'] as $category => $channels) {
             abort_unless(array_key_exists($category, self::CATEGORIES), 422, 'Unknown notification category.');
             abort_if(self::CATEGORIES[$category]['locked'] ?? false, 422, 'Account and security notifications cannot be disabled.');
-            abort_if(array_key_exists('email', $channels) && $channels['email'] && config('mail.default') === 'log', 422, 'Email delivery is not configured.');
-            abort_if(array_key_exists('push', $channels) && $channels['push'] && ! config('services.fcm.enabled'), 422, 'Push delivery is not configured.');
+            $emailSetting = SystemSetting::query()->where('setting_key', 'notifications.email.enabled')->first()?->value ?? false;
+            $emailEnabled = filter_var(is_array($emailSetting) ? ($emailSetting['enabled'] ?? false) : $emailSetting, FILTER_VALIDATE_BOOLEAN);
+            $selectedMailer = (string) (SystemSetting::query()->where('setting_key', 'notifications.email.mailer')->first()?->value ?? config('mail.default', 'smtp'));
+            $mailerConfigured = $selectedMailer !== 'log' && array_key_exists($selectedMailer, config('mail.mailers', []));
+            abort_if(array_key_exists('email', $channels) && $channels['email'] && (! $emailEnabled || ! $mailerConfigured), 422, 'Email notifications are not enabled by the platform or mail is not configured.');
+            $pushSetting = SystemSetting::query()->where('setting_key', 'notifications.push.enabled')->first()?->value ?? true;
+            $pushEnabled = filter_var(is_array($pushSetting) ? ($pushSetting['enabled'] ?? true) : $pushSetting, FILTER_VALIDATE_BOOLEAN);
+            abort_if(array_key_exists('push', $channels) && $channels['push'] && (! $pushEnabled || ! config('services.fcm.enabled')), 422, 'Push notifications are not enabled by the platform or Firebase is not configured.');
             $preference = UserNotificationPreference::query()->firstOrNew([
                 'user_id' => $request->user()->id,
                 'category' => $category,

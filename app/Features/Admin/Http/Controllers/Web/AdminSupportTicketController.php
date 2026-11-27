@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Http\Controllers\Web;
 
 use App\Models\AuditLog;
+use App\Models\Notification;
 use App\Models\SupportTicket;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,12 +59,22 @@ final class AdminSupportTicketController
         $data = $request->validate(['message' => ['required', 'string', 'min:2', 'max:5000']]);
         $before = ['status' => $ticket->status];
 
-        $ticket->messages()->create([
+        $message = $ticket->messages()->create([
             'sender_type' => 'admin',
             'sender_admin_id' => Auth::guard('admin')->id(),
             'message' => trim($data['message']),
         ]);
         $ticket->forceFill(['status' => 'waiting_on_user', 'last_message_at' => now()])->save();
+        Notification::query()->firstOrCreate(
+            ['notification_key' => 'support-ticket-reply-'.$message->id],
+            [
+                'user_id' => $ticket->user_id,
+                'type' => 'support_ticket_reply',
+                'title' => 'Support replied: '.$ticket->ticket_number,
+                'body' => 'Our support team replied to ticket '.$ticket->ticket_number.': '.$ticket->subject,
+                'data' => ['support_ticket_id' => $ticket->id, 'support_ticket_message_id' => $message->id, 'ticket_number' => $ticket->ticket_number, 'ticket_subject' => $ticket->subject, 'reply' => $message->message],
+            ],
+        );
         $this->audit('support_ticket.replied', $ticket, $before, ['status' => $ticket->status]);
 
         return redirect()->route('admin.support-tickets.show', $ticket)->with('success', 'Reply sent to the user.');

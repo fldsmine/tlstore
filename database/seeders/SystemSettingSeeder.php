@@ -76,6 +76,15 @@ class SystemSettingSeeder extends Seeder
             'payment.active_payment_currency' => [$activePaymentCurrency, true],
             'account_validation.provider' => [['provider' => 'paystack'], false],
 
+            // Outbound notifications. Credentials remain in environment-backed
+            // Laravel mailer configuration; these settings control delivery.
+            'notifications.email.enabled' => [false, false],
+            'notifications.email.mailer' => [config('mail.default', 'smtp'), false],
+            'notifications.email.from_address' => [config('mail.from.address', 'hello@example.com'), false],
+            'notifications.email.from_name' => [config('mail.from.name', 'TLStore'), false],
+            'notifications.push.enabled' => [true, false],
+            'notifications.sms.enabled' => [false, false],
+
             // VAS remains disabled until purchase and wallet settlement are deployed.
             'vas.enabled' => [true, true],
             'vas.services' => [[

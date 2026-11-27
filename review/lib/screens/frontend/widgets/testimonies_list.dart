@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:review/services/media_url.dart';
 
+import 'anim/anim_kit.dart';
+
 class TestimoniesList extends StatefulWidget {
   final List<Map<String, dynamic>> testimonies;
 
@@ -90,14 +92,22 @@ class _TestimoniesListState extends State<TestimoniesList> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: List.generate(
-                            rating.clamp(0, 5).toInt(),
-                            (_) => Icon(
-                              Icons.star_rounded,
-                              size: 18,
-                              color: colors.tertiary,
+                          children: [
+                            ...List.generate(
+                              rating.clamp(0, 5).toInt(),
+                              (i) => TwinkleStar(index: i, color: colors.tertiary),
                             ),
-                          ),
+                            const Spacer(),
+                            Floating(
+                              amplitude: 3,
+                              tilt: .08,
+                              child: Icon(
+                                Icons.format_quote_rounded,
+                                size: 32,
+                                color: colors.primary.withValues(alpha: .45),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         Expanded(

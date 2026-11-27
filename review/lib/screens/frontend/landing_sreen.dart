@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/auth_api.dart';
 import 'widgets/ads_share.dart';
+import 'widgets/anim/anim_kit.dart';
 import 'widgets/app_features.dart';
 import 'widgets/banner_section.dart';
 import 'widgets/faq_section.dart';
@@ -179,57 +180,72 @@ class _LandingScreenState extends State<LandingScreen> {
     final theme = _landingTheme(context);
 
     return Scaffold(
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1180),
-          child: _loading && _payload.isEmpty
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null && _payload.isEmpty
-              ? _loadError(theme)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      BannerSection(banner: _banner, user: widget.isUser),
-                      const SizedBox(height: 24),
-                      FeaturedApp(apps: _apps),
-                      const SizedBox(height: 24),
-                      PaymentOptions(options: _paymentOptions),
-                      const SizedBox(height: 24),
-                      Leaderboard(leaders: _leaders),
-                      const SizedBox(height: 24),
-                      HowItWorks(steps: _steps),
-                      const SizedBox(height: 24),
-                      AdShare(ads: _ads, api: widget.api),
-                      const SizedBox(height: 24),
-                      AppFeatures(features: _features),
-                      const SizedBox(height: 24),
-                      VasServicesSection(data: _vasServices),
-                      const SizedBox(height: 24),
-                      PlatformStats(stats: _stats),
-                      const SizedBox(height: 24),
-                      TestimoniesList(testimonies: _testimonies),
-                      const SizedBox(height: 24),
-                      FaqSection(faqs: _faqs),
-                      const SizedBox(height: 24),
-                      ContactUs(
-                        api: widget.api,
-                        token: widget.token,
-                        contact: _contact,
-                        support: _supportLinks,
-                        user: widget.isUser,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AmbientBackdrop()),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1180),
+              child: _loading && _payload.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null && _payload.isEmpty
+                  ? _loadError(theme)
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          // The hero animates itself.
+                          BannerSection(banner: _banner, user: widget.isUser),
+                          _gap,
+                          Reveal(child: FeaturedApp(apps: _apps)),
+                          _gap,
+                          Reveal(child: PaymentOptions(options: _paymentOptions)),
+                          _gap,
+                          Reveal(child: Leaderboard(leaders: _leaders)),
+                          _gap,
+                          // How it works, features, services and stats
+                          // run their own staggered, illustrated reveals.
+                          HowItWorks(steps: _steps),
+                          _gap,
+                          Reveal(child: AdShare(ads: _ads, api: widget.api)),
+                          _gap,
+                          AppFeatures(features: _features),
+                          _gap,
+                          VasServicesSection(data: _vasServices),
+                          _gap,
+                          PlatformStats(stats: _stats),
+                          _gap,
+                          Reveal(child: TestimoniesList(testimonies: _testimonies)),
+                          _gap,
+                          Reveal(child: FaqSection(faqs: _faqs)),
+                          _gap,
+                          Reveal(
+                            child: ContactUs(
+                              api: widget.api,
+                              token: widget.token,
+                              contact: _contact,
+                              support: _supportLinks,
+                              user: widget.isUser,
+                            ),
+                          ),
+                          _gap,
+                          Reveal(
+                            offset: const Offset(0, 16),
+                            child: FooterSection(footer: _footerData, api: widget.api),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 24),
-                      FooterSection(footer: _footerData, api: widget.api),
-                    ],
-                  ),
-                ),
-        ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  static const _gap = SizedBox(height: 24);
 
   Widget _loadError(ThemeData theme) => Center(
     child: Padding(

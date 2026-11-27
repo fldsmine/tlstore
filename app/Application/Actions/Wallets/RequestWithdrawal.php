@@ -5,6 +5,7 @@ namespace App\Application\Actions\Wallets;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Application\Money\CurrencyConverter;
 use App\Models\LedgerEntry;
+use App\Models\Notification;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\UserSubscription;
@@ -126,6 +127,29 @@ final class RequestWithdrawal
                     'fee_percent' => (float) $option->tax,
                 ],
             ]);
+
+            $amount = number_format(
+                CurrencyMinorUnits::fromMinor($amountMinor, $wallet->currency),
+                CurrencyMinorUnits::precision($wallet->currency),
+            );
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'withdrawal-requested-'.$withdrawal->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'withdrawal_requested',
+                    'title' => 'Withdrawal request received',
+                    'body' => 'Your withdrawal request for '.$amount.' '.$wallet->currency.' is pending processing.',
+                    'data' => [
+                        'withdrawal_id' => $withdrawal->id,
+                        'amount_minor' => $amountMinor,
+                        'amount' => $amount,
+                        'currency' => $wallet->currency,
+                        'reference' => (string) $withdrawal->id,
+                        'wallet_type' => $walletType,
+                        'status' => 'pending',
+                    ],
+                ],
+            );
 
             return $withdrawal->load('option');
         });

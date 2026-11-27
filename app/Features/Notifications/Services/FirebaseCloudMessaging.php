@@ -15,7 +15,7 @@ final class FirebaseCloudMessaging
 {
     private const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
-    public function send(Notification $notification): void
+    public function send(Notification $notification, ?string $title = null, ?string $body = null): void
     {
         $preference = $notification->user->notificationPreferences()
             ->where('category', $notification->preferenceCategory())->first();
@@ -54,8 +54,8 @@ final class FirebaseCloudMessaging
                         'message' => [
                             'token' => $device->push_token,
                             'notification' => [
-                                'title' => $notification->title,
-                                'body' => $notification->body ?? '',
+                                'title' => $title ?? $notification->title,
+                                'body' => $body ?? $notification->body ?? '',
                             ],
                             'data' => $data,
                             'android' => [

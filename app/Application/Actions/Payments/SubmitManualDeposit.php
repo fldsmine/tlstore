@@ -5,6 +5,7 @@ namespace App\Application\Actions\Payments;
 use App\Application\Support\PaymentGatewaySettings;
 use App\Models\ManualDepositSubmission;
 use App\Models\PaymentIntent;
+use App\Models\Notification;
 use App\Models\User;
 use App\Models\Transaction;
 use App\Application\Money\CurrencyMinorUnits;
@@ -60,6 +61,17 @@ final class SubmitManualDeposit
                     'provider' => 'manual',
                 ],
             ]);
+
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'manual-deposit-submitted-'.$deposit->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'manual_deposit_submitted',
+                    'title' => 'Top-up proof received',
+                    'body' => 'Your manual top-up proof was received and is awaiting admin approval.',
+                    'data' => ['manual_deposit_id' => $deposit->id, 'payment_intent_id' => $intent->id, 'amount_minor' => $amountMinor, 'amount' => number_format(CurrencyMinorUnits::fromMinor($amountMinor, strtoupper($currency)), CurrencyMinorUnits::precision(strtoupper($currency))), 'currency' => strtoupper($currency), 'reference' => (string) ($bankReference ?: $intent->id), 'status' => 'submitted'],
+                ],
+            );
 
             return $deposit;
         });

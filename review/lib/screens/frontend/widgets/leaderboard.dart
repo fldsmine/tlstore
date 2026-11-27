@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:review/services/media_url.dart';
 import '../../../core/currency/money.dart';
+import 'anim/anim_kit.dart';
+import 'anim/illustrations.dart';
 
 class Leaderboard extends StatelessWidget {
 
@@ -14,8 +16,6 @@ class Leaderboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
-    debugPrint('LEADER BOARD:: $leaders');
 
     if (leaders.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
@@ -62,7 +62,20 @@ class Leaderboard extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: colors.outlineVariant),
             ),
-            child: Column(
+            child: Stack(
+              children: [
+                if (hasPodium)
+                  Positioned.fill(
+                    child: ConfettiRain(
+                      colors: [
+                        const Color(0xFFE9B949),
+                        colors.primary,
+                        colors.tertiary,
+                        const Color(0xFFFF7AB6),
+                      ],
+                    ),
+                  ),
+                Column(
               children: [
                 if (hasPodium) ...[
                   Row(
@@ -107,6 +120,8 @@ class Leaderboard extends StatelessWidget {
                     remaining[index],
                     hasPodium ? index + 3 : index,
                   ),
+              ],
+            ),
               ],
             ),
           ),
@@ -191,11 +206,19 @@ class Leaderboard extends StatelessWidget {
     final firstName = name.split(RegExp(r'\s+')).first;
     final score = _leaderScore(leader);
 
-    return Column(
+    final delay = Duration(milliseconds: rank == 1 ? 350 : (rank == 2 ? 150 : 0));
+    return Reveal(
+      delay: delay,
+      offset: const Offset(0, 24),
+      child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (rank == 1)
-          Icon(Icons.workspace_premium_rounded, color: medal, size: 20),
+          Floating(
+            amplitude: 3,
+            duration: const Duration(seconds: 2),
+            child: Icon(Icons.workspace_premium_rounded, color: medal, size: 20),
+          ),
           
         CircleAvatar(
           radius: rank == 1 ? 25 : 21,
@@ -228,27 +251,40 @@ class Leaderboard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          height: blockHeight,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [medal.withValues(alpha: .35), medal.withValues(alpha: .12)],
-            ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '#$rank',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: colors.onSurface,
-              fontWeight: FontWeight.w900,
+        InView(
+          delay: delay,
+          builder: (context, visible) => TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: visible ? blockHeight : 0),
+            duration: reduceMotion(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 900),
+            curve: Curves.easeOutBack,
+            builder: (context, h, _) => ClipRect(
+              child: Container(
+                height: h < 0 ? 0 : h,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [medal.withValues(alpha: .35), medal.withValues(alpha: .12)],
+                  ),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '#$rank',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: colors.onSurface,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
       ],
+    ),
     );
   }
 
@@ -267,7 +303,10 @@ class Leaderboard extends StatelessWidget {
     final shares = int.tryParse(leader['total_share']?.toString() ?? '') ?? 0;
     final score = _leaderScore(leader);
 
-    return Container(
+    return Reveal(
+      delay: Duration(milliseconds: 80 * (index % 4)),
+      offset: const Offset(36, 0),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 7),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
@@ -327,6 +366,7 @@ class Leaderboard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 

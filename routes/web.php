@@ -3,6 +3,7 @@
 use App\Features\System\Http\Controllers\Web\LandingPageController;
 use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
+use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
 use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
 use Illuminate\Http\Request;
@@ -60,6 +61,11 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::middleware(EnsureAdminWebAccount::class)->group(function (): void {
         Route::post('/logout', [AdminConsoleController::class, 'logout'])->name('logout');
         Route::get('/', [AdminConsoleController::class, 'dashboard'])->name('dashboard');
+        Route::get('/notifications', [NotificationTemplateAdminController::class, 'index'])->name('notifications.index');
+        Route::patch('/notifications/settings', [NotificationTemplateAdminController::class, 'updateSettings'])->name('notifications.settings');
+        Route::post('/notifications/test', [NotificationTemplateAdminController::class, 'sendTest'])->middleware('throttle:3,1')->name('notifications.test');
+        Route::get('/notifications/templates/{template}/edit', [NotificationTemplateAdminController::class, 'edit'])->whereNumber('template')->name('notifications.templates.edit');
+        Route::patch('/notifications/templates/{template}', [NotificationTemplateAdminController::class, 'update'])->whereNumber('template')->name('notifications.templates.update');
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])->name('support-tickets.index');
         Route::get('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
         Route::post('/support-tickets/{ticket}/messages', [AdminSupportTicketController::class, 'reply'])->whereNumber('ticket')->name('support-tickets.reply');

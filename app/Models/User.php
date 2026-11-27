@@ -11,7 +11,6 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Notifications\PasswordResetTokenNotification;
 
 class User extends Authenticatable
 {
@@ -21,7 +20,8 @@ class User extends Authenticatable
 
     public function sendPasswordResetNotification($token): void
     {
-        $this->notify(new PasswordResetTokenNotification($token));
+        app(\App\Features\Notifications\Services\NotificationTemplateService::class)
+            ->sendPasswordReset($this, (string) $token);
     }
 
     protected $table = 'users';

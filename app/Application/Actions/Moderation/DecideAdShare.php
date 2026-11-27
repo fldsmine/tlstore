@@ -65,6 +65,8 @@ final class DecideAdShare
                     'data' => [
                         'ad_share_event_id' => $event->id,
                         'ad_share_task_id' => $event->task->id,
+                        'ad_id' => $ad->id,
+                        'ad_title' => $ad->title,
                         'status' => $decision === 'approved' ? 'validated' : 'rejected',
                     ],
                 ],

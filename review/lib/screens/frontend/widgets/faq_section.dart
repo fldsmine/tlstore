@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'anim/illustrations.dart';
+
 class FaqSection extends StatelessWidget {
   final List<Map<String, dynamic>> faqs;
 
@@ -33,6 +35,7 @@ class FaqSection extends StatelessWidget {
           'Helpful answers',
           'Frequently asked questions',
           description: 'Select a category to browse its questions.',
+          trailing: const FaqArt(),
         ),
 
         Padding(
@@ -196,43 +199,52 @@ class FaqSection extends StatelessWidget {
     String eyebrow,
     String title, {
     String? description,
+    Widget? trailing,
   }) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(
-            eyebrow.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: colors.primary,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  eyebrow.toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.5,
+                  ),
+                ),
+                if (description != null) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    description,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -.5,
-            ),
-          ),
-          if (description != null) ...[
-            const SizedBox(height: 5),
-            Text(
-              description,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-          ],
+          if (trailing != null) trailing,
         ],
       ),
     );
   }
+
 }

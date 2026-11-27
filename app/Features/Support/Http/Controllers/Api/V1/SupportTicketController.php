@@ -4,6 +4,7 @@ namespace App\Features\Support\Http\Controllers\Api\V1;
 
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
+use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -115,12 +116,22 @@ final class SupportTicketController
         }
         $data = $request->validate(['message' => ['required', 'string', 'min:2', 'max:5000']]);
         DB::transaction(function () use ($request, $ticket, $data): void {
-            $ticket->messages()->create([
+            $message = $ticket->messages()->create([
                 'sender_type' => 'admin',
                 'sender_admin_id' => $request->user()->id,
                 'message' => trim($data['message']),
             ]);
             $ticket->forceFill(['status' => 'waiting_on_user', 'last_message_at' => now()])->save();
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'support-ticket-reply-'.$message->id],
+                [
+                    'user_id' => $ticket->user_id,
+                    'type' => 'support_ticket_reply',
+                    'title' => 'Support replied: '.$ticket->ticket_number,
+                    'body' => 'Our support team replied to ticket '.$ticket->ticket_number.': '.$ticket->subject,
+                    'data' => ['support_ticket_id' => $ticket->id, 'support_ticket_message_id' => $message->id, 'ticket_number' => $ticket->ticket_number, 'ticket_subject' => $ticket->subject, 'reply' => $message->message],
+                ],
+            );
         });
         return response()->json(['data' => $this->serialize($ticket->fresh(['user:id,full_name,email,username', 'messages.senderUser:id,full_name,username', 'messages.senderAdmin:id,full_name']))]);
     }

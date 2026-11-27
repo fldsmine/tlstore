@@ -5,6 +5,7 @@ namespace App\Application\Actions\Ads;
 use App\Application\Actions\Marketplace\ListingEligibility;
 use App\Models\AdShareEvent;
 use App\Models\AdShareTask;
+use App\Models\Notification;
 use App\Models\Transaction;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\User;
@@ -50,6 +51,16 @@ final class SubmitAdShareEvidence
             $task->update(['status' => 'submitted', 'completed_at' => now()]);
 
             $currency = strtoupper($task->ad->currency);
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'ad-share-submitted-'.$event->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'ad_share_submitted',
+                    'title' => 'Share proof received: '.$task->ad->title,
+                    'body' => 'Your share proof for "'.$task->ad->title.'" was submitted and is awaiting verification.',
+                    'data' => ['ad_share_event_id' => $event->id, 'ad_share_task_id' => $task->id, 'ad_id' => $task->ad_id, 'ad_title' => $task->ad->title, 'channel' => $channel, 'status' => 'pending_validation'],
+                ],
+            );
             Transaction::query()->updateOrCreate(
                 ['reference' => 'ad-share-event:'.$event->id],
                 [

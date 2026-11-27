@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
         // production database needs them before the app can boot.
         $this->call([
             SystemSettingSeeder::class,
+            NotificationTemplateSeeder::class,
             AboutPageSettingsSeeder::class,
             SubscriptionGroupSeeder::class,
         ]);

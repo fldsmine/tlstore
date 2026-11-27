@@ -7,6 +7,7 @@ use App\Application\Actions\PackageAddons\ActivatePackageAddon;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\LedgerEntry;
 use App\Models\PaymentIntent;
+use App\Models\Notification;
 use App\Models\PaymentTransaction;
 use App\Models\PaymentWebhookEvent;
 use App\Models\SubscriptionPlan;
@@ -199,6 +200,21 @@ final class ProcessGatewayWebhook
                 ['wallet_id' => $wallet->id, 'entry_type' => 'gateway_topup', 'direction' => 'credit', 'amount_minor' => $intent->amount_minor,
                     'status' => 'posted', 'source_type' => 'payment_intent', 'source_id' => $intent->id,
                     'description' => ucfirst($intent->provider).' top-up', 'available_at' => $now, 'posted_at' => $now],
+            );
+            $currency = strtoupper($intent->currency);
+            $amount = number_format(
+                CurrencyMinorUnits::fromMinor((int) $intent->amount_minor, $currency),
+                CurrencyMinorUnits::precision($currency),
+            );
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'topup-completed-'.$intent->id],
+                [
+                    'user_id' => $intent->user_id,
+                    'type' => 'topup_completed',
+                    'title' => 'Top-up received',
+                    'body' => 'Your top-up of '.$amount.' '.$currency.' has been added to your Top-up Funds wallet.',
+                    'data' => ['payment_intent_id' => $intent->id, 'amount_minor' => $intent->amount_minor, 'amount' => $amount, 'currency' => $currency, 'reference' => $providerTransactionId, 'status' => 'paid'],
+                ],
             );
         });
     }

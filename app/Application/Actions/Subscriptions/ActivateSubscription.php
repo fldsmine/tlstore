@@ -7,6 +7,7 @@ use App\Application\Actions\Wallets\CreditUserWallet;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Enums\WalletType;
 use App\Models\PaymentIntent;
+use App\Models\Notification;
 use App\Models\SubscriptionPlan;
 use App\Models\SystemSetting;
 use App\Models\User;
@@ -104,6 +105,17 @@ final class ActivateSubscription
                 'referral-subscription:'.$intent->id,
                 'Referral subscription reward: '.$plan->name,
                 $plan,
+            );
+
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'subscription-activated-'.$subscription->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'subscription_activated',
+                    'title' => 'Package activated: '.$plan->name,
+                    'body' => 'Your '.$plan->name.' package is active until '.$endsAt->toDateString().'.',
+                    'data' => ['user_subscription_id' => $subscription->id, 'subscription_plan_id' => $plan->id, 'plan_name' => $plan->name, 'group_key' => $plan->group?->group_key, 'ends_at' => $endsAt->toDateString()],
+                ],
             );
 
             return $subscription->load(['plan.group', 'plan.features']);

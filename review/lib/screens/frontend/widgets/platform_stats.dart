@@ -1,17 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
-class PlatformStats extends StatelessWidget {
+import 'anim/anim_kit.dart';
 
+class PlatformStats extends StatelessWidget {
   final List<Map<String, dynamic>> stats;
 
-  const PlatformStats({
-    super.key, 
-    required this.stats, 
-  });
+  const PlatformStats({super.key, required this.stats});
 
   @override
   Widget build(BuildContext context) {
-
     if (stats.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
@@ -19,10 +18,9 @@ class PlatformStats extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeading(
-          context,
-          '',
-          'Platform Stats',
+        SectionHeading(
+          eyebrow: '',
+          title: 'Platform Stats',
           description: 'Whats keeps us outstanding',
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -33,7 +31,11 @@ class PlatformStats extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.trending_up_rounded, size: 15, color: colors.tertiary),
+                Floating(
+                  amplitude: 2.5,
+                  duration: const Duration(seconds: 2),
+                  child: Icon(Icons.trending_up_rounded, size: 15, color: colors.tertiary),
+                ),
                 const SizedBox(width: 5),
                 Text(
                   'Our Growth',
@@ -51,66 +53,21 @@ class PlatformStats extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final columns = constraints.maxWidth >= 760 ? 4 : 2;
-              final width =
-                  (constraints.maxWidth - 12 * (columns - 1)) / columns;
+              final width = (constraints.maxWidth - 12 * (columns - 1)) / columns;
               return Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                children: stats.map((stat) {
-                  return SizedBox(
-                    width: width,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: colors.outlineVariant),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: colors.primary.withValues(alpha: .18),
-                              borderRadius: BorderRadius.circular(13),
-                            ),
-                            alignment: Alignment.center,
-                            child: Icon(
-                              _statIcon(stat['icon']?.toString()),
-                              color: colors.primary,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _text(stat['value'], '—'),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                Text(
-                                  _text(stat['label'], 'Platform activity'),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                children: [
+                  for (var i = 0; i < stats.length; i++)
+                    SizedBox(
+                      width: width,
+                      child: Reveal(
+                        delay: Duration(milliseconds: 100 * (i % columns)),
+                        scale: .85,
+                        child: _tile(context, stats[i], i),
                       ),
                     ),
-                  );
-                }).toList(),
+                ],
               );
             },
           ),
@@ -118,7 +75,57 @@ class PlatformStats extends StatelessWidget {
         const SizedBox(height: 8),
       ],
     );
+  }
 
+  Widget _tile(BuildContext context, Map<String, dynamic> stat, int index) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final accent = [colors.primary, colors.secondary, colors.tertiary][index % 3];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: Loop(
+              duration: const Duration(seconds: 5),
+              builder: (context, t, child) => CustomPaint(
+                painter: _RingPainter(t, accent),
+                child: child,
+              ),
+              child: Center(
+                child: Icon(_statIcon(stat['icon']?.toString()), color: accent, size: 22),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CountUpText(
+                  value: _text(stat['value'], '—'),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                Text(
+                  _text(stat['label'], 'Platform activity'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _text(Object? value, String fallback) {
@@ -133,58 +140,45 @@ class PlatformStats extends StatelessWidget {
     'globe' => Icons.public_rounded,
     _ => Icons.insights_rounded,
   };
+}
 
-  Widget _sectionHeading(
-    BuildContext context,
-    String eyebrow,
-    String title, {
-    String? description,
-    Widget? trailing,
-  }) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  eyebrow.toUpperCase(),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colors.primary,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.5,
-                  ),
-                ),
-                if (description != null) ...[
-                  const SizedBox(height: 5),
-                  Text(
-                    description,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (trailing != null) trailing,
-        ],
-      ),
+/// A faint track with a comet-like arc sweeping around the icon.
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.t, this.color);
+
+  final double t;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final inner = rect.deflate(3);
+    canvas.drawCircle(
+      rect.center,
+      inner.width / 2,
+      Paint()..color = color.withValues(alpha: .14),
+    );
+    canvas.drawCircle(
+      rect.center,
+      inner.width / 2,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = color.withValues(alpha: .25),
+    );
+    canvas.drawArc(
+      inner,
+      2 * math.pi * t,
+      math.pi * .7,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..color = color,
     );
   }
 
+  @override
+  bool shouldRepaint(_RingPainter old) => old.t != t || old.color != color;
 }
