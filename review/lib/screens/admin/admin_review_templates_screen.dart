@@ -178,12 +178,8 @@ class AdminReviewTemplatesScreen extends StatefulWidget {
 
 class _AdminReviewTemplatesScreenState extends State<AdminReviewTemplatesScreen>
     with SingleTickerProviderStateMixin {
-  final TextEditingController _email = TextEditingController(
-    text: 'admin@tlstore.test',
-  );
-  final TextEditingController _password = TextEditingController(
-    text: 'meandmyson',
-  );
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
   final TextEditingController _templateSearch = TextEditingController();
   final TextEditingController _questionSearch = TextEditingController();
   late final TabController _tabs = TabController(length: 2, vsync: this);

@@ -56,7 +56,7 @@ Route::get('/ref/{code}', function (string $code) use ($webAppUrl) {
 
 Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::get('/login', [AdminConsoleController::class, 'loginForm'])->name('login');
-    Route::post('/login', [AdminConsoleController::class, 'login'])->middleware('throttle:10,1')->name('login.submit');
+    Route::post('/login', [AdminConsoleController::class, 'login'])->middleware('throttle:admin-auth')->name('login.submit');
 
     Route::middleware(EnsureAdminWebAccount::class)->group(function (): void {
         Route::post('/logout', [AdminConsoleController::class, 'logout'])->name('logout');

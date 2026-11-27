@@ -88,7 +88,10 @@ return [
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 
-    'system_account_password' => env('SYSTEM_ACCOUNT_PASSWORD', 'Password123!'),
+    // Only used by the demo seeders. It deliberately has no default value so
+    // a misconfigured environment can never seed demo accounts with a
+    // well-known password (see Database\Seeders\Concerns\ProvidesDemoAccountPassword).
+    'system_account_password' => env('SYSTEM_ACCOUNT_PASSWORD'),
 
     /*
     |--------------------------------------------------------------------------

@@ -19,12 +19,8 @@ class AdminUsersScreen extends StatefulWidget {
 }
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
-  final TextEditingController _email = TextEditingController(
-    text: 'admin@tlstore.test',
-  );
-  final TextEditingController _password = TextEditingController(
-    text: 'meandmyson',
-  );
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
 
   final _search = TextEditingController();
   String? _token;

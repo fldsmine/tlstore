@@ -79,7 +79,7 @@ Route::prefix('v1')->group(function (): void {
 	Route::get('/banks', [BankController::class, 'index'])->name('api.v1.banks.index');
 
     Route::prefix('admin/auth')->name('api.v1.admin.auth.')->group(function (): void {
-        Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:6,1')->name('login');
+        Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:admin-auth')->name('login');
     });
 
     Route::middleware(['auth:sanctum', 'user.account', 'user.two-factor'])->group(function (): void {

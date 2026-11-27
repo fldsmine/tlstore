@@ -4,10 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\Admin;
 use App\Models\SystemSetting;
+use Database\Seeders\Concerns\ProvidesDemoAccountPassword;
 use Illuminate\Database\Seeder;
 
 class DemoAdminSeeder extends Seeder
 {
+    use ProvidesDemoAccountPassword;
+
     public function run(): void
     {
         // Never create or reset an administrator to demo credentials while
@@ -17,7 +20,11 @@ class DemoAdminSeeder extends Seeder
             return;
         }
 
-        $password = (string) config('app.system_account_password');
+        $password = $this->demoAccountPassword();
+
+        if ($password === null) {
+            return;
+        }
 
         $admin = Admin::updateOrCreate(
             ['email' => 'admin@tlstore.test'],

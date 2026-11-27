@@ -31,8 +31,8 @@ class AdminPackageAddonsScreen extends StatefulWidget {
 }
 
 class _AdminPackageAddonsScreenState extends State<AdminPackageAddonsScreen> {
-  final _emailController = TextEditingController(text: 'admin@tlstore.test');
-  final _passwordController = TextEditingController(text: 'meandmyson');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _searchController = TextEditingController();
 
   String? _token;

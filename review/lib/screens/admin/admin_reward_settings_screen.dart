@@ -35,9 +35,6 @@ class _AdminRewardSettingsScreenState extends State<AdminRewardSettingsScreen> {
   @override
   void initState() {
     super.initState();
-
-    _email.text = "admin@tlstore.test";
-    _password.text = "meandmyson";
   }
 
   @override

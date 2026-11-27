@@ -27,3 +27,13 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 server-setup.md
+
+# The document root may only ever contain the front controller and the
+# gateway return bridge. Guard against committing stray PHP entry points
+# (database managers, shells, one-off export scripts) into the web root.
+/public/*.php
+!/public/index.php
+!/public/redirect.php
+
+# Local sandbox scratch (dev sqlite copy, downloaded dists)
+/.tools/tmp/

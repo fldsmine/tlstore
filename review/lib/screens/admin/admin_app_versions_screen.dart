@@ -13,12 +13,8 @@ class AdminAppVersionsScreen extends StatefulWidget {
 }
 
 class _AdminAppVersionsScreenState extends State<AdminAppVersionsScreen> {
-  final TextEditingController _email = TextEditingController(
-    text: 'admin@tlstore.test',
-  );
-  final TextEditingController _password = TextEditingController(
-    text: 'meandmyson',
-  );
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
   final TextEditingController _search = TextEditingController();
 
   String? _token;

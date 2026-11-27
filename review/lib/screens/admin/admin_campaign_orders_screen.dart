@@ -13,7 +13,7 @@ class AdminCampaignOrdersScreen extends StatefulWidget {
 }
 
 class _AdminCampaignOrdersScreenState extends State<AdminCampaignOrdersScreen> {
-  final _email = TextEditingController(text: 'admin@tlstore.test');
+  final _email = TextEditingController();
   final _password = TextEditingController();
   String? _token;
   String? _error;
