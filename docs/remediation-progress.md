@@ -223,3 +223,39 @@ response with a Sanctum token — so the form either 404'd or tried to sign the 
 - Guests cannot revisit their own ticket; the reference is emailed and the inbox notification
   carries the same number. A public "track my ticket" view would need a signed token and is a
   follow-up, not part of this fix.
+
+---
+
+## Phase 3 — Client–server contract alignment & web bundle ✅ (2026-11-27)
+
+| Item | Status | Change |
+|---|---|---|
+| `ERR-16` / `ERR-39` guest contact form | ✅ (done earlier) | Delivered with the public contact form (`POST /api/v1/guest-support`, `AuthApi.submitGuestSupport()`, `ContactUs` reusing `widget.api` and `isUser = widget.user.isNotEmpty`). Re-listed here because it is the first item of this phase. |
+| `ERR-25` wallet transfer targets | ✅ | `WalletType::transferTargets()` is now the single list (`review_group_b`, `review_group_c`, `share`, `referral`, `bonus`). `WalletController::transfer()` validates against it, `TransferTopupFunds` rejects anything else, and the error copy names what is actually accepted. The legacy `review` wallet — already excluded by the action and by the Flutter picker — is no longer advertised. |
+| `ERR-30` account-history page size | ✅ | `per_page` accepts 1–50 with a default of 20 (was `max:5`, default 5); `HistoryScreen` requests 20 rows per page, cutting the scroll-through request count by 4×. |
+| `ERR-26` hardcoded domains | ✅ | `public/redirect.php` boots config and resolves destinations through `App\Application\Support\ShortLinkDestination` (`app.url` / `app.web_url`); it fails closed with a 503 instead of redirecting to a hardcoded production host. `landing.blade.php` `og:url`, the withdrawal-receipt PDF footer domain, the frontend contact-email fallback and the CORS origin list (null entries dropped) all follow configuration. |
+| `ERR-27` mobile transport security | ✅ (Dart/Xcode not compiled here) | Release Android manifest is HTTPS-only (`usesCleartextTraffic="false"`, legacy `gptminpro.online` / `10.145.107.216` / `http://` hosts removed) and claims `web.tlstore.org`; a debug-only manifest overlay re-enables cleartext for local dev. iOS drops the global `NSAllowsArbitraryLoads` in favour of `NSAllowsLocalNetworking` plus a `localhost` exception. |
+| `ERR-28` app-link verification | ✅ | `GET /.well-known/assetlinks.json` and `GET /.well-known/apple-app-site-association` are served from `trustlens.deep_links` (`ANDROID_APP_PACKAGE`, `ANDROID_SHA256_CERT_FINGERPRINTS`, `IOS_APP_ID`). Each answers **404 while unconfigured**, so a half-set deployment never publishes an unusable verification file. |
+| `ERR-17` web bundle | ✅ (origin fixed; full rebuild pending) | New POSIX `review/tool/build_web.sh` mirrors `build_web.ps1` (same `--dart-define` defaults, service-worker templating, publish hint). The committed `public/web/main.dart.js` no longer references `gosmm.com` (11 occurrences) and now targets `https://tlstore.org/api/v1/`. **The Flutter SDK is not available in this environment**, so this is the existing build with the origin corrected, not a rebuild from the current `review/lib`. |
+
+### Verification evidence
+
+| Check | Result |
+|---|---|
+| PHPUnit (full suite) | **111 tests / 530 assertions — OK** (78 / 397 before this phase) |
+| `WalletTransferContractTest` (6 tests) | advertised list excludes `review`; `review` and `topup_fund` targets are rejected at validation; all five advertised targets credit the correct wallet and debit the source; replayed idempotency key never double-debits; the action's error copy lists the supported wallets |
+| `AccountHistoryControllerTest` | default `per_page` is 20, `per_page=50` returns 50 rows, `per_page=51` is a validation error |
+| `ShortLinkDestinationTest` (5 tests) | referral/app destinations follow config, codes are URL-encoded, unknown paths fall back to `register`, an unconfigured URL throws instead of using a hardcoded domain |
+| `WellKnownRoutesTest` (4 tests) | both files 404 until configured, then serve the Android relationship / iOS universal-link JSON with `application/json` |
+| `MobileTransportSecurityTest` (4 tests) | release manifest HTTPS-only with no retired hosts, debug overlay allows cleartext, `Info.plist` no longer allows arbitrary loads, `public/redirect.php` has no hardcoded production domain |
+| `WebBundleTest` (4 tests) | bundle has no `gosmm` / retired hosts, targets the production API, entrypoint loads it, POSIX build script present |
+| `php artisan route:list --path=well-known` | both verification routes registered |
+| `php artisan config:cache` / `config:clear` | both succeed with the new `deep_links` block |
+| `curl` against `php -S` (dev) | `redirect.php?ref=QA123TEST` → `302 https://tlstore.org/ref/QA123TEST`; `?path=login` → `302 https://web.tlstore.org/login`; unknown paths → `register` |
+
+### Residual risk / follow-ups
+
+- **The web bundle is still the old build.** Correcting the API origin makes the shipped web app talk to the right backend again, but it does not contain the guest-support, Fincra or guest-landing client changes. Run `review/tool/build_web.sh` (or `build_web.ps1`) on a machine with the Flutter SDK and publish `review/build/web/` to `public/web/` before release. `WebBundleTest` guards the origin and retired hosts in the meantime.
+- **Dart, Gradle and Xcode were not run here.** Manifest/plist edits were reviewed and XML/plist-parsed in the sandbox; `flutter analyze`, `flutter build apk` and an iOS archive must be run in CI or locally.
+- **App-link fingerprints are deployment secrets of sorts** — they come from the signing certificate and must be added to `.env` on the server; until then the verification endpoints intentionally 404.
+- **Landing page `og:url`** now follows `WEB_APP_URL`; deployments that relied on the old hardcoded marketing URL should set it explicitly.

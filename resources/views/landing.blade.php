@@ -9,7 +9,7 @@
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ $appName }} — Review. Share. Earn.">
     <meta property="og:description" content="A simple way to discover apps, complete tasks and earn rewards.">
-    <meta property="og:url" content="https://tlstore.org">
+    <meta property="og:url" content="{{ $webAppUrl }}">
     <meta property="og:image" content="{{ asset('images/logo-long.png') }}">
     <link rel="icon" href="{{ asset('images/logo.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">

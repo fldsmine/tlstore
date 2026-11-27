@@ -210,7 +210,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       final response = await widget.api.accountHistory(
         widget.token,
         page: _page,
-        perPage: 5,
+        perPage: 20,
         category: _activityFilters[_selectedActivityFilter].$1,
         status: _statusFilter,
         fromDate: _fromDate,

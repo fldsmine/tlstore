@@ -32765,15 +32765,15 @@ this.b=b
 this.c=c},
 LG:function LG(a,b){this.a=a
 this.b=b},
-bke(a){var s="https://gosmm.com/api/v1/"
-return A.fq(B.c.iS(s,"/")?s:"https://gosmm.com/api/v1//",0,null).X(a)},
+bke(a){var s="https://tlstore.org/api/v1/"
+return A.fq(B.c.iS(s,"/")?s:"https://tlstore.org/api/v1/",0,null).X(a)},
 bpf(a){var s,r,q,p
 if(a.gdk()!=="http"&&a.gdk()!=="https")return!1
-s=A.fq("https://gosmm.com",0,null)
+s=A.fq("https://tlstore.org",0,null)
 s=s.geF(s)
-r=A.fq("https://gosmm.com/api/v1/",0,null)
+r=A.fq("https://tlstore.org/api/v1/",0,null)
 r=r.geF(r)
-q=A.fq("https://web.gosmm.com",0,null)
+q=A.fq("https://web.tlstore.org",0,null)
 p=A.dt([s.toLowerCase(),r.toLowerCase(),q.geF(q).toLowerCase()],t.N)
 p.wy(new A.alO(),!0)
 return p.m(0,a.geF(a).toLowerCase())},
@@ -32783,7 +32783,7 @@ return A.ns(s,"register",s,s,s,A.am(["ref",B.c.V(a).toUpperCase()],t.N,t.z),"tls
 aCK(a){var s=!0
 if(!(a.gdk().toLowerCase()==="tlstore"&&a.geF(a).toLowerCase()==="register"))if(A.bpf(a)){if(!B.b.d8(a.glu(),new A.aCL()))s=a.glu().length>=2&&B.b.gW(a.glu()).toLowerCase()==="ref"}else s=!1
 return s},
-a2z(a){var s=A.fq("https://gosmm.com",0,null),r=s.glu()
+a2z(a){var s=A.fq("https://tlstore.org",0,null),r=s.glu()
 r=A.a2(new A.as(r,new A.aCM(),A.ac(r).i("as<1>")),t.N)
 r.push("ref")
 r.push(B.c.V(a).toUpperCase())
@@ -39693,7 +39693,7 @@ jg(a){var s,r,q,p,o,n,m=null,l=a==null?m:B.c.V(a)
 if(l==null||l.length===0)return m
 s=A.hM(l)
 if(s!=null&&s.glm()&&s.geF(s).length!==0)return l
-r=A.fq("https://gosmm.com/api/v1/",0,m)
+r=A.fq("https://tlstore.org/api/v1/",0,m)
 q=r.gdk()
 p=r.geF(r)
 o=A.ns(m,p,m,r.gEm()?r.gze(r):m,m,m,q)
@@ -139303,7 +139303,7 @@ return q.fw(new A.amA(this,a,q))},
 q2(a){return this.aEr(a)},
 aEr(a2){var s=0,r=A.v(t.P),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1
 var $async$q2=A.q(function(a4,a5){if(a4===1){o.push(a5)
-s=p}for(;;)switch(s){case 0:f=A.fq("https://gosmm.com/api/v1/",0,null)
+s=p}for(;;)switch(s){case 0:f=A.fq("https://tlstore.org/api/v1/",0,null)
 e="trustlens.legal."+f.geF(f).toLowerCase()+"."+a2+".v1"
 d=A.n(e)+".cached_at"
 c=null
@@ -139380,7 +139380,7 @@ s=r.x=r.q1()
 return s.fw(new A.amz(r,s))},
 q1(){var s=0,r=A.v(t.b5),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b,a,a0
 var $async$q1=A.q(function(a1,a2){if(a1===1){o.push(a2)
-s=p}for(;;)switch(s){case 0:g=A.fq("https://gosmm.com/api/v1/",0,null)
+s=p}for(;;)switch(s){case 0:g=A.fq("https://tlstore.org/api/v1/",0,null)
 f="trustlens.faqs."+g.geF(g).toLowerCase()+".v1"
 e=A.n(f)+".cached_at"
 d=null
@@ -139767,7 +139767,7 @@ break
 case 9:case 1:return A.t(q,r)
 case 2:return A.r(o.at(-1),r)}})
 return A.u($async$pK,r)},
-PT(a){var s=A.hM("https://gosmm.com/api/v1/"),r=s==null?null:s.geF(s).toLowerCase()
+PT(a){var s=A.hM("https://tlstore.org/api/v1/"),r=s==null?null:s.geF(s).toLowerCase()
 if(r==null)r="api"
 s=A.bo("[^A-Za-z0-9@._-]",!0,!1)
 return"trustlens.vas.cache.v1."+r+"."+A.cG(a,s,"_")},
@@ -142709,7 +142709,7 @@ m=m.f
 m=m==="pending"||m==="processing"?"PROCESSING":"STATUS"
 e=0.4*c
 b=b.d
-return A.fX(A.H(A.a([a4,A.X(new A.K(new A.I(a5,a6,a5,16*c),A.H(A.a([b0,a9,a7,s,a0,r,A.X(A.H(A.a([A.J(A.a([i,A.G(d,A.H(A.a([o,g,f,h,A.G(d,A.d(m,d,d,d,d,d,A.Q(d,d,B.m,d,d,d,d,d,d,d,d,6.2*c,d,d,B.p,d,d,!0,d,e,d,d,d,d,d,d),B.I,d,d),B.h,d,d,new A.B(B.fc,d,d,new A.cB(B.V,B.V,a8,a8),d,d,B.k),d,d,d,new A.I(0,k,0,k),d,d,1/0)],b1),B.i,d,B.d,B.z),B.h,d,d,new A.B(B.m,d,l,n,d,d,B.k),d,d,d,d,d,d,84*c)],b1),B.n,B.d,B.e,0),B.az,A.G(d,d,B.h,B.VA,d,d,d,c,d,d,d,d,d),A.aq(d,q,d),A.d("THANK YOU FOR USING "+b.toUpperCase(),d,1,B.x,d,d,A.Q(d,d,B.fc,d,d,d,d,d,d,d,d,p,d,d,B.p,d,d,!0,d,e,d,d,d,d,d,d),d,d,d),A.aq(d,j,d),A.d("For questions about your withdrawal, visit gosmm.com or contact "+b+" support.",d,2,B.x,d,d,A.Q(d,d,B.fR,d,d,d,d,d,d,d,d,8.6*c,d,d,d,d,1.35,!0,d,d,d,d,d,d,d,d),d,d,d),A.aq(d,a3,d),A.d(b+". All rights reserved. This receipt confirms a withdrawal request submitted to "+b+". Funds are subject to processing.",d,2,B.x,d,d,A.Q(d,d,B.fR,d,d,d,d,d,d,d,d,6.6*c,d,d,d,d,1.35,!0,d,d,d,d,d,d,d,d),d,d,d)],b1),B.bJ,d,B.d,B.e),1)],b1),B.bJ,d,B.d,B.e),d),1),A.aq(A.J(A.a([A.aq(A.fX(d,B.lF,!0),d,62*c),B.a2m],b1),B.i,B.d,B.e,0),q,d)],b1),B.i,d,B.d,B.e),B.Xp,!0)},
+return A.fX(A.H(A.a([a4,A.X(new A.K(new A.I(a5,a6,a5,16*c),A.H(A.a([b0,a9,a7,s,a0,r,A.X(A.H(A.a([A.J(A.a([i,A.G(d,A.H(A.a([o,g,f,h,A.G(d,A.d(m,d,d,d,d,d,A.Q(d,d,B.m,d,d,d,d,d,d,d,d,6.2*c,d,d,B.p,d,d,!0,d,e,d,d,d,d,d,d),B.I,d,d),B.h,d,d,new A.B(B.fc,d,d,new A.cB(B.V,B.V,a8,a8),d,d,B.k),d,d,d,new A.I(0,k,0,k),d,d,1/0)],b1),B.i,d,B.d,B.z),B.h,d,d,new A.B(B.m,d,l,n,d,d,B.k),d,d,d,d,d,d,84*c)],b1),B.n,B.d,B.e,0),B.az,A.G(d,d,B.h,B.VA,d,d,d,c,d,d,d,d,d),A.aq(d,q,d),A.d("THANK YOU FOR USING "+b.toUpperCase(),d,1,B.x,d,d,A.Q(d,d,B.fc,d,d,d,d,d,d,d,d,p,d,d,B.p,d,d,!0,d,e,d,d,d,d,d,d),d,d,d),A.aq(d,j,d),A.d("For questions about your withdrawal, visit tlstore.org or contact "+b+" support.",d,2,B.x,d,d,A.Q(d,d,B.fR,d,d,d,d,d,d,d,d,8.6*c,d,d,d,d,1.35,!0,d,d,d,d,d,d,d,d),d,d,d),A.aq(d,a3,d),A.d(b+". All rights reserved. This receipt confirms a withdrawal request submitted to "+b+". Funds are subject to processing.",d,2,B.x,d,d,A.Q(d,d,B.fR,d,d,d,d,d,d,d,d,6.6*c,d,d,d,d,1.35,!0,d,d,d,d,d,d,d,d),d,d,d)],b1),B.bJ,d,B.d,B.e),1)],b1),B.bJ,d,B.d,B.e),d),1),A.aq(A.J(A.a([A.aq(A.fX(d,B.lF,!0),d,62*c),B.a2m],b1),B.i,B.d,B.e,0),q,d)],b1),B.i,d,B.d,B.e),B.Xp,!0)},
 $S:869}
 A.b1v.prototype={
 $1(a){var s=null,r=this.a,q=1.2*r

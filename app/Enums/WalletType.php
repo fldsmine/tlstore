@@ -26,6 +26,26 @@ enum WalletType: string
         ];
     }
 
+    /**
+     * Wallets a top-up balance may be moved into.
+     *
+     * The legacy mixed `Review` wallet is deliberately excluded: new review
+     * rewards are credited to a group-specific wallet, and
+     * `TransferTopupFunds` has never accepted `review`.
+     *
+     * @return list<self>
+     */
+    public static function transferTargets(): array
+    {
+        return [
+            self::ReviewGroupB,
+            self::ReviewGroupC,
+            self::Share,
+            self::Referral,
+            self::Bonus,
+        ];
+    }
+
     public function label(): string
     {
         return match ($this) {

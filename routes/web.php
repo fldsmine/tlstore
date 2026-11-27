@@ -1,6 +1,7 @@
 <?php
 
 use App\Features\System\Http\Controllers\Web\LandingPageController;
+use App\Features\System\Http\Controllers\Web\WellKnownController;
 use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
 use App\Features\Admin\Http\Controllers\Web\GatewayPaymentAdminController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
@@ -21,6 +22,10 @@ $flutterWebEntry = static function () {
         'Cache-Control' => 'no-cache, no-store, must-revalidate',
     ]);
 };
+
+// App-link verification files (ERR-28). Both 404 until configured.
+Route::get('/.well-known/assetlinks.json', [WellKnownController::class, 'assetLinks'])->name('well-known.assetlinks');
+Route::get('/.well-known/apple-app-site-association', [WellKnownController::class, 'appleAppSiteAssociation'])->name('well-known.apple-app-site-association');
 
 Route::get('/', function (Request $request, LandingPageController $landing) use ($webAppUrl, $flutterWebEntry) {
     $webHost = parse_url($webAppUrl(), PHP_URL_HOST);

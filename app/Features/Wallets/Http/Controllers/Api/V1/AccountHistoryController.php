@@ -16,13 +16,13 @@ final class AccountHistoryController
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'category' => ['sometimes', 'in:all,review,share,payment,withdrawal,referral,bonus,other'],
             'status' => ['sometimes', 'in:all,posted,completed,approved,pending,failed,rejected,cancelled,expired'],
             'from_date' => ['sometimes', 'date'],
             'to_date' => ['sometimes', 'date'],
         ]);
-        $perPage = (int) ($validated['per_page'] ?? 5);
+        $perPage = (int) ($validated['per_page'] ?? 20);
         $baseQuery = Transaction::query()->where('user_id', $request->user()->id);
         $this->applyFilters($baseQuery, $validated);
 

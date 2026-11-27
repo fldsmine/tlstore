@@ -57,6 +57,20 @@ return [
         filled($paymentGateways['bachs']['secret_key'] ?? null) && filled($paymentGateways['bachs']['webhook_secret'] ?? null) ? 'bachs' : null,
         filled($paymentGateways['fincra']['secret_key'] ?? null) && filled($paymentGateways['fincra']['webhook_secret'] ?? null) ? 'fincra' : null,
     ])),
+    // Verified deep links, served at /.well-known/assetlinks.json and
+    // /.well-known/apple-app-site-association. Each endpoint answers 404 until
+    // its identifiers are configured, so a half-configured deployment never
+    // publishes a file that would fail app-link verification.
+    'deep_links' => [
+        'android_package' => env('ANDROID_APP_PACKAGE', 'pynith.tlstore.review'),
+        'android_sha256_fingerprints' => array_values(array_filter(array_map(
+            static fn ($fingerprint): string => strtoupper(trim((string) $fingerprint)),
+            explode(',', (string) env('ANDROID_SHA256_CERT_FINGERPRINTS', '')),
+        ))),
+        // Full `TEAMID.bundle.id`, e.g. A1B2C3D4E5.pynith.tlstore.review
+        'ios_app_id' => env('IOS_APP_ID'),
+        'ios_paths' => ['/register', '/register/*', '/login', '/ref/*'],
+    ],
     'currency_minor_units' => [
         'BIF' => 0, 'CLP' => 0, 'DJF' => 0, 'GNF' => 0, 'ISK' => 0, 'JPY' => 0,
         'KMF' => 0, 'KRW' => 0, 'PYG' => 0, 'RWF' => 0, 'UGX' => 0, 'VND' => 0,

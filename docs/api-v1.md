@@ -81,8 +81,8 @@ second one.
 | `POST`, `GET` | `/subscriptions`, `/me/subscriptions` | Purchase a configured plan from top-up funds and view subscriptions/entitlements |
 | `POST`, `GET` | `/topups/manual-deposits`, `/me/manual-deposits` | Upload bank-deposit proof and view status |
 | `GET` | `/wallets`, `/wallets/{wallet}/ledger` | View derived balances and ledger entries |
-| `GET` | `/me/account-history?per_page=5&page=1` | Unified account transactions, five records per page maximum |
-| `POST` | `/wallets/topup-transfer` | Fee-free transfer from top-up to an earned wallet |
+| `GET` | `/me/account-history?per_page=20&page=1` | Unified account transactions; `per_page` 1–50, default 20 |
+| `POST` | `/wallets/topup-transfer` | Fee-free transfer from top-up funds to a `review_group_b`, `review_group_c`, `share`, `referral` or `bonus` wallet |
 | `GET` | `/withdrawal-options` | List active payout options and required fields |
 | `GET`, `POST` | `/withdrawals` | View or submit withdrawals from earned wallets |
 | `GET`, `PATCH` | `/notifications`, `/notifications/{notification}/read` | In-app notification inbox |

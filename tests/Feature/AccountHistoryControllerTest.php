@@ -88,6 +88,47 @@ class AccountHistoryControllerTest extends TestCase
         ]);
     }
 
+    public function test_default_page_size_is_twenty_and_fifty_rows_are_allowed(): void
+    {
+        $user = $this->historyUser('page-size-user@example.test');
+        for ($i = 0; $i < 55; $i++) {
+            $this->transaction($user, TransactionType::APP_REVIEW, 'credit', 1, 'review', now()->subMinutes($i));
+        }
+        $token = $user->createToken('history-page-size')->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me/account-history')
+            ->assertOk()
+            ->assertJsonPath('data.per_page', 20)
+            ->assertJsonCount(20, 'data.data')
+            ->assertJsonPath('data.total', 55);
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me/account-history?per_page=50')
+            ->assertOk()
+            ->assertJsonPath('data.per_page', 50)
+            ->assertJsonCount(50, 'data.data');
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me/account-history?per_page=51')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('per_page');
+    }
+
+    private function historyUser(string $email): User
+    {
+        return User::query()->create([
+            'full_name' => 'History Page User',
+            'username' => 'history-page-'.substr(md5($email), 0, 8),
+            'email' => $email,
+            'country_code' => null,
+            'preferred_currency' => 'NGN',
+            'wallet_currency' => 'NGN',
+            'role' => 'reviewer',
+            'status' => 'active',
+        ]);
+    }
+
     private function transaction(User $user, TransactionType $type, string $direction, float $amount, string $wallet, $createdAt): void
     {
         Transaction::query()->create([
