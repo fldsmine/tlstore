@@ -5,6 +5,7 @@ namespace App\Application\Actions\Payments;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Application\Payments\PaymentIntentLifecycle;
 use App\Application\Support\PaymentGatewaySettings;
+use App\Enums\TransactionType;
 use App\Models\PaymentIntent;
 use App\Models\SubscriptionPlan;
 use App\Models\PackageAddon;
@@ -100,10 +101,13 @@ final class InitializeGatewayTopup
             'expires_at' => now()->addHours(2),
         ]));
 
+        // `transactions.type` is a TransactionType, not the plan's product
+        // type: writing 'marketplace_access' here fataled every gateway
+        // subscription checkout with a ValueError.
         $transactionType = match ($purpose) {
-            'subscription' => $subscriptionPlan?->product_type->value ?? 'subscription_plan',
-            'package_addon' => 'package_addon',
-            default => 'top_up_fund',
+            'subscription' => TransactionType::SUBSCRIPTION_PLAN->value,
+            'package_addon' => TransactionType::PACKAGE_ADDON->value,
+            default => TransactionType::TOP_UP_FUND->value,
         };
         Transaction::query()->updateOrCreate(['reference' => 'payment-intent:'.$intent->id], [
             'user_id' => $user->id,

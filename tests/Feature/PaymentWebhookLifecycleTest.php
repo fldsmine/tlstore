@@ -153,6 +153,49 @@ class PaymentWebhookLifecycleTest extends TestCase
         $this->assertSame(10.0, (float) $transaction->amount);
     }
 
+    public function test_gateway_subscription_checkout_and_webhook_activate_the_plan(): void
+    {
+        // Regression: the checkout wrote the plan's *product type*
+        // ('marketplace_access') into transactions.type, which is a
+        // TransactionType enum — every gateway subscription purchase fataled.
+        $this->seed(\Database\Seeders\SubscriptionPlanSeeder::class);
+        $plan = \App\Models\SubscriptionPlan::query()->where('plan_key', 'market-lite')->firstOrFail();
+        $user = $this->user();
+
+        \App\Models\SystemSetting::query()->create([
+            'setting_key' => 'payment.active_gateways',
+            'value' => ['paystack' => ['NGN']],
+            'is_public' => false,
+        ]);
+
+        Http::fake([
+            'api.paystack.test/transaction/initialize' => Http::response([
+                'status' => true,
+                'data' => ['authorization_url' => 'https://checkout.paystack.test/sub'],
+            ]),
+        ]);
+
+        $result = app(\App\Application\Actions\Payments\InitializeGatewayTopup::class)->handle(
+            $user, 150000, 'NGN', 'paystack', 'sub-checkout-1', 'subscription', $plan,
+        );
+
+        $intent = PaymentIntent::query()->findOrFail($result['intent_id']);
+        $transaction = Transaction::query()->where('reference', 'payment-intent:'.$intent->id)->firstOrFail();
+        $this->assertSame('subscription_plan', $transaction->type->value);
+        $this->assertSame('pending', $transaction->status);
+
+        $this->fakeVerification(['status' => 'success', 'amount' => 150000, 'currency' => 'NGN', 'reference' => $intent->provider_reference]);
+        $this->postPaystackWebhook($this->payload($intent))->assertOk();
+
+        $this->assertSame('paid', $intent->fresh()->status->value);
+        $this->assertSame('completed', $transaction->fresh()->status);
+        $this->assertDatabaseHas('user_subscriptions', [
+            'user_id' => $user->id,
+            'subscription_plan_id' => $plan->id,
+            'status' => 'active',
+        ]);
+    }
+
     public function test_gateway_checkout_accepts_a_reserved_test_email_domain(): void
     {
         // `email:rfc,dns` used to reject `@example.test` addresses (and time out

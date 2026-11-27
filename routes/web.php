@@ -2,6 +2,7 @@
 
 use App\Features\System\Http\Controllers\Web\LandingPageController;
 use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
+use App\Features\Admin\Http\Controllers\Web\GatewayPaymentAdminController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
 use App\Http\Middleware\EnsureAdminWebAccount;
@@ -61,6 +62,11 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::middleware(EnsureAdminWebAccount::class)->group(function (): void {
         Route::post('/logout', [AdminConsoleController::class, 'logout'])->name('logout');
         Route::get('/', [AdminConsoleController::class, 'dashboard'])->name('dashboard');
+        Route::get('/gateway-payments', [GatewayPaymentAdminController::class, 'index'])->name('gateway-payments.index');
+        Route::get('/gateway-payments/{intent}', [GatewayPaymentAdminController::class, 'show'])->whereNumber('intent')->name('gateway-payments.show');
+        Route::post('/gateway-payments/{intent}/revalidate', [GatewayPaymentAdminController::class, 'revalidate'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.revalidate');
+        Route::post('/gateway-payments/{intent}/decision', [GatewayPaymentAdminController::class, 'decide'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.decision');
+        Route::get('/gateway-balances', [GatewayPaymentAdminController::class, 'balances'])->middleware('throttle:20,1')->name('gateway-balances.index');
         Route::get('/notifications', [NotificationTemplateAdminController::class, 'index'])->name('notifications.index');
         Route::patch('/notifications/settings', [NotificationTemplateAdminController::class, 'updateSettings'])->name('notifications.settings');
         Route::post('/notifications/test', [NotificationTemplateAdminController::class, 'sendTest'])->middleware('throttle:3,1')->name('notifications.test');

@@ -157,3 +157,28 @@ can leave a phantom `pending` row. The rules are now written down in
 - Provider payload shapes (Bachs `charge.status`, Korapay signature canonicalisation) are
   covered by unit-level fakes here, not by live sandbox calls — the sandbox has no outbound
   network. Validate against provider sandboxes before release.
+
+---
+
+## Phase 2 follow-up — admin console for gateway payments ✅ (2026-11-27)
+
+Requested addition: finance had no way to reconcile deposits taken by Korapay / Paystack /
+Flutterwave / Bachs, and nobody could see the money sitting at a provider.
+
+| Item | Status | Change |
+|---|---|---|
+| Gateway payments console | ✅ | `/admin/gateway-payments` lists every gateway intent (filters: gateway, purpose, status, date range, reference / idempotency key / user). Detail page shows the amount, provider reference, ledger entries, provider receipts, the transaction projection and the raw provider metadata. Roles: `super_admin`, `admin`, `finance`. |
+| Revalidate payment request | ✅ | "Revalidate" asks the provider what happened and applies the answer through the normal completion path (`VerifyGatewayTopup`): paid → credit/activate, failed/cancelled/expired → close the intent and its projection, still pending → no change. Provider/network failures are surfaced in the console and audited, never 500. |
+| Manually verified payment | ✅ | Approving a payment marks the intent paid, records a provider receipt, runs the **intended action** (top-up credit / subscription activation / add-on entitlement), notifies the user and writes an audit entry with the administrator, note and reconciled reference. A second approval is refused, so a payment cannot be credited twice. Rejecting closes intent + projection and notifies the user. |
+| Super-admin live balances | ✅ | `/admin/gateway-balances` (super admin only) reads each enabled gateway's balance API live: Paystack `/balance`, Korapay `/balances`, Flutterwave `/balances/{currency}`, Bachs `/balances`. Endpoints are configurable per environment (`*_BALANCE_PATH`); missing credentials or provider errors show as "Unavailable" instead of failing the page. |
+| Mobile admin parity | ✅ | `GET/POST /api/v1/admin/gateway-payments*` and `GET /api/v1/admin/gateway-balances` expose the same operations and role rules for the mobile admin app. |
+| **Bug found while building it** | ✅ | Gateway **subscription** checkouts were fatally broken: `InitializeGatewayTopup` and `ProcessGatewayWebhook` wrote the plan's product type (`marketplace_access`) into `transactions.type`, which is cast to `TransactionType` → `ValueError` on insert. Both now write `subscription_plan` / `package_addon`, and the flow is covered end-to-end (checkout → webhook → active subscription). |
+
+### Verification evidence
+
+| Check | Result |
+|---|---|
+| PHPUnit (full suite) | **65 tests / 298 assertions — OK** |
+| `GatewayPaymentAdminTest` (13 tests) | finance role sees only gateway intents; moderator forbidden; revalidate settles / leaves pending; manual approval credits exactly once (second attempt refused, wallet unchanged); approval activates a subscription and creates an add-on entitlement; rejection closes intent + projection and notifies; detail page renders; wallet/manual intents 404 here; super-admin-only balances; a provider 401 shows "Unavailable" and the page still renders; API parity + role enforcement |
+| `PaymentWebhookLifecycleTest` | new end-to-end subscription checkout → webhook → `user_subscriptions` active (guards the `transactions.type` regression) |
+| `php artisan route:list --path=admin` | web + API routes registered for all five endpoints |

@@ -159,3 +159,63 @@ Both are read-only except the expiry, which only touches rows that are already s
    transition go through `PaymentIntentLifecycle` (payments) or the deciding action.
 5. Add a test that asserts the ledger entry, the projection status and the wallet balance
    together, then run `php artisan ledger:verify`.
+
+---
+
+## 9. Admin settlement of gateway payments
+
+Providers charge the customer; the platform's job is to make the *account* agree. Two admin
+surfaces exist, both restricted to `super_admin`, `admin` and `finance`:
+
+| surface | route | who |
+|---|---|---|
+| Gateway payments console | `/admin/gateway-payments` | `super_admin`, `admin`, `finance` |
+| Live gateway balances | `/admin/gateway-balances` | `super_admin` only |
+| JSON parity (mobile admin app) | `/api/v1/admin/gateway-payments`, `/api/v1/admin/gateway-balances` | same roles |
+
+### Revalidate
+
+`RevalidateGatewayPayment` asks the provider for the truth about one checkout and applies it
+through the normal completion path:
+
+* provider says paid → the top-up is credited / subscription activated / add-on created
+  (exactly like a webhook), and the projection becomes `completed`;
+* provider says failed/cancelled/expired → the intent and its projection close;
+* provider says "still pending" → nothing changes, the console says so;
+* provider is unreachable → the intent is untouched and the error is shown. Nothing throws.
+
+Every attempt (including failures) is written to `audit_logs` as
+`gateway_payment.revalidated` / `gateway_payment.revalidate_failed`.
+
+### Manual approval / rejection
+
+`SettleGatewayPaymentManually` is for the "money left the customer but no webhook arrived"
+case:
+
+* **approved** → the intent is marked `paid`, a `PaymentTransaction` receipt is recorded,
+  and the **intended action runs** (`creditVerifiedTopup` / `completeVerifiedSubscription` /
+  `completeVerifiedPackageAddon`). The administrator, note and reconciled provider reference
+  are stored in `provider_metadata.manual_approval` and on the audit log
+  (`gateway_payment.manually_approved`). A second approval is refused — no double credit.
+* **rejected** → the intent and its projection become `failed`
+  (`gateway_payment.manually_rejected`), and the user is notified.
+
+Only real gateway providers (`korapay`, `paystack`, `flutterwave`, `bachs`) can be settled
+here. Wallet-funded purchases and manual bank deposits keep their own flows
+(`wallet` intents are already paid; manual deposits go through *Manual deposits*).
+
+### Live balances
+
+`GatewayBalances` reads each enabled gateway's balance endpoint on demand (never stored):
+
+| gateway | path (configurable via `*_BALANCE_PATH`) | units |
+|---|---|---|
+| Paystack | `/balance` | minor (kobo) |
+| Korapay | `/balances` | major |
+| Flutterwave | `/balances/{currency}` (per configured currency) | major |
+| Bachs | `/balances` | major |
+
+A gateway without credentials, an unreachable provider or an unexpected payload shows as
+"Unavailable" with the reason — the page never 500s. **Verify the paths above against each
+provider's current documentation before relying on them in production**; they are
+configurable per environment precisely because provider APIs drift.

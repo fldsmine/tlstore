@@ -5,6 +5,7 @@ namespace App\Application\Actions\Payments;
 use App\Application\Actions\Subscriptions\ActivateSubscription;
 use App\Application\Payments\PaymentIntentLifecycle;
 use App\Enums\PaymentIntentStatus;
+use App\Enums\TransactionType;
 use App\Application\Actions\PackageAddons\ActivatePackageAddon;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\LedgerEntry;
@@ -328,7 +329,7 @@ final class ProcessGatewayWebhook
                 ['reference' => PaymentIntentLifecycle::transactionReference($intent)],
                 [
                     'user_id' => $intent->user_id,
-                    'type' => $plan->product_type->value,
+                    'type' => TransactionType::SUBSCRIPTION_PLAN->value,
                     'direction' => 'debit',
                     'amount' => CurrencyMinorUnits::fromMinor($intent->amount_minor, $intent->currency),
                     'fee' => 0,
