@@ -6,9 +6,12 @@ use App\Enums\ReviewSubmissionStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class ReviewSubmission extends Model
 {
+    use TrustLensMorphMap;
+
     protected $table = 'review_submissions';
     protected $fillable = [
         'review_task_id', 'reviewer_id', 'review_template_version_id', 'status',
@@ -51,8 +54,8 @@ class ReviewSubmission extends Model
         return $this->hasMany(RiskSignal::class);
     }
 
-    public function ledgerEntries(): HasMany
+    public function ledgerEntries(): MorphMany
     {
-        return $this->hasMany(LedgerEntry::class, 'source_id')->where('source_type', 'review_submission');
+        return $this->morphMany(LedgerEntry::class, 'source');
     }
 }

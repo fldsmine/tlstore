@@ -6,9 +6,12 @@ use App\Enums\AdShareEventStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class AdShareEvent extends Model
 {
+    use TrustLensMorphMap;
+
     protected $table = 'ad_share_events';
     protected $fillable = [
         'ad_share_task_id', 'channel', 'tracking_token', 'external_reference', 'status',
@@ -36,8 +39,8 @@ class AdShareEvent extends Model
         return $this->hasMany(ModerationDecision::class, 'ad_share_event_id');
     }
 
-    public function ledgerEntries(): HasMany
+    public function ledgerEntries(): MorphMany
     {
-        return $this->hasMany(LedgerEntry::class, 'source_id')->where('source_type', 'ad_share_event');
+        return $this->morphMany(LedgerEntry::class, 'source');
     }
 }

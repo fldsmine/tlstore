@@ -128,7 +128,7 @@ final class AccountHistoryController
         $types = match ($category) {
             'review' => ['app_review'],
             'share' => ['ads_share'],
-            'payment' => ['top_up_fund', 'subscription_plan', 'package_addon', 'fund_transfer', 'vtu_purchase'],
+            'payment' => ['top_up_fund', 'subscription_plan', 'package_addon', 'fund_transfer', 'vtu_purchase', 'campaign_order'],
             'withdrawal' => ['withdrawal'],
             'referral' => ['referral_bonus'],
             'bonus' => ['referral_bonus', 'social_follow_reward', 'rank_earning'],
@@ -139,7 +139,8 @@ final class AccountHistoryController
         } elseif ($category === 'other') {
             $query->whereNotIn('type', [
                 'app_review', 'ads_share', 'top_up_fund', 'subscription_plan', 'package_addon',
-                'fund_transfer', 'vtu_purchase', 'withdrawal', 'referral_bonus', 'social_follow_reward', 'rank_earning',
+                'fund_transfer', 'vtu_purchase', 'campaign_order', 'withdrawal', 'referral_bonus',
+                'social_follow_reward', 'rank_earning',
             ]);
         }
 

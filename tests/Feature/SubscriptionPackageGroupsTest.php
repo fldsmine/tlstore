@@ -34,17 +34,17 @@ class SubscriptionPackageGroupsTest extends TestCase
         $this->seed(SubscriptionPlanSeeder::class);
 
         $plans = \App\Models\SubscriptionPlan::query()->with('group')->get()->keyBy('plan_key');
-        foreach (['demo-market-lite', 'demo-market-premium', 'demo-market-gold'] as $key) {
+        foreach (['market-lite', 'market-premium', 'market-gold'] as $key) {
             $this->assertSame('group_a', $plans[$key]->group->group_key);
             $this->assertSame(0, $plans[$key]->max_review_tasks);
             $this->assertSame(['Monthly 28th'], $plans[$key]->withdrawal_days);
             $this->assertArrayNotHasKey('global_listing_access', $plans[$key]->getAttributes());
         }
 
-        $this->assertSame(600000, $plans['demo-market-lite']->minimum_withdrawal_minor);
-        $this->assertSame(1150000, $plans['demo-market-premium']->minimum_withdrawal_minor);
-        $this->assertSame(1850000, $plans['demo-market-gold']->minimum_withdrawal_minor);
-        foreach (['demo-market-lite', 'demo-market-premium', 'demo-market-gold'] as $key) {
+        $this->assertSame(600000, $plans['market-lite']->minimum_withdrawal_minor);
+        $this->assertSame(1150000, $plans['market-premium']->minimum_withdrawal_minor);
+        $this->assertSame(1850000, $plans['market-gold']->minimum_withdrawal_minor);
+        foreach (['market-lite', 'market-premium', 'market-gold'] as $key) {
             $this->assertNull($plans[$key]->task_reward_minor);
             $this->assertNull($plans[$key]->daily_task_limit);
             $this->assertNotNull($plans[$key]->daily_revenue_minor);
@@ -111,7 +111,7 @@ class SubscriptionPackageGroupsTest extends TestCase
         $this->assertSame('eligible', $eligibility->taskAccessStatus($user, null, taskType: 'ad'));
         $this->assertSame('eligible', $eligibility->taskAccessStatus($user, null, 'Apple App Store', 'Finance', 'review'));
 
-        $lite = SubscriptionPlan::query()->where('plan_key', 'demo-market-lite')->firstOrFail();
+        $lite = SubscriptionPlan::query()->where('plan_key', 'market-lite')->firstOrFail();
         $replacement = app(PurchaseSubscription::class)->handle($user, $lite, 'switch-back-to-lite');
         $this->assertSame('active', $replacement->status->value);
         $this->assertSame(3, UserSubscription::query()
@@ -139,7 +139,7 @@ class SubscriptionPackageGroupsTest extends TestCase
             'role' => 'reviewer',
             'status' => 'active',
         ]);
-        $lite = SubscriptionPlan::query()->where('plan_key', 'demo-market-lite')->firstOrFail();
+        $lite = SubscriptionPlan::query()->where('plan_key', 'market-lite')->firstOrFail();
         UserSubscription::query()->create([
             'user_id' => $user->id,
             'subscription_plan_id' => $lite->id,

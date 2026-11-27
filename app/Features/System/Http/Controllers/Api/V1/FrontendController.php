@@ -175,7 +175,7 @@ final class FrontendController
 		return collect($configured)
 			->filter(fn ($step) => is_array($step))
 			->values()
-			->map(function (array $step, int $index) use ($defaults): array {
+			->map(function (array $step, int $index) use ($configured, $defaults): array {
 				$default = $defaults[$index] ?? $defaults[0];
 				return [
 					'number' => (string) ($index + 1),

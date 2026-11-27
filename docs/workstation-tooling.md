@@ -1,6 +1,6 @@
 # TLStore / TrustLens — Workstation & Sandbox Tooling
 
-**Last Updated:** 2026-11-27 (Phase 0)
+**Last Updated:** 2026-11-27 (Phase 1)
 **Workspace Root:** `/home/user/tlstore`
 
 This document describes **the actual toolchain available in the current sandbox**. It
@@ -93,3 +93,17 @@ reproduce the environment.
 6. The dev server serves the app correctly, but its single-threaded WASM loop logs
    `Failed to accept a client` noise; concurrent-request tests (load/race testing) are not
    meaningful here.
+7. **PHPUnit cannot drive `RefreshDatabase` unpatched.** `Illuminate\Testing\PendingCommand`
+   runs the migration from its destructor, and executing an artisan command re-entrantly
+   aborts the PHP-WASM VM (`RuntimeError: unreachable`) with no test output at all.
+   `.tools/apply-sandbox-patches.php` appends the missing `->run()` to
+   `vendor/.../Foundation/Testing/RefreshDatabase.php`; run it again after any dependency
+   reinstall. It patches `vendor/` **only** — CI and production use the stock framework.
+8. **PHPStan is not a project dependency.** PHPStan 2.3.7 can be pulled from its GitHub
+   phar (`gh api repos/phpstan/phpstan/git/blobs/<sha>` with the raw media type) and runs,
+   but without `larastan` a Laravel codebase produces hundreds of Eloquent magic-property
+   false positives. Treat it as a smoke check, not a gate, until Phase 6 adds `larastan`
+   and a baseline.
+9. **`vendor/autoload.php` is generated** by `.tools/gen-autoload.php` (no Composer) and
+   now guards `Composer\Autoload\ClassLoader` with `class_exists(..., false)` so phar
+   tools (PHPStan, PHPUnit) can bootstrap it after declaring the class themselves.

@@ -43,3 +43,62 @@ for the toolchain and its caveats), and what is deliberately left for later phas
   splitting them into a separate admin entry point is a Phase 5 UX decision.
 - Removing the Adminer file is containment, not remediation: the production database
   credentials it exposed should be treated as compromised until rotated.
+
+---
+
+## Phase 1 — Boot & test-suite stabilisation ✅ (2026-11-27)
+
+Goal: the framework boots against a fresh database, `gs()` can never take the app down,
+and the existing PHPUnit suite goes from *failing before it starts* to green.
+
+| Item | Status | Change |
+|---|---|---|
+| `ERR-04` `gs()` helper | ✅ | Rewritten as a keyed accessor: `gs()` returns every public setting (`[]` when the table or cache is empty), `gs('key', $default)` returns one value; reads are schema-guarded (`Schema::hasTable`), filtered with SQL-level `where('is_public', true)`, cached for 30 minutes and never throw — a `database` cache store with no `cache` table used to abort `artisan` itself. |
+| `ERR-07` stale `GeneralSetting` cache | ✅ | `SystemSetting::saved()` now forgets the `GeneralSetting` key, so an edited setting is visible immediately instead of after the TTL. The `Cache` calls are wrapped so a cache outage is a miss, not a 500. |
+| `ERR-08` `users.wallet_currency` NOT NULL without default | ✅ | New migration `2026_11_27_090001_add_default_to_users_wallet_currency` (default `NGN`); `User::booted()` fills the attribute from `preferred_currency` before insert; `UserFactory` supplies it. Every "insert a user" path (tests, seeders, admin API) stopped failing with an integrity-constraint violation. |
+| `ERR-09` plan-key drift | ✅ | The seeder is the source of truth (`market-lite` / `market-premium` / `market-gold`); `SubscriptionPackageGroupsTest` and `GroupADailyShareRevenueTest` were still asserting the retired `demo-market-*` keys and now match the seeded data. |
+| `ERR-05` VAS purchase fatal | ✅ | Missing `use App\Enums\LedgerEntryStatus;` in `PurchaseVasOrder` made **every** VTU purchase die with `Class not found`. |
+| `ERR-19` ad-share auto-approval TypeError | ✅ | `AutoApproveAdShares` passed a sixth argument to `DecideAdShare::handle()` (five parameters), so every auto-approval run crashed; the now-unused `$subscription` capture was dropped too. |
+| `ERR-12` ledger relations | ✅ | `AdShareEvent`, `PaymentIntent`, `ReferralAttribution`, `ReviewSubmission` and `WithdrawalRequest` now declare `morphMany(LedgerEntry::class, 'source')` instead of `hasMany(...)->where('source_type', '…')`; the three that lacked `TrustLensMorphMap` now use it, so the alias is always registered. Query bindings are unchanged (`ad_share_event`, `payment_intent`, …). |
+| `ERR-13` dead immutability guard | ✅ | `AdminConsoleController` referenced `ReviewQuestion` without importing it, so the "answered questions cannot be edited" check could never run. |
+| `ERR-14` review-step defaults | ✅ | The `FrontendController` closure that builds review steps now captures `$configured`; without it every request touching the step defaults raised an undefined-variable error. |
+| `ERR-15` `money()` helper | ✅ | `Transaction::getSignedAmountAttribute()` called a `money()` function that does not exist; it now formats using the transaction currency's minor units. |
+| `ERR-11` / `ERR-33` transaction taxonomy | ✅ | `campaign_order` joined the `payment` history category and the "other" exclusion list; `VTU_PURCHASE` is no longer treated as a gateway charge (it is paid from the wallet balance); `Salary Salary`/`Referal Reward` labels corrected and the unreachable `default` arms removed. |
+| `HasFactory` | ✅ | `App\Models\User` never used the trait although `UserFactory` and `TransactionFactory` (which calls `User::factory()`) exist — both were unusable. |
+
+### Verification evidence
+
+| Check | Result |
+|---|---|
+| PHPUnit (full suite) | **20 tests / 133 assertions — OK** (start of phase: 13 tests, 9 errors, and before the sandbox workaround, no output at all) |
+| `php artisan migrate` on a deliberately broken store | green on an empty SQLite file, on the developer database, and with a `database` cache store whose `cache` table is missing |
+| Morph-map regression probe | all five relations return `MorphMany` and bind the same aliases as before (`ad_share_event`, `payment_intent`, `referral_attribution`, `review_submission`, `withdrawal_request`) |
+| `php -l` over every changed PHP file | clean |
+| New `tests/Feature/Phase1RegressionTest.php` | 7 tests / 22 assertions covering `gs()` (empty schema, cached reads, defaults), the wallet-currency default, `signed_amount`, transaction labels/gateway classification, `campaign_order` in the payment category, the morph alias bindings and the VAS enum import |
+| PHPStan | **not reproducible as stated in the audit** — see caveats below |
+
+### Test fixtures adjusted (not weakened)
+
+- `SubscriptionPackageGroupsTest` / `GroupADailyShareRevenueTest`: `demo-market-*` → `market-*`.
+  The seeded rows are `market-*`; nothing else in either test changed.
+- `AccountHistoryControllerTest`: spending statistics are computed from **paid
+  `withdrawal_requests`** (a rejected reservation is not spending), so the fixture now
+  creates the settled request instead of only its transaction projection. The assertions
+  are untouched.
+
+### Caveats and residual risk
+
+- **PHPStan was not part of `composer.json`.** The audit reported "PHPStan Level 5 → 0
+  errors", but without `larastan` the tool reports 800+ Eloquent magic-property false
+  positives across the project, so that number cannot be reproduced from the repository as
+  committed. PHPStan 2.3.7 was fetched as a phar to run it here; on the files this phase
+  touched the only findings are the same pre-existing magic-property/`View` contract
+  notices. **Recommendation: add `larastan` + a baseline in the Phase 6 CI work** so the
+  gate is real rather than aspirational.
+- The PHP-WASM runtime cannot run `PendingCommand` (PHPUnit's `RefreshDatabase`) because the
+  command is executed from the destructor. `.tools/apply-sandbox-patches.php` appends the
+  missing `->run()` **in `vendor/` only**; it is a sandbox workaround, never a production
+  change, and has to be re-applied after any `composer install` in the sandbox.
+- `AccountHistoryController` still converts `SUM(amount)` per currency with
+  `CurrencyMinorUnits::toMinor()` in PHP; a mixed-precision currency would need the
+  SQL-side rewrite tracked under `ERR-10`/`ERR-11` (Phase 2).

@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\WithdrawalRequestStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class WithdrawalRequest extends Model
 {
@@ -57,8 +57,8 @@ class WithdrawalRequest extends Model
         return $this->belongsTo(Admin::class, 'processed_by_admin_id');
     }
 
-    public function ledgerEntries(): HasMany
+    public function ledgerEntries(): MorphMany
     {
-        return $this->hasMany(LedgerEntry::class, 'source_id')->where('source_type', 'withdrawal_request');
+        return $this->morphMany(LedgerEntry::class, 'source');
     }
 }

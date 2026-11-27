@@ -14,6 +14,7 @@ use App\Models\AuditLog;
 use App\Models\LedgerEntry;
 use App\Models\ManualDepositSubmission;
 use App\Models\ReviewSubmission;
+use App\Models\ReviewQuestion;
 use App\Models\ReviewTemplate;
 use App\Models\ReviewTemplateVersion;
 use App\Models\ReviewTemplateVersionQuestion;
@@ -90,7 +91,7 @@ final class AdminConsoleController
         return view('admin.review_templates.versions', [
             'title' => 'Questionnaire versions',
             'questionnaire' => $questionnaire,
-            'questions' => \App\Models\ReviewQuestion::query()->orderBy('step_order')->orderBy('question_order')->get(),
+            'questions' => ReviewQuestion::query()->orderBy('step_order')->orderBy('question_order')->get(),
         ]);
     }
 
@@ -106,7 +107,7 @@ final class AdminConsoleController
 
         DB::transaction(function () use ($questionnaire, $data): void {
             $version = $questionnaire->versions()->create(['version' => $data['version'], 'status' => 'draft']);
-            $questions = \App\Models\ReviewQuestion::query()->whereIn('id', $data['question_ids'])
+            $questions = ReviewQuestion::query()->whereIn('id', $data['question_ids'])
                 ->orderBy('step_order')->orderBy('question_order')->get();
             foreach ($questions as $question) {
                 $version->questionLinks()->create([

@@ -30,6 +30,7 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'country_code' => 'NG',
             'preferred_currency' => 'NGN',
+            'wallet_currency' => 'NGN',
             'role' => 'reviewer',
             'status' => 'active',
             'email_verified_at' => now(),

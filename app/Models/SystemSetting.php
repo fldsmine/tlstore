@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 class SystemSetting extends Model
 {
@@ -28,9 +29,20 @@ class SystemSetting extends Model
     protected static function boot()
     {
         parent::boot();
-        static::saved(function(){
-            \Cache::forget('GeneralSetting');
-        });
+
+        // Any write invalidates the helper's cache. Failures are swallowed: a
+        // `database` cache store without its `cache` table must not stop a
+        // setting from being saved.
+        $forget = static function (): void {
+            try {
+                Cache::forget('GeneralSetting');
+            } catch (\Throwable) {
+                // Nothing to invalidate if the cache backend is unavailable.
+            }
+        };
+
+        static::saved($forget);
+        static::deleted($forget);
     }
 
     public function updatedBy(): BelongsTo

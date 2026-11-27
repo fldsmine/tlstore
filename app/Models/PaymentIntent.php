@@ -6,6 +6,7 @@ use App\Enums\PaymentIntentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -56,8 +57,8 @@ class PaymentIntent extends Model
         return $this->hasOne(UserPackageAddon::class);
     }
 
-    public function ledgerEntries(): HasMany
+    public function ledgerEntries(): MorphMany
     {
-        return $this->hasMany(LedgerEntry::class, 'source_id')->where('source_type', 'payment_intent');
+        return $this->morphMany(LedgerEntry::class, 'source');
     }
 }
