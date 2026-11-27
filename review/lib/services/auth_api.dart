@@ -1237,20 +1237,19 @@ class AuthApi {
   String _dateQuery(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-  //Guest contact us message api submit
-  Future<AuthResult> support({
+  // Public contact form (no account, no token). The response carries the
+  // ticket reference so the visitor can quote it when we reply by email.
+  Future<Map<String, dynamic>> submitGuestSupport({
     required String name,
     required String subject,
     required String email,
     required String message,
-  }) async {
-    return _authRequest('guest-support', {
-      'name': name.trim(),
-      'subject': subject.trim(),
-      'email': email.trim(),
-      'message': message.trim(),
-    });
-  }
+  }) => postPublic('guest-support', {
+    'name': name.trim(),
+    'subject': subject.trim(),
+    'email': email.trim(),
+    'message': message.trim(),
+  });
 
   Future<Map<String, dynamic>> supportTickets(
     String token, {

@@ -5,6 +5,7 @@ use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
 use App\Features\Admin\Http\Controllers\Web\GatewayPaymentAdminController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
+use App\Features\Support\Http\Controllers\Web\ContactController;
 use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
 use Illuminate\Http\Request;
@@ -44,6 +45,9 @@ foreach (['login', 'register'] as $appPath) {
         return redirect()->away($destination.($query ? '?'.$query : ''));
     })->name('frontend.'.$appPath);
 }
+
+Route::get('/contact', [ContactController::class, 'show'])->name('contact.show');
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:guest-support')->name('contact.store');
 
 Route::get('/ref/{code}', function (string $code) use ($webAppUrl) {
     abort_unless(preg_match('/^[A-Za-z0-9_-]{1,64}$/', $code) === 1, 404);

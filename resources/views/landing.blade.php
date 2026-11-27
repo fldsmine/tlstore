@@ -96,6 +96,6 @@
     </div></div></section>
     <section style="padding-top:0"><div class="wrap"><div class="final-cta"><h2>Ready to explore TLStore?</h2><p>Create your account, find tasks that fit your package and keep your progress in one place.</p><a class="button button-primary" href="{{ $webAppUrl }}/register">Get started now <span aria-hidden="true">→</span></a></div></div></section>
 </main>
-<footer class="footer"><div class="wrap"><div class="footer-top"><a href="/" aria-label="TLStore"><img src="{{ asset('images/logo-long.png') }}" alt="TLStore"></a><nav class="footer-links"><a href="{{ $webAppUrl }}/privacy">Privacy</a><a href="{{ $webAppUrl }}/terms">Terms</a><a href="{{ $webAppUrl }}/help">Help center</a><a href="mailto:support@tlstore.org">Contact support</a></nav></div><div class="footer-bottom"><span>© {{ date('Y') }} {{ $appName }}. All rights reserved.</span><a href="{{ $webAppUrl }}">Open web app →</a></div></div></footer>
+<footer class="footer"><div class="wrap"><div class="footer-top"><a href="/" aria-label="TLStore"><img src="{{ asset('images/logo-long.png') }}" alt="TLStore"></a><nav class="footer-links"><a href="{{ $webAppUrl }}/privacy">Privacy</a><a href="{{ $webAppUrl }}/terms">Terms</a><a href="{{ $webAppUrl }}/help">Help center</a><a href="/contact">Contact support</a></nav></div><div class="footer-bottom"><span>© {{ date('Y') }} {{ $appName }}. All rights reserved.</span><a href="{{ $webAppUrl }}">Open web app →</a></div></div></footer>
 </body>
 </html>

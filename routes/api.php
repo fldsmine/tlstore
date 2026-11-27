@@ -49,6 +49,7 @@ use App\Features\Vas\Http\Controllers\Api\V1\VasPurchaseController;
 use App\Features\Vas\Http\Controllers\Api\V1\VasOrderController;
 use App\Features\Vas\Http\Controllers\Api\V1\VtpassWebhookController;
 use App\Features\Support\Http\Controllers\Api\V1\SupportTicketController;
+use App\Features\Support\Http\Controllers\Api\V1\GuestSupportController;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('api.v1.health');
@@ -76,6 +77,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/exchange-rates', [PublicCatalogController::class, 'exchangeRates'])->name('api.v1.exchange-rates.index');
     Route::get('/currencies', [PublicCatalogController::class, 'currencies'])->name('api.v1.currencies.index');
     Route::post('/webhooks/vtpass', VtpassWebhookController::class)->middleware('throttle:30,1')->name('api.v1.vas.webhook');
+    // Public contact form: no token required, heavily rate limited per IP and address.
+    Route::post('/guest-support', [GuestSupportController::class, 'store'])->middleware('throttle:guest-support')->name('api.v1.guest-support.store');
     Route::post('/webhooks/{provider}', [TopupController::class, 'webhook'])->name('api.v1.payments.webhook');
 	Route::get('/banks', [BankController::class, 'index'])->name('api.v1.banks.index');
 

@@ -35,6 +35,17 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(8)->by($userId ? 'withdrawal-user:'.$userId : $request->ip());
         });
 
+        // The public contact form is unauthenticated: cap submissions per source
+        // address *and* per email address so one script cannot flood the inbox.
+        RateLimiter::for('guest-support', function (Request $request): array {
+            $email = mb_strtolower(trim((string) $request->input('email', '')));
+
+            return [
+                Limit::perMinute(4)->by('guest-support-ip:'.$request->ip()),
+                Limit::perHour(6)->by('guest-support-email:'.sha1($email)),
+            ];
+        });
+
         // Administrator sign-in is a high-value target: throttle per account
         // *and* per source address, so neither password spraying across many
         // accounts nor repeated attempts against one account get more than a

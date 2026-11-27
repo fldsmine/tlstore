@@ -4,7 +4,6 @@ import 'package:review/services/auth_api.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../widgets/auth_components.dart';
-import '../../home_screen.dart';
 import '../../support_ticket_screen.dart';
 
 class ContactUs extends StatefulWidget {
@@ -63,7 +62,7 @@ class _ContactUsState extends State<ContactUs> {
     setState(() => _submitting = true);
 
     try {
-      final result = await _api.support(
+      final result = await _api.submitGuestSupport(
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
           subject: _subjectController.text.trim(),
@@ -71,11 +70,24 @@ class _ContactUsState extends State<ContactUs> {
       );
 
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => HomeScreen(result: result, api: _api),
+
+      // Sending a message never signs anyone in: show the reference inline and
+      // leave the visitor exactly where they were.
+      final data = result['data'];
+      final reference = data is Map ? (data['ticket_number']?.toString() ?? '') : '';
+      _nameController.clear();
+      _emailController.clear();
+      _subjectController.clear();
+      _messageController.clear();
+      setState(() => _showForm = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            reference.isEmpty
+                ? 'Message sent — we will reply by email.'
+                : 'Message sent — your reference is $reference. We will reply by email.',
+          ),
         ),
-        (_) => false,
       );
     } on AuthException catch (error) {
       if (mounted) showAuthMessage(context, error.message);
@@ -109,7 +121,7 @@ class _ContactUsState extends State<ContactUs> {
     final theme = Theme.of(context);
     final contact = widget.contact;
     final colors = theme.colorScheme;
-    final isUser = false;
+    final isUser = widget.user.isNotEmpty;
 
     final social = _asMap(contact['social_links']);
     final email = _text(contact['email'], '');
@@ -311,12 +323,19 @@ class _ContactUsState extends State<ContactUs> {
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.email],
                             decoration: const InputDecoration(
                               hintText: 'Email Address',
                               prefixIcon: Icon(Icons.email_outlined),
                             ),
-                            validator: (v) =>
-                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                            validator: (v) {
+                              final value = (v ?? '').trim();
+                              if (value.isEmpty) return 'Required';
+                              final at = value.indexOf('@');
+                              if (at <= 0 || at == value.length - 1 || !value.substring(at + 1).contains('.'))
+                                return 'Enter a valid email address';
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 24),
                           TextFormField(
@@ -336,8 +355,13 @@ class _ContactUsState extends State<ContactUs> {
                               hintText: 'Your Message',
                               prefixIcon: Icon(Icons.message_outlined),
                             ),
-                            validator: (v) =>
-                                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                            validator: (v) {
+                              final value = (v ?? '').trim();
+                              if (value.isEmpty) return 'Required';
+                              if (value.length < 10)
+                                return 'Please add a little more detail (10+ characters)';
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 30),
                     Row(

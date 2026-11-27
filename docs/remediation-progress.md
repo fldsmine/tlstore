@@ -182,3 +182,44 @@ Flutterwave / Bachs, and nobody could see the money sitting at a provider.
 | `GatewayPaymentAdminTest` (13 tests) | finance role sees only gateway intents; moderator forbidden; revalidate settles / leaves pending; manual approval credits exactly once (second attempt refused, wallet unchanged); approval activates a subscription and creates an add-on entitlement; rejection closes intent + projection and notifies; detail page renders; wallet/manual intents 404 here; super-admin-only balances; a provider 401 shows "Unavailable" and the page still renders; API parity + role enforcement |
 | `PaymentWebhookLifecycleTest` | new end-to-end subscription checkout → webhook → `user_subscriptions` active (guards the `transactions.type` regression) |
 | `php artisan route:list --path=admin` | web + API routes registered for all five endpoints |
+
+---
+
+## Public contact form / guest support ✅ (2026-11-27)
+
+Requested fix: the Flutter landing page ("Get in touch" → *Message us*) posted to
+`POST /api/v1/guest-support`, which did not exist, and its client helper expected a login
+response with a Sanctum token — so the form either 404'd or tried to sign the visitor in.
+
+| Item | Status | Change |
+|---|---|---|
+| `POST /api/v1/guest-support` | ✅ | Public endpoint (`GuestSupportController`) validated through a shared `ContactFormRules` contract, answering `201` with the ticket reference. No token is issued and no account is required. |
+| Persistence | ✅ | Migration `2026_11_27_110001_add_guest_fields_to_support_tickets` makes `support_tickets.user_id` nullable and adds `guest_name`, `guest_email`, `source`, `ip_address`, `user_agent`. Guest tickets reuse the existing admin inbox instead of a parallel table. |
+| Emails | ✅ | `app/Mail/Support/*`: acknowledgement to the visitor, notification to `SUPPORT_EMAIL` (with the matching account's name when the address belongs to a user), and admin replies emailed to the guest. They are dispatched with `defer()`, so a slow or broken SMTP host neither delays the visitor's response nor loses the ticket (errors are reported, headers are newline-sanitised). |
+| Spam & abuse | ✅ | Honeypot field (`website`) answered with a quiet `201`; `guest-support` limiter (4/min per IP, 6/hour per email address); a duplicate email + subject inside five minutes returns the existing ticket so a double-tapped send does not open two. |
+| Storefront form | ✅ | `GET /contact` (branded Blade page, CSRF, inline validation and success state) posts to the same action; the landing footer now links to it instead of `mailto:support@`. |
+| Admin handling | ✅ | Support inbox lists guest tickets with a *Guest form* badge, search covers guest name/email, the ticket page shows the source and IP, and replying emails the guest (no `Notification` row for a non-account). Admin API list rows carry a `guest` block. |
+| Client | ✅ (Dart uncompiled) | `AuthApi.submitGuestSupport()` posts without a token; `ContactUs` shows the ticket reference in a snackbar and stays on the page. `isUser = widget.user.isNotEmpty` restores the `+ Ticket` route for signed-in reviewers. |
+
+### Verification evidence
+
+| Check | Result |
+|---|---|
+| PHPUnit (full suite) | **78 tests / 397 assertions — OK** |
+| `GuestSupportContactTest` | 13 tests / 101 assertions |
+| `GuestSupportContactTest` coverage | store + acknowledge, registered email not attached to the account, 422 validation, honeypot stores nothing, duplicate submit reuses the ticket, per-IP 429 after 4 posts, storefront page renders/submits/validates, admin web list+search+detail+reply-by-email, admin API list+reply, signed-in tickets still notify the user, all three emails render with user input escaped, broken mailer still stores the ticket |
+| Migration | applied and rolled back against a copy of the developer database; `user_id` foreign key preserved, existing rows untouched |
+| Live sandbox check | `GET /contact` → 200; `POST /api/v1/guest-support` → `201` with `TKT-…` in 0.22 s while SMTP was unreachable (the two delivery failures were logged *after* the response); stored row had `user_id = NULL`, `source = public_form`, one `guest` message |
+
+### Deliberate decisions / residual risk
+
+- **A guest ticket is never claimed by an account.** Typing a registered email address does not
+  put the ticket in that user's list, so a stranger cannot post into someone else's thread. The
+  support inbox still shows the matching account name to help the agent.
+- **Flutter source only.** `public/web/main.dart.js` is still the stale prebuilt bundle
+  (`ERR-17`); a rebuild is needed before the web app picks up the new client code. The API
+  endpoint already matches the shipped (`guest-support`) path, so the old bundle stops 404ing
+  and stops trying to sign visitors in even without a rebuild.
+- Guests cannot revisit their own ticket; the reference is emailed and the inbox notification
+  carries the same number. A public "track my ticket" view would need a signed token and is a
+  follow-up, not part of this fix.
