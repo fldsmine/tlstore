@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\PaymentIntentLifecycle;
 use App\Application\Support\PaymentGatewaySettings;
 use App\Models\PaymentIntent;
 use App\Models\SubscriptionPlan;
@@ -18,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 final class InitializeGatewayTopup
 {
+    public function __construct(private readonly PaymentIntentLifecycle $lifecycle) {}
+
     /** @return array{intent_id:int,reference:string,provider:string,checkout_url:string,status:string} */
     public function handle(
         User $user,
@@ -42,11 +45,11 @@ final class InitializeGatewayTopup
 
         $email = trim($customerEmail ?: (string) $user->email);
         $emailValidator = Validator::make(['email' => $email], [
-            'email' => ['required', 'string', 'max:191', 'email:rfc,dns'],
+            'email' => ['required', 'string', 'max:191', 'email:rfc'],
         ]);
         if ($emailValidator->fails()) {
             throw ValidationException::withMessages([
-                'customer_email' => 'Enter a valid email address on a public email domain for the payment provider. Reserved or test email domains cannot be used.',
+                'customer_email' => 'Enter a valid email address for the payment receipt.',
             ]);
         }
 
@@ -196,8 +199,11 @@ final class InitializeGatewayTopup
 
             return ['intent_id' => $intent->id, 'reference' => $reference, 'provider' => $gateway, 'checkout_url' => $checkoutUrl, 'status' => 'pending'];
         } catch (\Throwable $exception) {
-            $intent->forceFill(['status' => 'failed', 'provider_metadata' => ['initialization_error' => 'Gateway checkout could not be initialized.']])->save();
-            Transaction::query()->where('reference', 'payment-intent:'.$intent->id)->update(['status' => 'failed', 'updated_at' => now()]);
+            // A checkout that could not be initialised is terminal: close the
+            // intent and its projection through the single lifecycle writer.
+            $this->lifecycle->markTerminal($intent, \App\Enums\PaymentIntentStatus::Failed, [
+                'initialization_error' => 'Gateway checkout could not be initialized.',
+            ]);
             if ($exception instanceof \Illuminate\Http\Client\RequestException) {
                 Log::warning('Payment gateway rejected checkout initialization.', [
                     'provider' => $gateway,

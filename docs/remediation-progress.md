@@ -102,3 +102,58 @@ and the existing PHPUnit suite goes from *failing before it starts* to green.
 - `AccountHistoryController` still converts `SUM(amount)` per currency with
   `CurrencyMinorUnits::toMinor()` in PHP; a mixed-precision currency would need the
   SQL-side rewrite tracked under `ERR-10`/`ERR-11` (Phase 2).
+
+---
+
+## Phase 2 — Financial, ledger, payment & webhook integrity ✅ (2026-11-27)
+
+Goal: one deterministic source of truth for balances and history, and no payment path that
+can leave a phantom `pending` row. The rules are now written down in
+[`money-and-ledger-invariants.md`](./money-and-ledger-invariants.md).
+
+| Item | Status | Change |
+|---|---|---|
+| `ERR-10` duplicate/permanently pending top-ups | ✅ | New `App\Enums\TransactionStatus` (the canonical vocabulary) and `App\Application\Payments\PaymentIntentLifecycle`, the single idempotent writer that moves an intent **and** its `payment-intent:{id}` projection together. Gateway webhooks that report failure/cancellation now close the intent instead of being marked `ignored`; `POST /topups/{intent}/cancel` closes both rows; new `payments:expire-intents` command (scheduled every 5 min) expires stale checkouts. `VerifyGatewayTopup`, `InitializeGatewayTopup` and the cancel endpoint all route through the same writer. |
+| `ERR-11` / `ERR-33` conflicting projections | ✅ | The observer now maps ledger statuses one-to-one onto the canonical vocabulary (`posted` → `completed`) with a dedicated `activityStatus()` for review/share/campaign workflows, distinguishes `campaign-order-refund:{id}` from `campaign-order:{id}` and flags `meta.refund`. The account-history `status` filter normalises legacy spellings (`posted`, `success`, `reserved`) and now accepts `completed`/`approved`/`expired`. |
+| `ERR-18` Bachs verification | ✅ | `VerifyGatewayTopup` reads `payment_status` (falling back to `charge.status`) for Bachs instead of the envelope `status`, matching the webhook. |
+| `ERR-23` `email:rfc,dns` | ✅ | All three checkout validators (`TopupController`, `InitializeGatewayTopup`, `SubscriptionController`, `PackageAddonController`) use `email:rfc`; reserved/test domains no longer block a payment and checkout no longer depends on outbound DNS. |
+| `ERR-24` seeder contradictions | ✅ | Group A plans seed `withdrawal_days` from one constant (`['Monthly 28th']`) for both the column and the customer-facing `features` block, and the review plans' `task_referral_percent` now equals `task_referral_tiers['1']` (5%), which is what `CreditReferralReward` actually pays. |
+| `ERR-31` Korapay bank resolve | ✅ | The payout resolver maps `banks.country` → ISO-4217 currency through `countries.default_currency` (with an inline fallback) and rejects unknown countries instead of calling the provider. **Also fixed:** `account_validation.provider` was read with `->value('value')`, bypassing the model's array cast, so every deployment silently used Paystack — a configured Korapay/Flutterwave/Bachs provider was ignored. |
+| `ERR-36` `env()` outside config | ✅ | `config/trustlens.php` resolves gateway credentials once into `$paymentGateways`; `implemented_payment_gateways` derives from that array (no second set of `env()` calls). `DemoAdminSeeder` no longer calls `env()` (it already did not at this commit). `php artisan config:cache` verified. |
+| new: `ledger:verify` | ✅ | Read-only command that proves the Phase 2 exit criteria: every wallet balance equals its ledger impact sum, every transaction status is canonical, and no terminal intent is still projected as `pending`. Scheduled nightly; exits non-zero on drift. |
+| new: data migration | ✅ | `2026_11_27_090002_normalize_transaction_statuses` rewrites legacy `posted` / `success` / `successful` / `reserved` rows to the canonical vocabulary. |
+
+### Verification evidence
+
+| Check | Result |
+|---|---|
+| PHPUnit (full suite) | **51 tests / 238 assertions — OK** (was 20 / 133 at the end of Phase 1) |
+| New webhook suite `PaymentWebhookLifecycleTest` | success, duplicate replay (no double credit), failure, cancellation, non-terminal provider status, cross-currency top-up, and a reserved-domain checkout — all through the real endpoint with a valid HMAC signature |
+| New `PaymentIntentExpiryTest` | expiry job expires stale checkouts only (open/paid/manual untouched, completed projections never downgraded), cancel endpoint closes both rows |
+| New `PayoutAccountResolutionTest` | Korapay receives `NGN` (not `NG`), unknown countries are rejected before any HTTP call, Paystack path unaffected |
+| New `TransactionProjectionTest` | posted → `completed`, reserved → `pending` (and a hold on the balance), refund row separate + `completed`, balance never negative |
+| New `LedgerIntegrityCommandTest` + `WithdrawalScheduleTest` | 12 command/parser tests (unrecognised schedule tokens fail open, mixed tokens still block) |
+| `php artisan ledger:verify` on the developer database | 109 wallets, **0 balance discrepancies**, 0 non-canonical statuses, 0 dangling intents |
+| `php artisan config:cache` / `config:clear` | both succeed with the rewritten config |
+
+### Deliberate decisions
+
+- **Top-ups are never converted.** A USD payment credits a USD `topup_fund` wallet; rewards
+  are converted into `wallet_currency`. Converting a top-up would make the history disagree
+  with what the provider actually charged.
+- **`posted` is a ledger status, not a transaction status.** Legacy clients keep working:
+  the API normalises `posted`/`success`/`reserved` on input, and the nightly checks report
+  any non-canonical row.
+- **A reservation is a `pending` transaction with a real balance hold**, which matches what
+  the wallet does.
+
+### Residual risk moved to later phases
+
+- Wallet-funded subscription/add-on purchases still write their projection directly (the
+  observer rewrites the same reference immediately afterwards). Converging them on the
+  observer is a Phase 6 refactor; behaviour is already consistent and covered.
+- `PaymentGatewaySettings` reads `SystemSetting` on every call; caching it is a Phase 4/6
+  performance item.
+- Provider payload shapes (Bachs `charge.status`, Korapay signature canonicalisation) are
+  covered by unit-level fakes here, not by live sandbox calls — the sandbox has no outbound
+  network. Validate against provider sandboxes before release.

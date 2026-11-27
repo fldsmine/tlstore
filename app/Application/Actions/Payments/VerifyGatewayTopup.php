@@ -3,14 +3,17 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\PaymentIntentLifecycle;
 use App\Enums\PaymentIntentStatus;
 use App\Models\PaymentIntent;
-use App\Models\Transaction;
 use Illuminate\Support\Facades\Http;
 
 final class VerifyGatewayTopup
 {
-    public function __construct(private readonly ProcessGatewayWebhook $processor) {}
+    public function __construct(
+        private readonly ProcessGatewayWebhook $processor,
+        private readonly PaymentIntentLifecycle $lifecycle,
+    ) {}
 
     public function handle(PaymentIntent $intent): PaymentIntent
     {
@@ -52,12 +55,16 @@ final class VerifyGatewayTopup
         };
 
         if (! $providerSuccess) {
-            $providerStatus = strtolower((string) ($intent->provider === 'bachs' ? ($data['status'] ?? '') : ($data['status'] ?? '')));
-            if (in_array($providerStatus, ['failed', 'failure', 'cancelled', 'canceled', 'abandoned'], true)
-                && $intent->status === PaymentIntentStatus::Pending) {
-                $intent->forceFill(['status' => 'failed'])->save();
-                Transaction::query()->where('reference', 'payment-intent:'.$intent->id)
-                    ->update(['status' => 'failed', 'updated_at' => now()]);
+            // Bachs reports the payment state in `payment_status`; the
+            // envelope `status` there is the HTTP-level result.
+            $providerStatus = strtolower(trim((string) (
+                $intent->provider === 'bachs'
+                    ? ($data['payment_status'] ?? $data['charge']['status'] ?? $data['status'] ?? '')
+                    : ($data['status'] ?? '')
+            )));
+            $terminal = PaymentIntentLifecycle::terminalStatusFor($providerStatus);
+            if ($terminal !== null) {
+                $this->lifecycle->markTerminal($intent, $terminal, ['verified_by' => 'check-payment', 'provider_status' => $providerStatus]);
             }
 
             return $intent->fresh() ?? $intent;

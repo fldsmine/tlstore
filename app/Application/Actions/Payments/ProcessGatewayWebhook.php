@@ -3,6 +3,8 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Actions\Subscriptions\ActivateSubscription;
+use App\Application\Payments\PaymentIntentLifecycle;
+use App\Enums\PaymentIntentStatus;
 use App\Application\Actions\PackageAddons\ActivatePackageAddon;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Models\LedgerEntry;
@@ -20,6 +22,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class ProcessGatewayWebhook
 {
+    public function __construct(private readonly PaymentIntentLifecycle $lifecycle) {}
+
     public function handle(string $provider, Request $request): void
     {
         $payload = $request->all();
@@ -72,7 +76,22 @@ final class ProcessGatewayWebhook
                     && (($verified['charge']['status'] ?? 'succeeded') === 'succeeded'),
             };
             if (! $status) {
-                $event->forceFill(['processing_status' => 'ignored', 'processed_at' => now()])->save();
+                // A provider that reports failure/cancellation is a terminal
+                // event, not a no-op: close the intent *and* its projection so
+                // the user never sees a phantom pending top-up.
+                $providerStatus = $this->providerStatus($provider, $verified);
+                $terminal = PaymentIntentLifecycle::terminalStatusFor($providerStatus);
+
+                if ($terminal !== null) {
+                    $this->lifecycle->markTerminal($intent, $terminal, [
+                        'webhook_event_id' => $event->id,
+                        'provider_status' => $providerStatus,
+                    ]);
+                    $event->forceFill(['processing_status' => 'processed', 'processed_at' => now(), 'processing_error' => null])->save();
+                    return;
+                }
+
+                $event->forceFill(['processing_status' => 'ignored', 'processing_error' => 'Provider reports a non-final status: '.$providerStatus, 'processed_at' => now()])->save();
                 return;
             }
 
@@ -98,6 +117,25 @@ final class ProcessGatewayWebhook
             report($exception);
             throw new HttpException(500, 'Payment notification could not be processed.');
         }
+    }
+
+    /**
+     * The provider's own status string, normalised to lower case.
+     *
+     * Bachs reports `payment_status` (and sometimes only `charge.status`);
+     * the other gateways use `status` on the verified payload.
+     */
+    private function providerStatus(string $provider, array $verified): string
+    {
+        $status = match ($provider) {
+            'bachs' => $verified['payment_status']
+                ?? $verified['charge']['status']
+                ?? $verified['status']
+                ?? null,
+            default => $verified['status'] ?? null,
+        };
+
+        return is_string($status) ? strtolower(trim($status)) : '';
     }
 
     private function validSignature(string $provider, Request $request, array $data): bool
@@ -248,7 +286,7 @@ final class ProcessGatewayWebhook
                 'status' => 'succeeded', 'provider_response' => $providerResponse, 'occurred_at' => $now,
             ]);
             $addon = \App\Models\PackageAddon::query()->findOrFail($intent->source_id);
-            Transaction::query()->updateOrCreate(['reference' => 'payment-intent:'.$intent->id], [
+            Transaction::query()->updateOrCreate(['reference' => PaymentIntentLifecycle::transactionReference($intent)], [
                 'user_id' => $intent->user_id, 'type' => 'package_addon', 'direction' => 'debit',
                 'amount' => CurrencyMinorUnits::fromMinor($intent->amount_minor, $intent->currency), 'fee' => 0,
                 'wallet' => null, 'status' => 'completed', 'description' => 'Package add-on purchase: '.$addon->name,
@@ -287,7 +325,7 @@ final class ProcessGatewayWebhook
             $plan = SubscriptionPlan::query()->findOrFail($intent->source_id);
 
             Transaction::query()->updateOrCreate(
-                ['reference' => 'payment-intent:'.$intent->id],
+                ['reference' => PaymentIntentLifecycle::transactionReference($intent)],
                 [
                     'user_id' => $intent->user_id,
                     'type' => $plan->product_type->value,

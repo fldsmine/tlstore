@@ -3,6 +3,7 @@
 namespace App\Features\Wallets\Http\Controllers\Api\V1;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Enums\TransactionStatus;
 use App\Models\Transaction;
 use App\Models\WithdrawalRequest;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,7 +18,7 @@ final class AccountHistoryController
         $validated = $request->validate([
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'category' => ['sometimes', 'in:all,review,share,payment,withdrawal,referral,bonus,other'],
-            'status' => ['sometimes', 'in:all,posted,pending,failed,rejected,cancelled'],
+            'status' => ['sometimes', 'in:all,posted,completed,approved,pending,failed,rejected,cancelled,expired'],
             'from_date' => ['sometimes', 'date'],
             'to_date' => ['sometimes', 'date'],
         ]);
@@ -81,7 +82,7 @@ final class AccountHistoryController
             ? "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.currency')), 'USD')"
             : "COALESCE(json_extract(meta, '$.currency'), 'USD')";
         $successRows = (clone $userTransactions)
-            ->whereIn('status', ['posted', 'completed', 'success', 'successful', 'approved'])
+            ->whereIn('status', [...TransactionStatus::settledValues(), 'posted', 'success', 'successful'])
             ->where('direction', 'credit')
             ->whereIn('type', ['app_review', 'ads_share', 'referral_bonus', 'rank_earning', 'social_follow_reward'])
             ->selectRaw("{$currencyExpression} as currency, SUM(amount) as total_amount")
@@ -144,10 +145,12 @@ final class AccountHistoryController
             ]);
         }
 
-        $status = $filters['status'] ?? 'all';
-        if ($status === 'posted') {
-            $query->whereIn('status', ['posted', 'completed', 'success', 'successful', 'approved']);
-        } elseif ($status === 'cancelled') {
+        $status = TransactionStatus::normalize((string) ($filters['status'] ?? 'all'));
+        if ($status === TransactionStatus::Completed->value) {
+            // `posted` is the pre-Phase-2 spelling of a settled row and older
+            // clients still send it; both spellings select the same set.
+            $query->whereIn('status', [...TransactionStatus::settledValues(), 'posted', 'success', 'successful']);
+        } elseif ($status === TransactionStatus::Cancelled->value) {
             $query->whereIn('status', ['cancelled', 'canceled']);
         } elseif ($status !== 'all') {
             $query->where('status', $status);

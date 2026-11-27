@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\DB;
 
 class SubscriptionPlanSeeder extends Seeder
 {
+    /**
+     * Group A packages settle withdrawals on the 28th of each month. Both the
+     * column (read by `RequestWithdrawal`) and the customer-facing `features`
+     * metadata must come from this single value - they used to disagree
+     * (`['Monthly 28th']` vs `['Monthly']`).
+     */
+    private const MONTHLY_WITHDRAWAL_DAYS = ['Monthly 28th'];
+
     public function run(): void
     {
         // Keep this seeder self-contained for targeted data runs.
@@ -24,12 +32,12 @@ class SubscriptionPlanSeeder extends Seeder
                 'discount' => 0, 'bonus' => 500, 'subscription_referral_percent' => 50, 'task_referral_percent' => 0,
                 'is_special' => 0, 'max_review_tasks' => 0, 'max_ad_shares' => 1000, 'addons' => false,
                 'eligible_app_store' => null, 'eligible_app_category' => null,
-                'minimum_withdrawal_minor' => 600000, 'withdrawal_days' => ['Monthly 28th'],
+                'minimum_withdrawal_minor' => 600000, 'withdrawal_days' => self::MONTHLY_WITHDRAWAL_DAYS,
                 'daily_revenue_minor' => 15000, 'task_reward_minor' => null, 'daily_task_limit' => null,
                 'features' => [
                     'referral_bonus' => 750,
                     'minimum_withdrawal' => 6000,
-                    'withdrawal_days' => ['Monthly'],
+                    'withdrawal_days' => self::MONTHLY_WITHDRAWAL_DAYS,
                     'welcome_bonus' => 500,
                 ],
 				'subscription_referral_tiers' => ['1' => 50, '2' => 0, '3' => 0],
@@ -42,12 +50,12 @@ class SubscriptionPlanSeeder extends Seeder
                 'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 50, 'task_referral_percent' => 0,
                 'is_special' => 1, 'max_review_tasks' => 0, 'max_ad_shares' => 120, 'addons' => false,
                 'eligible_app_store' => null, 'eligible_app_category' => null,
-                'minimum_withdrawal_minor' => 1150000, 'withdrawal_days' => ['Monthly 28th'],
+                'minimum_withdrawal_minor' => 1150000, 'withdrawal_days' => self::MONTHLY_WITHDRAWAL_DAYS,
                 'daily_revenue_minor' => 30000, 'task_reward_minor' => null, 'daily_task_limit' => null,
                 'features' => [
                     'referral_bonus' => 1750,
                     'minimum_withdrawal' => 11500,
-                    'withdrawal_days' => ['Monthly'],
+                    'withdrawal_days' => self::MONTHLY_WITHDRAWAL_DAYS,
                 ],
 				'subscription_referral_tiers' => ['1' => 50, '2' => 0, '3' => 0],
 				'task_referral_tiers' => ['1' => 0, '2' => 0, '3' => 0],
@@ -59,12 +67,12 @@ class SubscriptionPlanSeeder extends Seeder
                 'discount' => 12, 'bonus' => 0, 'subscription_referral_percent' => 54.6, 'task_referral_percent' => 0,
                 'is_special' => 1, 'max_review_tasks' => 0, 'max_ad_shares' => 140, 'addons' => false,
                 'eligible_app_store' => null, 'eligible_app_category' => null,
-                'minimum_withdrawal_minor' => 1850000, 'withdrawal_days' => ['Monthly 28th'],
+                'minimum_withdrawal_minor' => 1850000, 'withdrawal_days' => self::MONTHLY_WITHDRAWAL_DAYS,
                 'daily_revenue_minor' => 45000, 'task_reward_minor' => null, 'daily_task_limit' => null,
                 'features' => [
                     'referral_bonus' => 3000,
                     'minimum_withdrawal' => 18500,
-                    'withdrawal_days' => ['Monthly'],
+                    'withdrawal_days' => self::MONTHLY_WITHDRAWAL_DAYS,
                     'package_percent_discount' => 12,
                 ],
 				'subscription_referral_tiers' => ['1' => 54.6, '2' => 0, '3' => 0],
@@ -74,7 +82,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'plan_key' => 'review-google-play-4m', 'subscription_group_id' => $groups['group_b'],
                 'product_type' => 'marketplace_access', 'name' => 'Playstore review', 'tier_key' => 'playstore_review',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 1215000, 'currency' => 'NGN',
-                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 6,
+                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 5,
                 'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Google Play', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday'],
@@ -94,7 +102,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'plan_key' => 'review-samsung-store-4m', 'subscription_group_id' => $groups['group_b'],
                 'product_type' => 'marketplace_access', 'name' => 'Samsung store', 'tier_key' => 'samsung_store',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 2485000, 'currency' => 'NGN',
-                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 6,
+                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 5,
                 'is_special' => 1, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Samsung Galaxy Store', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday'],
@@ -114,7 +122,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'plan_key' => 'review-apple-store-4m', 'subscription_group_id' => $groups['group_c'],
                 'product_type' => 'marketplace_access', 'name' => 'Apple store', 'tier_key' => 'apple_store',
                 'billing_interval' => 'monthly', 'duration_count' => 4, 'price_minor' => 5775000, 'currency' => 'NGN',
-                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 6,
+                'discount' => 0, 'bonus' => 0, 'subscription_referral_percent' => 10, 'task_referral_percent' => 5,
                 'is_special' => 0, 'max_review_tasks' => 360, 'max_ad_shares' => 0, 'addons' => true,
                 'eligible_app_store' => 'Apple App Store', 'eligible_app_category' => null,
                 'minimum_withdrawal_minor' => 300000, 'withdrawal_days' => ['Friday', 'Wednesday'],

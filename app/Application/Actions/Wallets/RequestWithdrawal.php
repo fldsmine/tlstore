@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Wallets;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Money\WithdrawalSchedule;
 use App\Application\Money\CurrencyConverter;
 use App\Models\LedgerEntry;
 use App\Models\Notification;
@@ -63,8 +64,8 @@ final class RequestWithdrawal
             }
             $plan = $subscription?->plan;
             $withdrawalDays = $plan?->withdrawal_days ?? [];
-            if (! $isReferralOrBonusWallet && ! $this->isWithdrawalDay($withdrawalDays, now())) {
-                throw ValidationException::withMessages(['withdrawal' => 'Your package allows withdrawals on: '.implode(' and ', $withdrawalDays).'.']);
+            if (! $isReferralOrBonusWallet && ! WithdrawalSchedule::allows($withdrawalDays, now())) {
+                throw ValidationException::withMessages(['withdrawal' => 'Your package allows withdrawals on: '.WithdrawalSchedule::describe($withdrawalDays).'.']);
             }
             $requiredFields = $option->fields ?? [];
             $payoutDetails = array_intersect_key($payoutDetails, array_flip($requiredFields));
@@ -153,18 +154,6 @@ final class RequestWithdrawal
 
             return $withdrawal->load('option');
         });
-    }
-
-    private function isWithdrawalDay(array $days, \Illuminate\Support\Carbon $date): bool
-    {
-        if ($days === []) return true;
-        foreach ($days as $day) {
-            $day = strtolower(trim((string) $day));
-            if (preg_match('/^monthly\s+(\d{1,2})(?:st|nd|rd|th)?$/', $day, $matches) && $date->day === (int) $matches[1]) return true;
-            if (strtolower($date->englishDayOfWeek) === $day) return true;
-        }
-
-        return false;
     }
 
     private function walletWithdrawalsEnabled(string $walletType): bool
