@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../services/auth_api.dart';
+import '../auth/login_screen.dart';
+import '../auth/register_screen.dart';
 import 'widgets/ads_share.dart';
 import 'widgets/anim/anim_kit.dart';
 import 'widgets/app_features.dart';
@@ -16,17 +18,23 @@ import 'widgets/testimonies_list.dart';
 import 'widgets/contact_us.dart';
 import 'widgets/vas_services.dart';
 
+/// Public TLStore landing page.
+///
+/// The page is browsable without a session: pass no `isUser`/`token` (the
+/// defaults) for visitors who arrived from the intro or a login screen.
+/// Anything that needs an account then offers "Create account" / "Log in"
+/// instead of failing silently.
 class LandingScreen extends StatefulWidget {
   const LandingScreen({
     super.key,
     required this.api,
-    required this.isUser,
-    required this.token,
+    this.isUser = const <String, dynamic>{},
+    this.token,
   });
 
   final AuthApi api;
   final Map<String, dynamic> isUser;
-  final String token;
+  final String? token;
 
   @override
   State<LandingScreen> createState() => _LandingScreenState();
@@ -34,6 +42,9 @@ class LandingScreen extends StatefulWidget {
 
 class _LandingScreenState extends State<LandingScreen> {
   final _scrollController = ScrollController();
+
+  bool get _isAuthenticated =>
+      (widget.token ?? '').isNotEmpty && widget.isUser.isNotEmpty;
 
   Map<String, dynamic> _payload = const {};
   bool _loading = true;
@@ -49,6 +60,97 @@ class _LandingScreenState extends State<LandingScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _openAuth({required bool register}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => register ? const RegisterScreen() : const LoginScreen(),
+      ),
+    );
+  }
+
+  /// Guests may read every section; an action that needs an account asks them
+  /// to create one or log in, without losing the page they were on.
+  Future<void> _requireAccount({
+    String message = 'Create an account or log in to continue.',
+  }) async {
+    if (_isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Open this from your dashboard.')),
+      );
+      return;
+    }
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 2, 22, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Join TLStore',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, 'register'),
+                  child: const Text('Create account'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext, 'login'),
+                  child: const Text('Log in'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('Keep exploring'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) return;
+    _openAuth(register: action == 'register');
+  }
+
+  void _primaryCta() {
+    if (_isAuthenticated) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    _openAuth(register: true);
+  }
+
+  void _secondaryCta() {
+    if (_isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Open your profile from the dashboard menu.'),
+        ),
+      );
+      return;
+    }
+    _openAuth(register: false);
   }
 
   Future<void> _load() async {
@@ -180,6 +282,14 @@ class _LandingScreenState extends State<LandingScreen> {
     final theme = _landingTheme(context);
 
     return Scaffold(
+      // Guests always have a visible way into registration while browsing.
+      floatingActionButton: _isAuthenticated
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _primaryCta,
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+              label: const Text('Create account'),
+            ),
       body: Stack(
         children: [
           const Positioned.fill(child: AmbientBackdrop()),
@@ -197,9 +307,23 @@ class _LandingScreenState extends State<LandingScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
                           // The hero animates itself.
-                          BannerSection(banner: _banner, user: widget.isUser),
+                          BannerSection(
+                            banner: _banner,
+                            user: widget.isUser,
+                            onPrimaryAction: _primaryCta,
+                            onSecondaryAction: _secondaryCta,
+                          ),
                           _gap,
-                          Reveal(child: FeaturedApp(apps: _apps)),
+                          Reveal(
+                            child: FeaturedApp(
+                              apps: _apps,
+                              onOpenApp: (app) => _requireAccount(
+                                message:
+                                    'Create an account or log in to open app '
+                                    'details and start reviewing.',
+                              ),
+                            ),
+                          ),
                           _gap,
                           Reveal(child: PaymentOptions(options: _paymentOptions)),
                           _gap,
@@ -209,7 +333,17 @@ class _LandingScreenState extends State<LandingScreen> {
                           // run their own staggered, illustrated reveals.
                           HowItWorks(steps: _steps),
                           _gap,
-                          Reveal(child: AdShare(ads: _ads, api: widget.api)),
+                          Reveal(
+                            child: AdShare(
+                              ads: _ads,
+                              api: widget.api,
+                              onOpenAd: (ad) => _requireAccount(
+                                message:
+                                    'Create an account or log in to join this '
+                                    'sponsored sharing campaign.',
+                              ),
+                            ),
+                          ),
                           _gap,
                           AppFeatures(features: _features),
                           _gap,
@@ -224,7 +358,7 @@ class _LandingScreenState extends State<LandingScreen> {
                           Reveal(
                             child: ContactUs(
                               api: widget.api,
-                              token: widget.token,
+                              token: widget.token ?? '',
                               contact: _contact,
                               support: _supportLinks,
                               user: widget.isUser,

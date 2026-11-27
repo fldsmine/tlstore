@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'core/links/referral_link.dart';
+import 'screens/frontend/landing_sreen.dart';
 import 'screens/home_screen.dart';
 import 'screens/intro_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -175,6 +176,17 @@ class _SessionGateState extends State<_SessionGate> {
     );
   }
 
+  /// Guest tour: open the public landing page over the intro, with no session.
+  /// Back returns to the intro; registering/logging in from the page replaces
+  /// the whole stack with the authenticated home screen.
+  Future<void> _openExplore() async {
+    await _storage.write(key: 'trustlens.intro_seen', value: 'true');
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => LandingScreen(api: _api)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<(AuthResult?, bool)>(
     future: _initial,
@@ -189,6 +201,7 @@ class _SessionGateState extends State<_SessionGate> {
                 : IntroScreen(
                     onLogin: () => _openAuth(register: false),
                     onRegister: () => _openAuth(register: true),
+                    onExplore: _openExplore,
                   )
           : HomeScreen(result: result, api: _api);
     },

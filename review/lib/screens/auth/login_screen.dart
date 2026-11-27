@@ -12,6 +12,7 @@ import '../../widgets/auth_components.dart';
 import '../../widgets/auth_provider_buttons.dart';
 import '../../widgets/auth_spotlight_panel.dart';
 import '../../widgets/google_web_sign_in_button.dart';
+import '../frontend/landing_sreen.dart';
 import '../home_screen.dart';
 import 'account_access_screen.dart';
 import 'password_recovery_screen.dart';
@@ -492,6 +493,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => LandingScreen(api: _api),
+                ),
+              ),
+              style: TextButton.styleFrom(foregroundColor: brandGreen),
+              icon: const Icon(Icons.travel_explore_rounded, size: 18),
+              label: const Text(
+                'Explore without an account',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
             ),
             const SizedBox(height: 14),
             const AuthFooter(),

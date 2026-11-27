@@ -10,8 +10,16 @@ import 'anim/illustrations.dart';
 class BannerSection extends StatelessWidget {
   final Map<String, dynamic> banner;
   final Map<String, dynamic> user;
+  final VoidCallback onPrimaryAction;
+  final VoidCallback onSecondaryAction;
 
-  const BannerSection({super.key, required this.banner, required this.user});
+  const BannerSection({
+    super.key,
+    required this.banner,
+    required this.user,
+    required this.onPrimaryAction,
+    required this.onSecondaryAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -186,8 +194,7 @@ class BannerSection extends StatelessWidget {
               PulseGlow(
                 color: Colors.white,
                 child: ElevatedButton(
-                  onPressed: () {},
-                  //onPressed: () { isLoggin ? dashboard : register },
+                  onPressed: onPrimaryAction,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: colors.primary,
@@ -211,7 +218,7 @@ class BannerSection extends StatelessWidget {
                 ),
               ),
               OutlinedButton(
-                onPressed: () {},
+                onPressed: onSecondaryAction,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: const BorderSide(color: Colors.white),
