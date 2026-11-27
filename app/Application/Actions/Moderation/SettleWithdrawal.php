@@ -7,14 +7,16 @@ use App\Models\AuditLog;
 use App\Models\LedgerEntry;
 use App\Models\Notification;
 use App\Models\WithdrawalRequest;
+use App\Jobs\SendWithdrawalStatusTelegramJob;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 final class SettleWithdrawal
 {
     public function handle(Admin $admin, WithdrawalRequest $withdrawal, string $decision, ?string $providerReference, ?string $reason): WithdrawalRequest
     {
-        return DB::transaction(function () use ($admin, $withdrawal, $decision, $providerReference, $reason): WithdrawalRequest {
+        $settled = DB::transaction(function () use ($admin, $withdrawal, $decision, $providerReference, $reason): WithdrawalRequest {
             $withdrawal = WithdrawalRequest::query()->lockForUpdate()->findOrFail($withdrawal->id);
             if ($withdrawal->status->value !== 'pending') {
                 throw ValidationException::withMessages(['withdrawal' => 'This withdrawal is no longer pending.']);
@@ -82,5 +84,22 @@ final class SettleWithdrawal
 
             return $withdrawal->refresh();
         });
+
+        $this->notifyTelegram($settled);
+
+        return $settled;
+    }
+
+    /** A Telegram outage must not undo or block a settled withdrawal. */
+    private function notifyTelegram(WithdrawalRequest $withdrawal): void
+    {
+        try {
+            SendWithdrawalStatusTelegramJob::dispatch($withdrawal->id);
+        } catch (\Throwable $error) {
+            Log::warning('telegram.withdrawal_status_dispatch_failed', [
+                'withdrawal_id' => $withdrawal->id,
+                'error' => $error->getMessage(),
+            ]);
+        }
     }
 }

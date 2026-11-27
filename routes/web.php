@@ -6,6 +6,7 @@ use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
 use App\Features\Admin\Http\Controllers\Web\GatewayPaymentAdminController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
+use App\Features\Admin\Http\Controllers\Web\TelegramAdminController;
 use App\Features\Support\Http\Controllers\Web\ContactController;
 use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
@@ -81,6 +82,14 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('/notifications/test', [NotificationTemplateAdminController::class, 'sendTest'])->middleware('throttle:3,1')->name('notifications.test');
         Route::get('/notifications/templates/{template}/edit', [NotificationTemplateAdminController::class, 'edit'])->whereNumber('template')->name('notifications.templates.edit');
         Route::patch('/notifications/templates/{template}', [NotificationTemplateAdminController::class, 'update'])->whereNumber('template')->name('notifications.templates.update');
+        // Telegram announcements, bot configuration and delivery history.
+        Route::get('/telegram', [TelegramAdminController::class, 'index'])->name('telegram.index');
+        Route::patch('/telegram/settings', [TelegramAdminController::class, 'updateSettings'])->middleware('throttle:30,1')->name('telegram.settings');
+        Route::post('/telegram/test-connection', [TelegramAdminController::class, 'testConnection'])->middleware('throttle:6,1')->name('telegram.test-connection');
+        Route::post('/telegram/test-message', [TelegramAdminController::class, 'sendTest'])->middleware('throttle:6,1')->name('telegram.test-message');
+        Route::post('/telegram/messages', [TelegramAdminController::class, 'send'])->middleware('throttle:20,1')->name('telegram.send');
+        Route::post('/telegram/messages/{message}/resend', [TelegramAdminController::class, 'resend'])->whereNumber('message')->middleware('throttle:20,1')->name('telegram.resend');
+        Route::get('/telegram/messages/{message}/image', [TelegramAdminController::class, 'image'])->whereNumber('message')->name('telegram.image');
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])->name('support-tickets.index');
         Route::get('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
         Route::post('/support-tickets/{ticket}/messages', [AdminSupportTicketController::class, 'reply'])->whereNumber('ticket')->name('support-tickets.reply');

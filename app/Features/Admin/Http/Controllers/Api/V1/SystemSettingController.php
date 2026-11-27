@@ -17,6 +17,9 @@ final class SystemSettingController
             ->where('setting_key', 'not like', '%secret%')
             ->where('setting_key', 'not like', '%credential%')
             ->where('setting_key', 'not like', '%private_key%')
+            // Telegram credentials are managed on the console page and never
+            // returned by an API response (ERR: credential exposure).
+            ->where('setting_key', 'not like', 'telegram.%')
             ->orderBy('setting_key')->get()]);
     }
 

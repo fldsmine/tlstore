@@ -13,7 +13,9 @@ use App\Models\UserSubscription;
 use App\Models\WithdrawalOption;
 use App\Models\WithdrawalRequest as Withdrawal;
 use App\Models\SystemSetting;
+use App\Jobs\SendWithdrawalTelegramNotificationJob;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 final class RequestWithdrawal
@@ -22,7 +24,9 @@ final class RequestWithdrawal
 
     public function handle(User $user, int $walletId, int $optionId, int $amountMinor, array $payoutDetails, string $idempotencyKey): Withdrawal
     {
-        return DB::transaction(function () use ($user, $walletId, $optionId, $amountMinor, $payoutDetails, $idempotencyKey): Withdrawal {
+        $created = false;
+
+        $withdrawal = DB::transaction(function () use ($user, $walletId, $optionId, $amountMinor, $payoutDetails, $idempotencyKey, &$created): Withdrawal {
             $existing = Withdrawal::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
                 if ($existing->user_id !== $user->id) {
@@ -116,6 +120,7 @@ final class RequestWithdrawal
                 'payout_details' => $payoutDetails, 'status' => 'pending', 'idempotency_key' => $idempotencyKey,
                 'requested_at' => now(),
             ]);
+            $created = true;
             LedgerEntry::query()->create([
                 'wallet_id' => $wallet->id, 'entry_type' => 'withdrawal_reservation', 'direction' => 'debit',
                 'amount_minor' => $amountMinor, 'status' => 'reserved', 'source_type' => 'withdrawal_request',
@@ -154,6 +159,28 @@ final class RequestWithdrawal
 
             return $withdrawal->load('option');
         });
+
+        if ($created) {
+            $this->notifyTelegram($withdrawal);
+        }
+
+        return $withdrawal;
+    }
+
+    /**
+     * Telegram is a side-channel: its failure must never surface to the user or
+     * roll back a request that has already been recorded and reserved.
+     */
+    private function notifyTelegram(Withdrawal $withdrawal): void
+    {
+        try {
+            SendWithdrawalTelegramNotificationJob::dispatch($withdrawal->id);
+        } catch (\Throwable $error) {
+            Log::warning('telegram.withdrawal_notification_dispatch_failed', [
+                'withdrawal_id' => $withdrawal->id,
+                'error' => $error->getMessage(),
+            ]);
+        }
     }
 
     private function walletWithdrawalsEnabled(string $walletType): bool
