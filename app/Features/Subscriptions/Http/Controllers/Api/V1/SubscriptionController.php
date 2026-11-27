@@ -74,7 +74,7 @@ final class SubscriptionController
     {
         $data = $request->validate([
             'subscription_plan_id' => ['required', 'integer', 'exists:subscription_plans,id'],
-            'gateway' => ['required', 'in:korapay,paystack,flutterwave,bachs'],
+            'gateway' => ['required', 'in:korapay,paystack,flutterwave,bachs,fincra'],
             'currency' => ['required', 'string', 'size:3'],
             'idempotency_key' => ['required', 'string', 'max:80'],
             'customer_email' => ['nullable', 'string', 'max:191', 'email:rfc'],

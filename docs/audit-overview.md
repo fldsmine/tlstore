@@ -55,7 +55,7 @@ Existing feature reference documents in `docs/`:
 ---
 ## 4. Financial & Wallet Architecture
 1. **Multi-Wallet Model (`App\Enums\WalletType`):**
-   - `topup_fund`: Funded via payment gateways (`korapay`, `paystack`, `flutterwave`, `bachs`) or manual deposit approval. Used to buy subscriptions, package add-ons, VAS orders, user campaigns, or transfer into earning wallets (`TransferTopupFunds`). Cannot be withdrawn directly.
+   - `topup_fund`: Funded via payment gateways (`korapay`, `paystack`, `flutterwave`, `bachs`, `fincra`) or manual deposit approval. Used to buy subscriptions, package add-ons, VAS orders, user campaigns, or transfer into earning wallets (`TransferTopupFunds`). Cannot be withdrawn directly.
    - `share`: Credited by Group A ad-share tasks.
    - `review_group_b`: Credited by Group B (Google Play / Samsung Galaxy Store) app review tasks.
    - `review_group_c`: Credited by Group C (Apple App Store) app review tasks.

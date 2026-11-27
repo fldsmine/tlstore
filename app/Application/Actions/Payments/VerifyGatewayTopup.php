@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\FincraApi;
 use App\Application\Payments\PaymentIntentLifecycle;
 use App\Enums\PaymentIntentStatus;
 use App\Models\PaymentIntent;
@@ -33,6 +34,8 @@ final class VerifyGatewayTopup
                 ->get($baseUrl.'/charges/'.rawurlencode((string) $intent->provider_reference)),
             'bachs' => Http::acceptJson()->withToken($secret)
                 ->get($baseUrl.'/checkout-sessions/'.rawurlencode((string) ($intent->provider_metadata['checkout_id'] ?? ''))),
+            'fincra' => FincraApi::client($providerConfig)
+                ->get(FincraApi::baseUrl($providerConfig).'/checkout/payments/merchant-reference/'.rawurlencode((string) $intent->provider_reference)),
             default => null,
         };
 
@@ -51,6 +54,7 @@ final class VerifyGatewayTopup
             'korapay' => ($body['status'] ?? false) === true && ($data['status'] ?? null) === 'success',
             'bachs' => ($data['payment_status'] ?? null) === 'succeeded'
                 && (($data['charge']['status'] ?? 'succeeded') === 'succeeded'),
+            'fincra' => ($data['status'] ?? null) === 'success',
             default => false,
         };
 
@@ -76,11 +80,18 @@ final class VerifyGatewayTopup
             'flutterwave' => $data['tx_ref'] ?? null,
             'korapay' => $data['reference'] ?? null,
             'bachs' => $data['reference'] ?? null,
+            'fincra' => $data['merchantReference'] ?? null,
             default => null,
         };
+        // Fincra (like the other non-Paystack gateways) reports major units.
+        // `amountReceived` is what actually landed, so an underpayment cannot
+        // settle the intent for more than the customer paid.
+        $providerAmount = $intent->provider === 'fincra'
+            ? ($data['amountReceived'] ?? $data['amount'] ?? 0)
+            : ($data['amount'] ?? 0);
         $amount = $intent->provider === 'paystack'
-            ? (int) ($data['amount'] ?? 0)
-            : CurrencyMinorUnits::toMinor((float) ($data['amount'] ?? 0), $currency);
+            ? (int) $providerAmount
+            : CurrencyMinorUnits::toMinor((float) $providerAmount, $currency);
 
         if ($reference !== $intent->provider_reference
             || $currency !== $intent->currency

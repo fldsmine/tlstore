@@ -4,7 +4,7 @@
 <div class="section-head" style="align-items:end">
     <div>
         <h2 class="page-title">Gateway payments</h2>
-        <p class="page-subtitle">Korapay, Paystack, Flutterwave and Bachs checkouts. Revalidate with the provider, or settle a payment by hand when the webhook never arrived.</p>
+        <p class="page-subtitle">Korapay, Paystack, Flutterwave, Bachs and Fincra checkouts. Revalidate with the provider, or settle a payment by hand when the webhook never arrived.</p>
     </div>
     @if(in_array((string) auth('admin')->user()->role, ['super_admin'], true))
         <a class="button secondary" href="{{ route('admin.gateway-balances.index') }}">Live gateway balances</a>

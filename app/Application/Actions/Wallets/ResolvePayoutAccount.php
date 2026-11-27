@@ -2,6 +2,7 @@
 
 namespace App\Application\Actions\Wallets;
 
+use App\Application\Payments\FincraApi;
 use App\Models\Bank;
 use App\Models\Country;
 use App\Models\SystemSetting;
@@ -48,6 +49,25 @@ final class ResolvePayoutAccount
         return $currency;
     }
 
+    /**
+     * Fincra resolves NGN accounts as NUBANs; every other market is a plain
+     * `bank_account` keyed by currency. `banks.code` holds the CBN/bank code
+     * Fincra expects.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function resolveFincraAccount(array $config, string $base, Bank $bank, string $accountNumber): \Illuminate\Http\Client\Response
+    {
+        $currency = $this->currencyForCountry($bank->country);
+
+        return FincraApi::client($config)->post($base.'/core/accounts/resolve', [
+            'type' => $currency === 'NGN' ? 'nuban' : 'bank_account',
+            'accountNumber' => $accountNumber,
+            'bankCode' => $bank->code,
+            'currency' => $currency,
+        ]);
+    }
+
     /** @return array{provider:string,account_name:string,account_number:string} */
     public function handle(User $user, Bank $bank, string $accountNumber): array
     {
@@ -58,7 +78,7 @@ final class ResolvePayoutAccount
         $setting = SystemSetting::query()->where('setting_key', 'account_validation.provider')->first()?->value;
         $provider = is_array($setting) ? ($setting['provider'] ?? 'paystack') : ($setting ?: 'paystack');
         $provider = strtolower(trim((string) $provider));
-        if (! in_array($provider, ['paystack', 'flutterwave', 'korapay', 'bachs'], true)) {
+        if (! in_array($provider, ['paystack', 'flutterwave', 'korapay', 'bachs', 'fincra'], true)) {
             $provider = 'paystack';
         }
         $config = config('trustlens.payment_gateways.'.$provider, []);
@@ -79,14 +99,20 @@ final class ResolvePayoutAccount
                     'flutterwave' => Http::acceptJson()->withToken($secret)->timeout(15)->post($base.'/accounts/resolve', ['account_number' => $accountNumber, 'account_bank' => $bank->flutterwave_code ?: $bank->code, 'country' => $bank->country]),
                     'korapay' => Http::acceptJson()->withToken($secret)->timeout(15)->post($base.'/misc/banks/resolve', ['bank' => $bank->institution_code ?: $bank->code, 'account' => $accountNumber, 'currency' => $this->currencyForCountry($bank->country)]),
                     'bachs' => Http::acceptJson()->withToken($secret)->timeout(15)->post($base.'/misc/bank-accounts/resolve', ['account_number' => $accountNumber, 'bank_code' => $bank->code, 'country' => $bank->country]),
+                    'fincra' => $this->resolveFincraAccount($config, $base, $bank, $accountNumber),
                 };
                 if (! $response->successful()) return ['resolved' => false, 'account_name' => null];
                 $body = $response->json();
-                $accountName = data_get($body, $provider === 'bachs' ? 'account_name' : 'data.account_name');
+                $accountName = data_get($body, match ($provider) {
+                    'bachs' => 'account_name',
+                    'fincra' => 'data.accountName',
+                    default => 'data.account_name',
+                });
                 $resolved = match ($provider) {
                     'paystack', 'korapay' => data_get($body, 'status') === true,
                     'flutterwave' => data_get($body, 'status') === 'success',
                     'bachs' => data_get($body, 'resolved') === true,
+                    'fincra' => data_get($body, 'success') === true || data_get($body, 'status') === true,
                 };
                 return ['resolved' => $resolved && is_string($accountName) && trim($accountName) !== '', 'account_name' => is_string($accountName) ? trim($accountName) : null];
             });

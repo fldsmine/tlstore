@@ -21,7 +21,7 @@ final class TopupController
         $data = $request->validate([
             'amount_minor' => ['required', 'integer', 'min:100'],
             'currency' => ['required', 'string', 'size:3'],
-            'gateway' => ['required', 'in:korapay,paystack,flutterwave,bachs'],
+            'gateway' => ['required', 'in:korapay,paystack,flutterwave,bachs,fincra'],
             'idempotency_key' => ['required', 'string', 'max:80'],
             'customer_email' => ['nullable', 'string', 'max:191', 'email:rfc'],
         ]);
@@ -92,7 +92,7 @@ final class TopupController
 
     public function webhook(string $provider, Request $request, ProcessGatewayWebhook $process): JsonResponse
     {
-        abort_unless(in_array($provider, ['korapay', 'paystack', 'flutterwave', 'bachs'], true), 404);
+        abort_unless(in_array($provider, ['korapay', 'paystack', 'flutterwave', 'bachs', 'fincra'], true), 404);
         $process->handle($provider, $request);
 
         return response()->json(['received' => true]);

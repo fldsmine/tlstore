@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\FincraApi;
 use App\Application\Payments\PaymentIntentLifecycle;
 use App\Application\Support\PaymentGatewaySettings;
 use App\Enums\TransactionType;
@@ -182,6 +183,27 @@ final class InitializeGatewayTopup
                         'metadata' => ['user_id' => (string) $user->id, 'payment_intent_id' => (string) $intent->id],
                         'expires_in_minutes' => 120,
                     ]),
+                // Fincra hosted checkout. `feeBearer: business` keeps the
+                // customer paying exactly the quoted amount (as with the other
+                // gateways) and settles the net into the Fincra wallet.
+                'fincra' => FincraApi::client($providerConfig)->post(
+                    FincraApi::baseUrl($providerConfig).'/checkout/payments',
+                    [
+                        'amount' => FincraApi::amount($amountMinor, $currency),
+                        'currency' => $currency,
+                        'reference' => $reference,
+                        'redirectUrl' => $returnUrl,
+                        'feeBearer' => (string) ($providerConfig['fee_bearer'] ?? 'business'),
+                        'settlementDestination' => 'wallet',
+                        'customer' => array_filter([
+                            'name' => $name,
+                            'email' => $email,
+                            'phoneNumber' => (string) ($user->phone ?? ''),
+                        ], static fn (string $value): bool => trim($value) !== ''),
+                        'metadata' => ['user_id' => (string) $user->id, 'payment_intent_id' => (string) $intent->id],
+                        'successMessage' => 'Payment received. You can return to TrustLens.',
+                    ],
+                ),
                 default => throw ValidationException::withMessages(['gateway' => 'Unsupported payment gateway.']),
             };
             $response->throw();
@@ -191,6 +213,7 @@ final class InitializeGatewayTopup
                 'flutterwave' => data_get($body, 'data.link'),
                 'korapay' => data_get($body, 'data.checkout_url'),
                 'bachs' => data_get($body, 'checkout_url'),
+                'fincra' => data_get($body, 'data.link'),
             };
             if (! is_string($checkoutUrl) || ! filter_var($checkoutUrl, FILTER_VALIDATE_URL)) {
                 throw new \RuntimeException('The gateway did not return a valid checkout link.');
@@ -199,7 +222,17 @@ final class InitializeGatewayTopup
             if ($gateway === 'bachs' && (! is_string($checkoutId) || $checkoutId === '')) {
                 throw new \RuntimeException('BACHS PAY did not return a checkout session ID.');
             }
-            $intent->forceFill(['provider_metadata' => ['checkout_url' => $checkoutUrl, 'checkout_id' => $checkoutId]])->save();
+            $metadata = ['checkout_url' => $checkoutUrl, 'checkout_id' => $checkoutId];
+            if ($gateway === 'fincra') {
+                // Fincra's webhook/verify payloads carry their own `reference`
+                // (`fcr-p-…`) alongside our merchant reference; keep both so a
+                // payload without `merchantReference` can still be matched.
+                $fincraReference = data_get($body, 'data.reference');
+                $fincraPayCode = data_get($body, 'data.payCode');
+                $metadata['fincra_reference'] = is_string($fincraReference) ? $fincraReference : null;
+                $metadata['fincra_pay_code'] = is_string($fincraPayCode) ? $fincraPayCode : null;
+            }
+            $intent->forceFill(['provider_metadata' => $metadata])->save();
 
             return ['intent_id' => $intent->id, 'reference' => $reference, 'provider' => $gateway, 'checkout_url' => $checkoutUrl, 'status' => 'pending'];
         } catch (\Throwable $exception) {

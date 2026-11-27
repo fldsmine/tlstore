@@ -43,6 +43,7 @@ class DemoAdminSeeder extends Seeder
                 'paystack' => ['NGN', 'GHS', 'ZAR', 'USD'],
                 'flutterwave' => ['NGN', 'USD', 'GHS', 'KES', 'UGX', 'ZAR', 'GBP', 'EUR'],
                 'bachs' => ['USD', 'NGN', 'GHS', 'KES', 'ZAR'],
+                'fincra' => ['NGN', 'GHS', 'KES', 'UGX', 'TZS', 'ZMW', 'USD', 'XAF', 'XOF'],
                 'manual' => [],
             ], 'is_public' => true, 'updated_by_admin_id' => $admin->id],
         );

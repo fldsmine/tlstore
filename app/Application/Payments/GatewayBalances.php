@@ -3,6 +3,7 @@
 namespace App\Application\Payments;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\FincraApi;
 use App\Application\Support\PaymentGatewaySettings;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -21,13 +22,14 @@ use Throwable;
  */
 final class GatewayBalances
 {
-    public const PROVIDERS = ['korapay', 'paystack', 'flutterwave', 'bachs'];
+    public const PROVIDERS = ['korapay', 'paystack', 'flutterwave', 'bachs', 'fincra'];
 
     private const LABELS = [
         'korapay' => 'Korapay',
         'paystack' => 'Paystack',
         'flutterwave' => 'Flutterwave',
         'bachs' => 'Bachs Pay',
+        'fincra' => 'Fincra',
     ];
 
     /** Providers that already report balances in minor units. */
@@ -103,7 +105,9 @@ final class GatewayBalances
             default => '/balances',
         });
 
-        $client = Http::acceptJson()->withToken($secret)->timeout(12);
+        $client = $gateway === 'fincra'
+            ? FincraApi::client($config)->timeout(12)
+            : Http::acceptJson()->withToken($secret)->timeout(12);
 
         if ($gateway === 'flutterwave') {
             $rows = [];
@@ -120,7 +124,11 @@ final class GatewayBalances
             return $this->normalise($rows, $this->reportsMinorUnits($gateway));
         }
 
-        $response = $client->get($base.$path);
+        // Fincra's wallets endpoint is scoped by business ID.
+        $query = $gateway === 'fincra'
+            ? array_filter(['businessID' => (string) ($config['business_id'] ?? '')])
+            : [];
+        $response = $client->get($base.$path, $query);
         $response->throw();
         $payload = $response->json();
         $data = $payload['data'] ?? $payload;
@@ -141,7 +149,7 @@ final class GatewayBalances
 
         foreach ($rows as $row) {
             $currency = strtoupper(trim((string) ($row['currency'] ?? $row['currency_code'] ?? '')));
-            $amount = $row['available_balance'] ?? $row['available'] ?? $row['balance'] ?? $row['amount'] ?? null;
+            $amount = $row['available_balance'] ?? $row['availableBalance'] ?? $row['available'] ?? $row['balance'] ?? $row['amount'] ?? null;
 
             if ($currency === '' || ! is_numeric($amount)) {
                 continue;

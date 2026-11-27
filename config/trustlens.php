@@ -26,6 +26,18 @@ $paymentGateways = [
         'base_url' => env('BACHS_BASE_URL', 'https://api.bachs.io/v1'),
         'balance_path' => env('BACHS_BALANCE_PATH', '/balances'),
     ],
+    // Fincra authenticates with an `api-key` header (not a bearer token) and
+    // signs webhooks with HMAC-SHA512 over the raw body using the portal's
+    // webhook secret. `business_id` is needed for the wallets (balance) API.
+    'fincra' => [
+        'secret_key' => env('FINCRA_SECRET_KEY'),
+        'public_key' => env('FINCRA_PUBLIC_KEY'),
+        'business_id' => env('FINCRA_BUSINESS_ID'),
+        'webhook_secret' => env('FINCRA_WEBHOOK_SECRET'),
+        'base_url' => env('FINCRA_BASE_URL', 'https://api.fincra.com'),
+        'balance_path' => env('FINCRA_BALANCE_PATH', '/wallets'),
+        'fee_bearer' => env('FINCRA_FEE_BEARER', 'business'),
+    ],
 ];
 
 return [
@@ -43,6 +55,7 @@ return [
         filled($paymentGateways['paystack']['secret_key'] ?? null) ? 'paystack' : null,
         filled($paymentGateways['flutterwave']['secret_key'] ?? null) && filled($paymentGateways['flutterwave']['webhook_secret'] ?? null) ? 'flutterwave' : null,
         filled($paymentGateways['bachs']['secret_key'] ?? null) && filled($paymentGateways['bachs']['webhook_secret'] ?? null) ? 'bachs' : null,
+        filled($paymentGateways['fincra']['secret_key'] ?? null) && filled($paymentGateways['fincra']['webhook_secret'] ?? null) ? 'fincra' : null,
     ])),
     'currency_minor_units' => [
         'BIF' => 0, 'CLP' => 0, 'DJF' => 0, 'GNF' => 0, 'ISK' => 0, 'JPY' => 0,

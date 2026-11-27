@@ -29,8 +29,8 @@ final class SystemSettingController
 
         if ($settingKey === 'account_validation.provider') {
             $provider = is_array($data['value']) ? ($data['value']['provider'] ?? null) : $data['value'];
-            if (! is_string($provider) || ! in_array(strtolower($provider), ['paystack', 'flutterwave', 'korapay', 'bachs'], true)) {
-                return response()->json(['message' => 'Account validation provider must be Paystack, Flutterwave, Korapay, or Bachs.'], 422);
+            if (! is_string($provider) || ! in_array(strtolower($provider), ['paystack', 'flutterwave', 'korapay', 'bachs', 'fincra'], true)) {
+                return response()->json(['message' => 'Account validation provider must be Paystack, Flutterwave, Korapay, Bachs, or Fincra.'], 422);
             }
             $data['value'] = ['provider' => strtolower($provider)];
         }
@@ -81,7 +81,7 @@ final class SystemSettingController
 
         if ($settingKey === 'payment.active_gateways') {
             $gateways = $data['value'];
-            $allowed = ['korapay', 'paystack', 'flutterwave', 'bachs', 'manual'];
+            $allowed = ['korapay', 'paystack', 'flutterwave', 'bachs', 'fincra', 'manual'];
             if (! is_array($gateways) || ($gateways !== [] && array_is_list($gateways)) || array_diff(array_keys($gateways), $allowed) !== []) {
                 return response()->json(['message' => 'Active gateways must map gateway names to supported currency codes.'], 422);
             }
@@ -106,10 +106,10 @@ final class SystemSettingController
             if (! is_array($options) || ($options !== [] && array_is_list($options))) {
                 return response()->json(['message' => 'Active payment currencies must map gateway.currency keys to display labels.'], 422);
             }
-            $allowed = ['korapay', 'paystack', 'flutterwave', 'bachs'];
+            $allowed = ['korapay', 'paystack', 'flutterwave', 'bachs', 'fincra'];
             $normalized = [];
             foreach ($options as $key => $label) {
-                if (! is_string($key) || preg_match('/^(korapay|korapy|paystack|flutterwave|bachs)\.([A-Za-z]{3})$/i', $key, $matches) !== 1) {
+                if (! is_string($key) || preg_match('/^(korapay|korapy|paystack|flutterwave|bachs|fincra)\.([A-Za-z]{3})$/i', $key, $matches) !== 1) {
                     return response()->json(['message' => 'Each payment currency key must use gateway.CURRENCY format.'], 422);
                 }
                 if (! is_string($label) || trim($label) === '' || mb_strlen($label) > 32) {

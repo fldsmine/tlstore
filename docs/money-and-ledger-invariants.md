@@ -200,7 +200,7 @@ case:
 * **rejected** → the intent and its projection become `failed`
   (`gateway_payment.manually_rejected`), and the user is notified.
 
-Only real gateway providers (`korapay`, `paystack`, `flutterwave`, `bachs`) can be settled
+Only real gateway providers (`korapay`, `paystack`, `flutterwave`, `bachs`, `fincra`) can be settled
 here. Wallet-funded purchases and manual bank deposits keep their own flows
 (`wallet` intents are already paid; manual deposits go through *Manual deposits*).
 
@@ -214,6 +214,7 @@ here. Wallet-funded purchases and manual bank deposits keep their own flows
 | Korapay | `/balances` | major |
 | Flutterwave | `/balances/{currency}` (per configured currency) | major |
 | Bachs | `/balances` | major |
+| Fincra | `/wallets?businessID=…` | major (`availableBalance`) |
 
 A gateway without credentials, an unreachable provider or an unexpected payload shows as
 "Unavailable" with the reason — the page never 500s. **Verify the paths above against each

@@ -11,6 +11,7 @@ final class PaymentGatewaySettings
         'paystack' => ['NGN', 'GHS', 'ZAR', 'USD'],
         'flutterwave' => ['NGN', 'USD', 'GHS', 'KES', 'UGX', 'ZAR', 'GBP', 'EUR'],
         'bachs' => ['USD', 'NGN', 'GHS', 'KES', 'ZAR'],
+        'fincra' => ['NGN', 'GHS', 'KES', 'UGX', 'TZS', 'ZMW', 'USD', 'XAF', 'XOF'],
         'manual' => [],
     ];
 
@@ -91,7 +92,7 @@ final class PaymentGatewaySettings
             if (! is_string($key) || ! is_string($label) || trim($label) === '') {
                 continue;
             }
-            if (preg_match('/^(korapay|korapy|paystack|flutterwave|bachs)\.([A-Za-z]{3})$/i', $key, $matches) !== 1) {
+            if (preg_match('/^(korapay|korapy|paystack|flutterwave|bachs|fincra)\.([A-Za-z]{3})$/i', $key, $matches) !== 1) {
                 continue;
             }
             $gateway = strtolower($matches[1]) === 'korapy' ? 'korapay' : strtolower($matches[1]);

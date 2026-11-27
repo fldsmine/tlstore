@@ -18,6 +18,7 @@ class _AdminPaymentGatewaysScreenState
     'korapay': 'Korapay',
     'flutterwave': 'Flutterwave',
     'bachs': 'BACHS PAY',
+    'fincra': 'Fincra',
     'manual': 'Manual bank deposit',
   };
   static const _defaults = <String, List<String>>{
@@ -25,16 +26,17 @@ class _AdminPaymentGatewaysScreenState
     'korapay': ['NGN', 'GHS', 'KES', 'UGX', 'USD'],
     'flutterwave': ['NGN', 'USD', 'GHS', 'KES', 'UGX', 'ZAR', 'GBP', 'EUR'],
     'bachs': ['USD', 'NGN', 'GHS', 'KES', 'ZAR'],
+    'fincra': ['NGN', 'GHS', 'KES', 'UGX', 'TZS', 'ZMW', 'USD', 'XAF', 'XOF'],
   };
 
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _currencyInputs = <String, TextEditingController>{
-    for (final gateway in ['paystack', 'korapay', 'flutterwave', 'bachs'])
+    for (final gateway in ['paystack', 'korapay', 'flutterwave', 'bachs', 'fincra'])
       gateway: TextEditingController(text: _defaults[gateway]!.join(', ')),
   };
   final _labelInputs = <String, TextEditingController>{
-    for (final gateway in ['paystack', 'korapay', 'flutterwave', 'bachs'])
+    for (final gateway in ['paystack', 'korapay', 'flutterwave', 'bachs', 'fincra'])
       gateway: TextEditingController(
         text: _defaults[gateway]!
             .map((currency) => '$currency=$currency')
@@ -46,6 +48,7 @@ class _AdminPaymentGatewaysScreenState
     'korapay': true,
     'flutterwave': true,
     'bachs': false,
+    'fincra': false,
     'manual': true,
   };
   String? _token;

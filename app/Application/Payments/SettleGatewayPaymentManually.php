@@ -28,7 +28,7 @@ use Illuminate\Validation\ValidationException;
 final class SettleGatewayPaymentManually
 {
     /** Providers that only ever exist as a real gateway checkout. */
-    public const GATEWAY_PROVIDERS = ['korapay', 'paystack', 'flutterwave', 'bachs'];
+    public const GATEWAY_PROVIDERS = ['korapay', 'paystack', 'flutterwave', 'bachs', 'fincra'];
 
     public function __construct(
         private readonly ProcessGatewayWebhook $processor,

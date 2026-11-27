@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Actions\Subscriptions\ActivateSubscription;
+use App\Application\Payments\FincraApi;
 use App\Application\Payments\PaymentIntentLifecycle;
 use App\Enums\PaymentIntentStatus;
 use App\Enums\TransactionType;
@@ -60,11 +61,24 @@ final class ProcessGatewayWebhook
                 'flutterwave' => $verified['tx_ref'] ?? null,
                 'korapay' => $data['payment_reference'] ?? $data['reference'] ?? null,
                 'bachs' => $verified['reference'] ?? $data['reference'] ?? null,
+                // Our merchant reference is authoritative; `reference` may be
+                // Fincra's own `fcr-p-…` code, which the metadata lookup below
+                // resolves instead.
+                'fincra' => $verified['merchantReference'] ?? $data['merchantReference'] ?? $data['reference'] ?? null,
             };
             $intentQuery = PaymentIntent::query()->where('provider', $provider);
             $intent = $reference ? (clone $intentQuery)->where('provider_reference', $reference)->first() : null;
             if (! $intent && $provider === 'bachs' && is_string($data['checkout_id'] ?? null)) {
                 $intent = $intentQuery->where('provider_metadata->checkout_id', $data['checkout_id'])->first();
+            }
+            if (! $intent && $provider === 'fincra') {
+                $payCode = $verified['reference'] ?? $data['reference'] ?? null;
+                if (is_string($payCode) && $payCode !== '') {
+                    $intent = $intentQuery->where(function ($query) use ($payCode): void {
+                        $query->where('provider_metadata->fincra_pay_code', $payCode)
+                            ->orWhere('provider_metadata->fincra_reference', $payCode);
+                    })->first();
+                }
             }
             if (! $intent) {
                 throw new \RuntimeException('No matching payment intent was found.');
@@ -75,6 +89,7 @@ final class ProcessGatewayWebhook
                 'korapay' => ($verified['status'] ?? null) === 'success' && ($data['transaction_status'] ?? 'success') === 'success',
                 'bachs' => ($verified['payment_status'] ?? null) === 'succeeded'
                     && (($verified['charge']['status'] ?? 'succeeded') === 'succeeded'),
+                'fincra' => ($verified['status'] ?? null) === 'success',
             };
             if (! $status) {
                 // A provider that reports failure/cancellation is a terminal
@@ -99,6 +114,11 @@ final class ProcessGatewayWebhook
             $currency = strtoupper((string) ($verified['currency'] ?? $data['currency'] ?? ''));
             $amount = match ($provider) {
                 'paystack' => (int) ($verified['amount'] ?? 0),
+                // Fincra reports major units. Bank transfers can arrive under
+                // or over the requested amount (`varianceType`); only the
+                // amount actually received may settle the intent, so a partial
+                // payment fails here for finance to settle by hand.
+                'fincra' => CurrencyMinorUnits::toMinor((float) ($verified['amountReceived'] ?? $verified['amount'] ?? $data['amount'] ?? 0), $currency),
                 'flutterwave', 'korapay', 'bachs' => CurrencyMinorUnits::toMinor((float) ($verified['amount'] ?? $data['amount'] ?? 0), $currency),
             };
             if ($currency !== $intent->currency || $amount !== $intent->amount_minor) {
@@ -150,6 +170,7 @@ final class ProcessGatewayWebhook
             'korapay' => is_string($config['secret_key'] ?? null)
                 && hash_equals(hash_hmac('sha256', json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION) ?: '', $config['secret_key']), (string) $request->header('x-korapay-signature')),
             'bachs' => $this->validBachsSignature($request, (string) ($config['webhook_secret'] ?? '')),
+            'fincra' => $this->validFincraSignature($request, (string) ($config['webhook_secret'] ?? '')),
             default => false,
         };
     }
@@ -159,6 +180,10 @@ final class ProcessGatewayWebhook
         $config = config('trustlens.payment_gateways.'.$provider, []);
         $baseUrl = rtrim((string) ($config['base_url'] ?? ''), '/');
         $secret = (string) ($config['secret_key'] ?? '');
+        if ($provider === 'fincra') {
+            // The helper performs the call and returns the verified payload.
+            return $this->verifyFincraCheckout($config, $data);
+        }
         $response = match ($provider) {
             'paystack' => Http::acceptJson()->withToken($secret)->get($baseUrl.'/transaction/verify/'.rawurlencode((string) ($data['reference'] ?? ''))),
             'flutterwave' => Http::acceptJson()->withToken($secret)->get($baseUrl.'/transactions/'.rawurlencode((string) ($data['id'] ?? '')).'/verify'),
@@ -178,6 +203,52 @@ final class ProcessGatewayWebhook
             throw new \RuntimeException('Payment provider could not verify the charge.');
         }
         return is_array($body['data'] ?? null) ? $body['data'] : [];
+    }
+
+    /**
+     * Fincra sends `signature: <hex HMAC-SHA512 of the raw request body>`,
+     * keyed with the webhook secret from the portal. The body must be hashed
+     * exactly as received: re-encoding the decoded payload changes key order
+     * and escapes, and the docs explicitly warn against modifying it.
+     */
+    private function validFincraSignature(Request $request, string $secret): bool
+    {
+        if ($secret === '') {
+            return false;
+        }
+        $signature = strtolower(trim((string) $request->header('signature', '')));
+        if ($signature === '') {
+            return false;
+        }
+
+        return hash_equals(hash_hmac('sha512', $request->getContent(), $secret), $signature);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function verifyFincraCheckout(array $config, array $data): array
+    {
+        $merchantReference = $data['merchantReference'] ?? null;
+        if (! is_string($merchantReference) || $merchantReference === '') {
+            // Some deliveries only carry Fincra's own reference. The signature
+            // was already verified against the raw body, so the signed payload
+            // itself is the record of the charge.
+            return $data;
+        }
+
+        $response = FincraApi::client($config)->get(
+            FincraApi::baseUrl($config).'/checkout/payments/merchant-reference/'.rawurlencode($merchantReference),
+        );
+        $response->throw();
+        $body = $response->json();
+        if (! is_array($body) || ! is_array($body['data'] ?? null)) {
+            throw new \RuntimeException('Payment provider could not verify the checkout.');
+        }
+
+        return $body['data'];
     }
 
     private function validBachsSignature(Request $request, string $secret): bool
