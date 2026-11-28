@@ -818,6 +818,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         children: [
           _buildHeader(),
+          if (widget.api.isImpersonating) _buildImpersonationBanner(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refreshHome,
@@ -851,6 +852,68 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     ),
   );
+
+  Widget _buildImpersonationBanner() {
+    final info = widget.api.impersonationInfo ?? const <String, dynamic>{};
+    final rawAdmin = info['admin'];
+    final admin = rawAdmin is Map ? rawAdmin : const <String, dynamic>{};
+    final adminName = (admin['full_name'] ?? admin['email'] ?? 'an administrator')
+        .toString();
+    return Material(
+      color: const Color(0xFFFFF4D9),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.visibility_outlined,
+              size: 18,
+              color: Color(0xFF855E00),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Impersonation session — you are signed in as $_displayName, started by $adminName.',
+                style: const TextStyle(
+                  color: Color(0xFF6B4B00),
+                  fontSize: 12,
+                  height: 1.3,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _exitImpersonation,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF855E00),
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Exit'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exitImpersonation() async {
+    final restored = await widget.api.exitImpersonation();
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    if (restored == null) {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    } else {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => HomeScreen(result: restored, api: AuthApi()),
+        ),
+        (_) => false,
+      );
+    }
+  }
 
   Widget _buildQuickAccess() {
     final scheme = Theme.of(context).colorScheme;

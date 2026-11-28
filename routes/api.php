@@ -9,6 +9,7 @@ use App\Features\Identity\Http\Controllers\Api\V1\AuthController;
 use App\Features\Identity\Http\Controllers\Api\V1\TwoFactorChallengeController;
 use App\Features\Admin\Http\Controllers\Api\V1\AdminGatewayPaymentController;
 use App\Features\Identity\Http\Controllers\Api\V1\AdminAuthController;
+use App\Features\Identity\Http\Controllers\Api\V1\ImpersonationController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\PublicCatalogController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\ListingController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\AppReportController;
@@ -85,6 +86,12 @@ Route::prefix('v1')->group(function (): void {
     Route::prefix('admin/auth')->name('api.v1.admin.auth.')->group(function (): void {
         Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:admin-auth')->name('login');
     });
+
+    // Single-use hand-off from the admin console to the Flutter web app. The app
+    // posts the code it received on `/?impersonation=` and receives a
+    // short-lived user token.
+    Route::post('/auth/impersonation', [ImpersonationController::class, 'redeem'])
+        ->middleware('throttle:20,1')->name('api.v1.auth.impersonation');
 
     Route::middleware(['auth:sanctum', 'user.account', 'user.two-factor'])->group(function (): void {
         Route::get('/support-tickets', [SupportTicketController::class, 'index'])->name('api.v1.support-tickets.index');
@@ -259,6 +266,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/users/{user}/reset-password', [UserManagementController::class, 'resetPassword'])->middleware('throttle:6,1')->name('users.reset-password');
         Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
         Route::post('/users/{user}/restore', [UserManagementController::class, 'restore'])->name('users.restore');
+        Route::post('/users/{user}/impersonation', [UserManagementController::class, 'impersonate'])->middleware('throttle:6,1')->name('users.impersonation.store');
         Route::get('/review-questions', [QuestionnaireController::class, 'questions'])->name('review-questions.index');
         Route::post('/review-questions', [QuestionnaireController::class, 'createQuestion'])->name('review-questions.store');
         Route::patch('/review-questions/{question}', [QuestionnaireController::class, 'updateQuestion'])->name('review-questions.update');

@@ -21,6 +21,7 @@ All API routes use `/api/v1`. JSON validation errors use Laravel's standard `422
 | `POST` | `/auth/social/{provider}` | Verify Google, Facebook, or Telegram credentials; create or sign in a linked user |
 | `POST` | `/guest-support` | Public contact form — no token, returns a ticket reference and emails the guest plus the support inbox |
 | `POST` | `/admin/auth/login` | Admin login |
+| `POST` | `/auth/impersonation` | Redeem a single-use admin hand-off code for a short-lived user session |
 
 ### Public contact form (`POST /api/v1/guest-support`)
 
@@ -104,12 +105,25 @@ Admin routes are prefixed `/admin` and require an active admin token.
 | Sponsor ads | `GET/POST /admin/ads`, `PATCH /admin/ads/{ad}` |
 | Plans and coverage | `GET /admin/subscription-plans`, `PATCH /admin/subscription-plans/{plan}`, `PUT /admin/subscription-plans/{plan}/coverage` |
 | Countries and regions | `GET/POST /admin/countries`, `PATCH /admin/countries/{country}`, `GET/POST /admin/regions`, `PATCH /admin/regions/{region}` |
-| Users and payout methods | `GET /admin/users`, `PATCH /admin/users/{user}`, `GET/POST /admin/withdrawal-options`, `PATCH /admin/withdrawal-options/{option}` |
+| Users and payout methods | `GET /admin/users`, `PATCH /admin/users/{user}`, `POST /admin/users/{user}/impersonation`, `GET/POST /admin/withdrawal-options`, `PATCH /admin/withdrawal-options/{option}` |
 | Runtime settings | `GET /admin/settings`, `PUT /admin/settings/{settingKey}` |
 | Support inbox | `GET /admin/support-tickets`, `GET /admin/support-tickets/{ticket}`, `POST /admin/support-tickets/{ticket}/messages`, `PATCH /admin/support-tickets/{ticket}` — includes guest tickets submitted through the public contact form (list rows carry a `guest` block) |
 | Moderation | Queues and decision endpoints under `/admin/moderation/reviews`, `/shares`, `/manual-deposits`, and `/withdrawals` |
 
 Approvals credit wallets transactionally and use unique ledger idempotency keys. Rejections release reservations or return reserved withdrawal funds and retain the admin reason in the audit trail.
+
+### Administrator impersonation
+
+`POST /admin/users/{user}/impersonation` (admin token, **super_admin only**) returns
+`{"data": {"url", "expires_at", "link_ttl_seconds", "session_minutes"}}`. The URL points at the
+Flutter web app root with a one-time `?impersonation=<code>`.
+
+`POST /auth/impersonation` (no token, 20/minute) exchanges `{"code": "..."}` for
+`{"data": <user>, "token", "token_type": "Bearer", "expires_at", "impersonation": {"admin", "expires_at"}}`.
+The code is single use, expires after `ADMIN_IMPERSONATION_LINK_TTL_SECONDS`, and the returned
+token expires after `ADMIN_IMPERSONATION_SESSION_MINUTES`. Only active, non-banned, non-deleted
+accounts can be impersonated. Both the issue and the redeem write an `audit_logs` row against the
+administrator (`user.impersonation_link_issued`, `user.impersonation_session_started`).
 
 ## Integration boundaries
 

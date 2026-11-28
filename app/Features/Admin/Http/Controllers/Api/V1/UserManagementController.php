@@ -2,6 +2,8 @@
 
 namespace App\Features\Admin\Http\Controllers\Api\V1;
 
+use App\Application\Identity\AdminImpersonation;
+use App\Exceptions\ImpersonationUnavailable;
 use App\Models\Admin;
 use App\Models\AuditLog;
 use App\Models\LedgerEntry;
@@ -276,6 +278,31 @@ final class UserManagementController
         ]);
 
         return response()->json(['message' => 'User account soft-deleted and active sessions revoked.']);
+    }
+
+    /**
+     * Hand the Flutter admin screens a one-time link that opens the web app
+     * signed in as this user. Super administrators only; audited server side.
+     */
+    public function impersonate(Request $request, int $user, AdminImpersonation $impersonation): JsonResponse
+    {
+        /** @var Admin $admin */
+        $admin = $request->user();
+        abort_unless(AdminImpersonation::allows($admin), 403, 'Only super administrators can impersonate an account.');
+
+        $account = User::withTrashed()->findOrFail($user);
+        try {
+            $issued = $impersonation->issue($admin, $account);
+        } catch (ImpersonationUnavailable $error) {
+            return response()->json(['message' => $error->getMessage()], 422);
+        }
+
+        return response()->json(['data' => [
+            'url' => $issued['url'],
+            'expires_at' => $issued['expires_at']->toISOString(),
+            'link_ttl_seconds' => (int) config('impersonation.link_ttl_seconds', 120),
+            'session_minutes' => (int) config('impersonation.session_minutes', 60),
+        ]], 201);
     }
 
     public function restore(Request $request, int $user): JsonResponse

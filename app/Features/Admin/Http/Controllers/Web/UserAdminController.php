@@ -2,8 +2,10 @@
 
 namespace App\Features\Admin\Http\Controllers\Web;
 
+use App\Application\Identity\AdminImpersonation;
 use App\Application\Money\CurrencyMinorUnits;
 use App\Enums\SubscriptionStatus;
+use App\Exceptions\ImpersonationUnavailable;
 use App\Enums\UserStatus;
 use App\Features\Admin\Support\AdminAuditLogger;
 use App\Features\Notifications\Services\FirebaseCloudMessaging;
@@ -246,7 +248,7 @@ final class UserAdminController
 
         $data = $request->validate([
             'full_name' => ['required', 'string', 'min:2', 'max:150'],
-            'username' => ['required', 'string', 'alpha_dash', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9_.-]+$/', Rule::unique('users', 'username')->ignore($account->id)],
+            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9_.-]+$/', Rule::unique('users', 'username')->ignore($account->id)],
             'email' => ['required', 'email', 'max:190', Rule::unique('users', 'email')->ignore($account->id)],
             'phone' => ['nullable', 'string', 'max:30'],
             'country_code' => ['nullable', 'string', 'size:2', Rule::exists('countries', 'code')],
@@ -266,6 +268,29 @@ final class UserAdminController
         $this->audit->log('user.profile_updated', $account, $before, $after);
 
         return redirect()->route('admin.users.show', $account->id)->with('success', 'Profile details saved.');
+    }
+
+    /**
+     * Open the Flutter web app in a new tab, signed in as this account.
+     *
+     * A single-use code is minted here and the browser is redirected to
+     * `/?impersonation=<code>`; the web app redeems it for a short-lived user
+     * token. The redirect is returned in a new tab because the form targets one.
+     */
+    public function impersonate(Request $request, int $user, AdminImpersonation $impersonation): RedirectResponse
+    {
+        $account = $this->findUser($user);
+        $this->authorizeRoles(['super_admin']);
+        /** @var \App\Models\Admin $admin */
+        $admin = Auth::guard('admin')->user();
+
+        try {
+            $issued = $impersonation->issue($admin, $account);
+        } catch (ImpersonationUnavailable $error) {
+            return back()->withErrors(['impersonation' => $error->getMessage()]);
+        }
+
+        return redirect()->away($issued['url']);
     }
 
     public function action(Request $request, int $user, string $action): RedirectResponse

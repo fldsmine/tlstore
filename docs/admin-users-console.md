@@ -80,6 +80,42 @@ the profile.
 Moderator and finance accounts can open every read-only tab; the screens hide or
 disable the controls their role cannot use rather than failing after submit.
 
+## Impersonation (super admins)
+
+A super administrator can open the Flutter web app **already signed in as the account** — to
+reproduce a bug, walk a user through a flow, or check what they can see. Two entry points:
+
+- **Admin console** → Users → account → Overview → *Impersonate — open the web app as this user*.
+  The button posts to `admin.users.impersonate` (`POST /admin/users/{user}/impersonate`) and the
+  redirect opens in a **new tab** (`target="_blank"`).
+- **Flutter admin screens** → Users → account → ⋯ → *Impersonate (open web app)*, or the
+  **Impersonate** button on the action row. The app calls
+  `POST /api/v1/admin/users/{user}/impersonation` with its admin token and opens the returned URL
+  with `url_launcher` (`webOnlyWindowName: '_blank'` on web, the system browser on mobile).
+
+Both entry points return a link to `/?impersonation=<code>`. The Flutter web app redeems it once
+via `POST /api/v1/auth/impersonation`, stores the returned user token as its session, and strips
+the code from the address bar (`history.replaceState`). While that session lasts, the home screen
+shows an **Impersonation session — … started by <admin> · Exit** banner; *Exit* restores the
+session that was signed in before the hand-off (when one existed) and otherwise returns to the
+login screen.
+
+Guard rails:
+
+| Control | Behaviour |
+| --- | --- |
+| Who can impersonate | `super_admin` only, on both the console route and the admin API |
+| Who can be impersonated | Active, not banned, not soft-deleted accounts — the API rejects sessions for anything else, so the tab would only show errors |
+| Hand-off code | 64 random characters, only its SHA-256 hash is stored, single use, expires after `ADMIN_IMPERSONATION_LINK_TTL_SECONDS` (default 120) |
+| Impersonated session | A normal Sanctum token for the user, expiring after `ADMIN_IMPERSONATION_SESSION_MINUTES` (default 60), named `admin-impersonation:<admin id>` so it is identifiable in the account's session list |
+| 2FA | Not re-challenged (the administrator already passed the admin login); the session is bounded and audited instead |
+| Audit | `user.impersonation_link_issued` and `user.impersonation_session_started`, both against the user with the administrator as actor, plus the link id, token id and expiry |
+| Kill switch | `ADMIN_IMPERSONATION_ENABLED=false` makes both steps refuse with a clear message |
+
+The code travels in the query string (the Flutter entry page is served at `/`), so it is also
+visible to same-origin server logs until it is redeemed or expires. It is single-use, expiring and
+scoped to one account; treat access logs accordingly.
+
 ## Notes and invariants
 
 - Wallet balances are never written directly: the adjustment creates a
@@ -105,7 +141,13 @@ view, profile edits plus audit, wallet adjustment permissions and overdraft
 protection, ban/unban token revocation, password reset/verify/delete/restore
 role gates, in-app notification creation and device revocation.
 
+`tests/Feature/AdminImpersonationTest.php` covers the impersonation hand-off:
+role gates on both entry points, the single-use code, token expiry, replay and
+expiry rejection, refused accounts (banned/suspended/deleted), the admin API
+payload and the two audit rows.
+
 ```bash
 .tools/bin/php vendor/phpunit/phpunit/phpunit tests/Feature/AdminUsersAreaTest.php
+.tools/bin/php vendor/phpunit/phpunit/phpunit tests/Feature/AdminImpersonationTest.php
 .tools/bin/php vendor/phpunit/phpunit/phpunit
 ```

@@ -16,6 +16,7 @@ class AdminUserDetailScreen extends StatefulWidget {
     required this.api,
     required this.token,
     required this.user,
+    this.adminRole,
     required this.onAdjustWallet,
     required this.onResetPassword,
     required this.onSetBan,
@@ -26,11 +27,17 @@ class AdminUserDetailScreen extends StatefulWidget {
   final AuthApi api;
   final String token;
   final Map<String, dynamic> user;
+
+  /// Role of the signed-in administrator; impersonation is super-admin only.
+  final String? adminRole;
   final Future<void> Function(Map<String, dynamic>) onAdjustWallet;
   final Future<void> Function(Map<String, dynamic>) onResetPassword;
   final Future<void> Function(Map<String, dynamic>, bool) onSetBan;
   final Future<void> Function(Map<String, dynamic>) onDelete;
   final Future<void> Function(Map<String, dynamic>) onRestore;
+
+  /// Requests a one-time hand-off link and opens the web app as this user.
+  final Future<void> Function(Map<String, dynamic>)? onImpersonate;
 
   @override
   State<AdminUserDetailScreen> createState() => _AdminUserDetailScreenState();
@@ -106,6 +113,13 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
   bool get _deleted => _user['deleted_at'] != null;
   bool get _banned =>
       _user['is_banned'] == true || _user['is_banned'] == 1 || _user['is_banned'] == '1';
+
+  bool get _canImpersonate =>
+      widget.adminRole == 'super_admin' &&
+      widget.onImpersonate != null &&
+      !_deleted &&
+      !_banned &&
+      _user['status']?.toString() == 'active';
 
   Future<void> _runAction(Future<void> Function() action) async {
     await action();
@@ -259,6 +273,11 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
                   const PopupMenuItem(value: 'delete', child: Text('Soft-delete account')),
                 if (_deleted)
                   const PopupMenuItem(value: 'restore', child: Text('Restore account')),
+                if (_canImpersonate)
+                  const PopupMenuItem(
+                    value: 'impersonate',
+                    child: Text('Impersonate (open web app)'),
+                  ),
               ],
             ),
             const SizedBox(width: 4),
@@ -335,6 +354,9 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
         return;
       case 'restore':
         await _runAction(() => widget.onRestore(_user));
+        return;
+      case 'impersonate':
+        await widget.onImpersonate?.call(_user);
         return;
     }
   }
@@ -762,6 +784,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
       if (!_deleted) OutlinedButton.icon(onPressed: () => _runAction(() => widget.onSetBan(_user, !_banned)), icon: Icon(_banned ? Icons.lock_open_rounded : Icons.block_rounded), label: Text(_banned ? 'Unban account' : 'Ban account')),
       if (!_deleted) OutlinedButton.icon(onPressed: () => _runAction(() => widget.onDelete(_user)), icon: const Icon(Icons.delete_outline_rounded), label: const Text('Soft-delete account')),
       if (_deleted) FilledButton.icon(onPressed: () => _runAction(() => widget.onRestore(_user)), icon: const Icon(Icons.restore_rounded), label: const Text('Restore account')),
+      if (_canImpersonate) FilledButton.icon(onPressed: () => widget.onImpersonate?.call(_user), icon: const Icon(Icons.open_in_new_rounded), label: const Text('Impersonate')),
     ],
   );
 

@@ -6,6 +6,11 @@
 @php
     $money = fn ($minor, $currency) => number_format(\App\Application\Money\CurrencyMinorUnits::fromMinor((int) $minor, (string) $currency), \App\Application\Money\CurrencyMinorUnits::precision((string) $currency));
     $isStaffEditor = in_array($adminRole, ['super_admin', 'admin'], true);
+    $impersonationLinkTtl = (int) config('impersonation.link_ttl_seconds', 120);
+    $impersonationSessionMinutes = (int) config('impersonation.session_minutes', 60);
+    $impersonationLinkTtlLabel = $impersonationLinkTtl >= 120
+        ? round($impersonationLinkTtl / 60).' minutes'
+        : $impersonationLinkTtl.' seconds';
     $isModerator = in_array($adminRole, ['super_admin', 'admin', 'moderator'], true);
 @endphp
 @include('admin.users._header', ['tab' => 'overview'])
@@ -126,6 +131,19 @@
     <div class="stack">
         <section class="card">
             <div class="section-head"><h2>Account actions</h2><span class="badge">{{ str($adminRole)->replace('_', ' ')->title() }}</span></div>
+            @if($adminRole === 'super_admin' && ! $account->trashed() && ! $account->is_banned && ($account->status?->value ?? $account->status) === 'active')
+                <form method="POST" action="{{ route('admin.users.impersonate', $account->id) }}" target="_blank" rel="noopener" style="margin-bottom:14px">
+                    @csrf
+                    <button class="button" type="submit" style="width:100%">Impersonate — open the web app as this user</button>
+                    <p class="field-help" style="margin:8px 0 0">
+                        Opens <code>{{ url('/') }}</code> in a new tab, already signed in as {{ $account->username ?: 'this user' }}.
+                        The one-time link expires in {{ $impersonationLinkTtlLabel }} and the session ends after
+                        {{ $impersonationSessionMinutes }} minutes. Both steps are audited.
+                    </p>
+                </form>
+            @elseif($adminRole === 'super_admin' && ! $account->trashed())
+                <p class="field-help" style="margin:0 0 12px">Activate the account (and lift any ban) to impersonate it — the app only accepts active sessions.</p>
+            @endif
             <div class="action-grid">
                 @if($account->trashed())
                     @if($isStaffEditor)

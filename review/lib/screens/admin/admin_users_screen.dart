@@ -5,6 +5,7 @@ import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/currency/money.dart';
 import '../../services/auth_api.dart';
@@ -24,6 +25,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   final _search = TextEditingController();
   String? _token;
+  String? _adminRole;
   String? _error;
   bool _loading = false;
   bool _passwordVisible = false;
@@ -55,6 +57,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         'password': _password.text,
       });
       _token = response['token']?.toString();
+      final admin = response['data'];
+      _adminRole = admin is Map ? admin['role']?.toString() : null;
       if (_token == null || _token!.isEmpty)
         throw const AuthException(
           'Admin login did not return an access token.',
@@ -755,6 +759,42 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   bool _truthy(Object? value) => value == true || value == 1 || value == '1';
 
+  /// Ask the API for a one-time hand-off link and open it in a new browser tab
+  /// (or the system browser on mobile) so the web app signs in as the user.
+  Future<void> _impersonate(Map<String, dynamic> user) async {
+    final token = _token;
+    if (token == null) return;
+    try {
+      final response = await widget.api.post(
+        'admin/users/${user['id']}/impersonation',
+        token,
+        const <String, dynamic>{},
+      );
+      final data = response['data'];
+      final url = data is Map ? data['url']?.toString() : null;
+      if (url == null || url.isEmpty) {
+        throw const AuthException('No impersonation link was returned.');
+      }
+      final opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!opened) {
+        throw const AuthException(
+          'The browser blocked the impersonation tab. Allow pop-ups for this site and retry.',
+        );
+      }
+      _message(
+        'Opening the web app as ${user['username'] ?? user['full_name'] ?? 'this user'}…',
+      );
+    } on AuthException catch (error) {
+      _message(error.message);
+    } catch (_) {
+      _message('The impersonation link could not be opened.');
+    }
+  }
+
   Future<void> _openUser(Map<String, dynamic> user) async {
     final token = _token;
     if (token == null) return;
@@ -764,11 +804,13 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           api: widget.api,
           token: token,
           user: user,
+          adminRole: _adminRole,
           onAdjustWallet: _adjustWallet,
           onResetPassword: _resetPassword,
           onSetBan: _setBan,
           onDelete: _delete,
           onRestore: _restore,
+          onImpersonate: _impersonate,
         ),
       ),
     );

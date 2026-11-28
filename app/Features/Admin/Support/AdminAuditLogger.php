@@ -10,11 +10,11 @@ use Illuminate\Support\Str;
 /** Shared audit writer for admin console actions. */
 final class AdminAuditLogger
 {
-    public function log(string $action, Model $entity, ?array $before, ?array $after): void
+    public function log(string $action, Model $entity, ?array $before, ?array $after, ?int $actorAdminId = null): void
     {
         AuditLog::query()->create([
             'audit_key' => (string) Str::uuid(),
-            'actor_admin_id' => Auth::guard('admin')->id(),
+            'actor_admin_id' => $actorAdminId ?? Auth::guard('admin')->id(),
             'action' => $action,
             'entity_type' => class_basename($entity),
             'entity_id' => (string) $entity->getKey(),

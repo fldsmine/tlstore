@@ -20,7 +20,11 @@ import 'register_screen.dart';
 import 'two_factor_challenge_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.notice});
+
+  /// Optional explanation shown above the form (for example a failed
+  /// administrator impersonation hand-off).
+  final String? notice;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -370,6 +374,10 @@ class _LoginScreenState extends State<LoginScreen> {
             const AuthBrandHeader(),
             const SizedBox(height: 31),
             const _WelcomeCard(),
+            if (widget.notice != null && widget.notice!.trim().isNotEmpty) ...[
+              const SizedBox(height: 17),
+              _NoticeCard(message: widget.notice!),
+            ],
             const SizedBox(height: 27),
             const AuthIntro(
               title: 'Welcome back',
@@ -610,6 +618,46 @@ class _WelcomeCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoticeCard extends StatelessWidget {
+  const _NoticeCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1EF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF3C9C4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.link_off_rounded,
+            size: 18,
+            color: Color(0xFFB42318),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFFB42318),
+                fontSize: 12.5,
+                height: 1.35,
+              ),
             ),
           ),
         ],

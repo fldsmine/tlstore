@@ -124,6 +124,9 @@ class AuthApi {
   final http.Client _client;
   final FlutterSecureStorage _storage;
   static const _sessionKey = 'trustlens.auth.session';
+  // Session that was active before an administrator impersonation started, so
+  // "Exit impersonation" can put the original account back.
+  static const _previousSessionKey = 'trustlens.auth.session.previous';
   static const _reviewProgressPrefix = 'trustlens.review.progress.v1';
   static const _spotlightsCacheKey = 'trustlens.spotlights.response.v1';
   static const _spotlightsCachedAtKey = 'trustlens.spotlights.cached_at.v1';
@@ -162,6 +165,14 @@ class AuthApi {
   String _cachePrincipal = 'anonymous';
 
   String get preferredCurrency => _preferredCurrency;
+
+  Map<String, dynamic>? _impersonation;
+
+  /// Administrator details while this app is viewing an account through an
+  /// impersonation link; null for a normal session.
+  Map<String, dynamic>? get impersonationInfo => _impersonation;
+
+  bool get isImpersonating => _impersonation != null;
 
   void setPreferredCurrency(String currency) {
     final normalized = currency.trim().toUpperCase();
@@ -210,6 +221,8 @@ class AuthApi {
       final session = jsonDecode(saved) as Map<String, dynamic>;
       final token = session['token'] as String;
       final profile = session['user'] as Map<String, dynamic>;
+      // Keeps the "impersonation session" banner after a page reload.
+      _impersonation = _mapOrNull(session['impersonation']);
       setPreferredCurrency(profile['preferred_currency']?.toString() ?? 'USD');
       _cachePrincipal = _principalFor(profile);
       try {
@@ -247,11 +260,21 @@ class AuthApi {
     _cachePrincipal = _principalFor(result.user);
     await _storage.write(
       key: _sessionKey,
-      value: jsonEncode({'token': result.token, 'user': result.user}),
+      value: jsonEncode({
+        'token': result.token,
+        'user': result.user,
+        if (_impersonation != null) 'impersonation': _impersonation,
+      }),
     );
   }
 
   Future<void> clearSession() async {
+    _impersonation = null;
+    try {
+      await _storage.delete(key: _previousSessionKey);
+    } catch (_) {
+      // Storage may be unavailable on the web preview; nothing to clean up.
+    }
     _preferredCurrency = 'USD';
     _usdRates = null;
     _ratesLoadedAt = null;
@@ -304,6 +327,83 @@ class AuthApi {
 
   String _reviewProgressKey(Object userId, Object taskId) =>
       '$_reviewProgressPrefix.${userId.toString().replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.${taskId.toString().replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}';
+
+  /// Exchange a one-time admin hand-off code for a user session.
+  ///
+  /// The code arrives on the web app URL (`?impersonation=`) and is redeemed
+  /// exactly once; the returned token expires on the server side too.
+  Future<AuthResult> redeemImpersonation(String code) async {
+    final response = await postPublic('auth/impersonation', {
+      'code': code.trim(),
+    });
+    final token = response['token']?.toString();
+    final payload = response['data'];
+    if (token == null || token.isEmpty || payload is! Map) {
+      throw const AuthException(
+        'The impersonation link could not be redeemed. Ask the administrator for a new one.',
+      );
+    }
+    final user = payload.map<String, dynamic>(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+    _impersonation = _mapOrNull(response['impersonation']);
+    final result = AuthResult(token: token, user: user);
+    await _rememberPreviousSession();
+    await _saveSession(result);
+    return result;
+  }
+
+  /// Leave an impersonation session, restoring the account that was signed in
+  /// before it when one is remembered. Returns that session, or null when the
+  /// app should return to the login screen.
+  Future<AuthResult?> exitImpersonation() async {
+    _impersonation = null;
+    String? previous;
+    try {
+      previous = await _storage.read(key: _previousSessionKey);
+      await _storage.delete(key: _previousSessionKey);
+    } catch (_) {
+      previous = null;
+    }
+    if (previous == null || previous.isEmpty) {
+      await clearSession();
+      return null;
+    }
+    try {
+      final session = jsonDecode(previous) as Map<String, dynamic>;
+      final token = session['token'] as String;
+      final profile = session['user'] as Map;
+      final restored = AuthResult(
+        token: token,
+        user: profile.map<String, dynamic>(
+          (key, value) => MapEntry(key.toString(), value),
+        ),
+      );
+      await _saveSession(restored);
+      return restored;
+    } catch (_) {
+      await clearSession();
+      return null;
+    }
+  }
+
+  Future<void> _rememberPreviousSession() async {
+    try {
+      final existing = await _storage.read(key: _previousSessionKey);
+      if (existing != null && existing.isNotEmpty) return;
+      final current = await _storage.read(key: _sessionKey);
+      if (current == null || current.isEmpty) return;
+      await _storage.write(key: _previousSessionKey, value: current);
+    } catch (_) {
+      // Without a backup the exit flow simply signs the tab out.
+    }
+  }
+
+  Map<String, dynamic>? _mapOrNull(Object? value) => value is Map
+      ? value.map<String, dynamic>(
+          (key, item) => MapEntry(key.toString(), item),
+        )
+      : null;
 
   Future<Map<String, dynamic>> requestPasswordReset(String email) =>
       postPublic('auth/forgot-password', {'email': email.trim()});

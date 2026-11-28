@@ -115,6 +115,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/users/{user}/notifications', [UserAdminController::class, 'notifications'])->whereNumber('user')->name('users.notifications');
         Route::get('/users/{user}/activity', [UserAdminController::class, 'activity'])->whereNumber('user')->name('users.activity');
         Route::patch('/users/{user}/profile', [UserAdminController::class, 'updateProfile'])->whereNumber('user')->name('users.profile.update');
+        Route::post('/users/{user}/impersonate', [UserAdminController::class, 'impersonate'])->whereNumber('user')->middleware('throttle:12,1')->name('users.impersonate');
         Route::post('/users/{user}/actions/{action}', [UserAdminController::class, 'action'])->whereNumber('user')->name('users.action');
         Route::get('/modules/{module}', [AdminConsoleController::class, 'index'])->name('modules.index');
         Route::get('/modules/{module}/create', [AdminConsoleController::class, 'create'])->name('modules.create');
