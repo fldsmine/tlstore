@@ -3,14 +3,18 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\FincraApi;
+use App\Application\Payments\PaymentIntentLifecycle;
 use App\Enums\PaymentIntentStatus;
 use App\Models\PaymentIntent;
-use App\Models\Transaction;
 use Illuminate\Support\Facades\Http;
 
 final class VerifyGatewayTopup
 {
-    public function __construct(private readonly ProcessGatewayWebhook $processor) {}
+    public function __construct(
+        private readonly ProcessGatewayWebhook $processor,
+        private readonly PaymentIntentLifecycle $lifecycle,
+    ) {}
 
     public function handle(PaymentIntent $intent): PaymentIntent
     {
@@ -30,6 +34,8 @@ final class VerifyGatewayTopup
                 ->get($baseUrl.'/charges/'.rawurlencode((string) $intent->provider_reference)),
             'bachs' => Http::acceptJson()->withToken($secret)
                 ->get($baseUrl.'/checkout-sessions/'.rawurlencode((string) ($intent->provider_metadata['checkout_id'] ?? ''))),
+            'fincra' => FincraApi::client($providerConfig)
+                ->get(FincraApi::baseUrl($providerConfig).'/checkout/payments/merchant-reference/'.rawurlencode((string) $intent->provider_reference)),
             default => null,
         };
 
@@ -48,16 +54,21 @@ final class VerifyGatewayTopup
             'korapay' => ($body['status'] ?? false) === true && ($data['status'] ?? null) === 'success',
             'bachs' => ($data['payment_status'] ?? null) === 'succeeded'
                 && (($data['charge']['status'] ?? 'succeeded') === 'succeeded'),
+            'fincra' => ($data['status'] ?? null) === 'success',
             default => false,
         };
 
         if (! $providerSuccess) {
-            $providerStatus = strtolower((string) ($intent->provider === 'bachs' ? ($data['status'] ?? '') : ($data['status'] ?? '')));
-            if (in_array($providerStatus, ['failed', 'failure', 'cancelled', 'canceled', 'abandoned'], true)
-                && $intent->status === PaymentIntentStatus::Pending) {
-                $intent->forceFill(['status' => 'failed'])->save();
-                Transaction::query()->where('reference', 'payment-intent:'.$intent->id)
-                    ->update(['status' => 'failed', 'updated_at' => now()]);
+            // Bachs reports the payment state in `payment_status`; the
+            // envelope `status` there is the HTTP-level result.
+            $providerStatus = strtolower(trim((string) (
+                $intent->provider === 'bachs'
+                    ? ($data['payment_status'] ?? $data['charge']['status'] ?? $data['status'] ?? '')
+                    : ($data['status'] ?? '')
+            )));
+            $terminal = PaymentIntentLifecycle::terminalStatusFor($providerStatus);
+            if ($terminal !== null) {
+                $this->lifecycle->markTerminal($intent, $terminal, ['verified_by' => 'check-payment', 'provider_status' => $providerStatus]);
             }
 
             return $intent->fresh() ?? $intent;
@@ -69,11 +80,18 @@ final class VerifyGatewayTopup
             'flutterwave' => $data['tx_ref'] ?? null,
             'korapay' => $data['reference'] ?? null,
             'bachs' => $data['reference'] ?? null,
+            'fincra' => $data['merchantReference'] ?? null,
             default => null,
         };
+        // Fincra (like the other non-Paystack gateways) reports major units.
+        // `amountReceived` is what actually landed, so an underpayment cannot
+        // settle the intent for more than the customer paid.
+        $providerAmount = $intent->provider === 'fincra'
+            ? ($data['amountReceived'] ?? $data['amount'] ?? 0)
+            : ($data['amount'] ?? 0);
         $amount = $intent->provider === 'paystack'
-            ? (int) ($data['amount'] ?? 0)
-            : CurrencyMinorUnits::toMinor((float) ($data['amount'] ?? 0), $currency);
+            ? (int) $providerAmount
+            : CurrencyMinorUnits::toMinor((float) $providerAmount, $currency);
 
         if ($reference !== $intent->provider_reference
             || $currency !== $intent->currency

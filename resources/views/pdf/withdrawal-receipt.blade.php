@@ -38,7 +38,9 @@
 
     $brand = array_merge([
         'name' => 'TL Store',
-        'domain' => 'tlstore.org',
+        // The receipt footer domain follows the deployment (ERR-26).
+        'domain' => parse_url((string) config('app.url'), PHP_URL_HOST)
+            ?: (string) config('app.name', 'TL Store'),
         'legal' => null,
         'logo' => public_path('images/logo-long.png'),
         'google_badge' => public_path('images/pdf/google-play-badge.png'),

@@ -1,9 +1,16 @@
 <?php
 
 use App\Features\System\Http\Controllers\Web\LandingPageController;
+use App\Features\System\Http\Controllers\Web\WellKnownController;
 use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
+use App\Features\Admin\Http\Controllers\Web\UserAdminController;
+use App\Features\Admin\Http\Controllers\Web\GatewayPaymentAdminController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
+use App\Features\Admin\Http\Controllers\Web\TelegramAdminController;
+use App\Features\Admin\Http\Controllers\Web\SystemSettingsController;
+use App\Features\Admin\Http\Controllers\Web\EnvironmentSettingsController;
+use App\Features\Support\Http\Controllers\Web\ContactController;
 use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
 use Illuminate\Http\Request;
@@ -19,6 +26,10 @@ $flutterWebEntry = static function () {
         'Cache-Control' => 'no-cache, no-store, must-revalidate',
     ]);
 };
+
+// App-link verification files (ERR-28). Both 404 until configured.
+Route::get('/.well-known/assetlinks.json', [WellKnownController::class, 'assetLinks'])->name('well-known.assetlinks');
+Route::get('/.well-known/apple-app-site-association', [WellKnownController::class, 'appleAppSiteAssociation'])->name('well-known.apple-app-site-association');
 
 Route::get('/', function (Request $request, LandingPageController $landing) use ($webAppUrl, $flutterWebEntry) {
     $webHost = parse_url($webAppUrl(), PHP_URL_HOST);
@@ -44,6 +55,9 @@ foreach (['login', 'register'] as $appPath) {
     })->name('frontend.'.$appPath);
 }
 
+Route::get('/contact', [ContactController::class, 'show'])->name('contact.show');
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:guest-support')->name('contact.store');
+
 Route::get('/ref/{code}', function (string $code) use ($webAppUrl) {
     abort_unless(preg_match('/^[A-Za-z0-9_-]{1,64}$/', $code) === 1, 404);
 
@@ -56,16 +70,34 @@ Route::get('/ref/{code}', function (string $code) use ($webAppUrl) {
 
 Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::get('/login', [AdminConsoleController::class, 'loginForm'])->name('login');
-    Route::post('/login', [AdminConsoleController::class, 'login'])->middleware('throttle:10,1')->name('login.submit');
+    Route::post('/login', [AdminConsoleController::class, 'login'])->middleware('throttle:admin-auth')->name('login.submit');
 
     Route::middleware(EnsureAdminWebAccount::class)->group(function (): void {
         Route::post('/logout', [AdminConsoleController::class, 'logout'])->name('logout');
         Route::get('/', [AdminConsoleController::class, 'dashboard'])->name('dashboard');
+        Route::get('/gateway-payments', [GatewayPaymentAdminController::class, 'index'])->name('gateway-payments.index');
+        Route::get('/gateway-payments/{intent}', [GatewayPaymentAdminController::class, 'show'])->whereNumber('intent')->name('gateway-payments.show');
+        Route::post('/gateway-payments/{intent}/revalidate', [GatewayPaymentAdminController::class, 'revalidate'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.revalidate');
+        Route::post('/gateway-payments/{intent}/decision', [GatewayPaymentAdminController::class, 'decide'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.decision');
+        Route::get('/gateway-balances', [GatewayPaymentAdminController::class, 'balances'])->middleware('throttle:20,1')->name('gateway-balances.index');
+        // Friendly settings console: one tab per system_settings group.
+        Route::get('/settings', [SystemSettingsController::class, 'index'])->name('settings.index');
+        Route::patch('/settings', [SystemSettingsController::class, 'update'])->middleware('throttle:60,1')->name('settings.update');
+        // Provider credentials written straight to the deployment's .env file.
+        Route::patch('/settings/api-keys', [EnvironmentSettingsController::class, 'update'])->middleware('throttle:30,1')->name('settings.environment.update');
         Route::get('/notifications', [NotificationTemplateAdminController::class, 'index'])->name('notifications.index');
         Route::patch('/notifications/settings', [NotificationTemplateAdminController::class, 'updateSettings'])->name('notifications.settings');
         Route::post('/notifications/test', [NotificationTemplateAdminController::class, 'sendTest'])->middleware('throttle:3,1')->name('notifications.test');
         Route::get('/notifications/templates/{template}/edit', [NotificationTemplateAdminController::class, 'edit'])->whereNumber('template')->name('notifications.templates.edit');
         Route::patch('/notifications/templates/{template}', [NotificationTemplateAdminController::class, 'update'])->whereNumber('template')->name('notifications.templates.update');
+        // Telegram announcements, bot configuration and delivery history.
+        Route::get('/telegram', [TelegramAdminController::class, 'index'])->name('telegram.index');
+        Route::patch('/telegram/settings', [TelegramAdminController::class, 'updateSettings'])->middleware('throttle:30,1')->name('telegram.settings');
+        Route::post('/telegram/test-connection', [TelegramAdminController::class, 'testConnection'])->middleware('throttle:6,1')->name('telegram.test-connection');
+        Route::post('/telegram/test-message', [TelegramAdminController::class, 'sendTest'])->middleware('throttle:6,1')->name('telegram.test-message');
+        Route::post('/telegram/messages', [TelegramAdminController::class, 'send'])->middleware('throttle:20,1')->name('telegram.send');
+        Route::post('/telegram/messages/{message}/resend', [TelegramAdminController::class, 'resend'])->whereNumber('message')->middleware('throttle:20,1')->name('telegram.resend');
+        Route::get('/telegram/messages/{message}/image', [TelegramAdminController::class, 'image'])->whereNumber('message')->name('telegram.image');
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])->name('support-tickets.index');
         Route::get('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'show'])->whereNumber('ticket')->name('support-tickets.show');
         Route::post('/support-tickets/{ticket}/messages', [AdminSupportTicketController::class, 'reply'])->whereNumber('ticket')->name('support-tickets.reply');
@@ -74,8 +106,17 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('/review-templates/{template}/versions', [AdminConsoleController::class, 'createTemplateVersion'])->whereNumber('template')->name('review-templates.versions.store');
         Route::post('/review-templates/{template}/versions/{version}/publish', [AdminConsoleController::class, 'publishTemplateVersion'])->whereNumber('template')->whereNumber('version')->name('review-templates.versions.publish');
         Route::get('/modules/{module}/{record}/proof', [AdminConsoleController::class, 'moderationProof'])->name('modules.proof');
-        Route::get('/users/{user}', [AdminConsoleController::class, 'userDetail'])->whereNumber('user')->name('users.show');
-        Route::post('/users/{user}/actions/{action}', [AdminConsoleController::class, 'userAction'])->whereNumber('user')->name('users.action');
+        Route::get('/users', [UserAdminController::class, 'index'])->name('users.index');
+        Route::get('/users/{user}', [UserAdminController::class, 'show'])->whereNumber('user')->name('users.show');
+        Route::get('/users/{user}/wallet', [UserAdminController::class, 'wallet'])->whereNumber('user')->name('users.wallet');
+        Route::get('/users/{user}/tasks', [UserAdminController::class, 'tasks'])->whereNumber('user')->name('users.tasks');
+        Route::get('/users/{user}/withdrawals', [UserAdminController::class, 'withdrawals'])->whereNumber('user')->name('users.withdrawals');
+        Route::get('/users/{user}/referrals', [UserAdminController::class, 'referrals'])->whereNumber('user')->name('users.referrals');
+        Route::get('/users/{user}/notifications', [UserAdminController::class, 'notifications'])->whereNumber('user')->name('users.notifications');
+        Route::get('/users/{user}/activity', [UserAdminController::class, 'activity'])->whereNumber('user')->name('users.activity');
+        Route::patch('/users/{user}/profile', [UserAdminController::class, 'updateProfile'])->whereNumber('user')->name('users.profile.update');
+        Route::post('/users/{user}/impersonate', [UserAdminController::class, 'impersonate'])->whereNumber('user')->middleware('throttle:12,1')->name('users.impersonate');
+        Route::post('/users/{user}/actions/{action}', [UserAdminController::class, 'action'])->whereNumber('user')->name('users.action');
         Route::get('/modules/{module}', [AdminConsoleController::class, 'index'])->name('modules.index');
         Route::get('/modules/{module}/create', [AdminConsoleController::class, 'create'])->name('modules.create');
         Route::post('/modules/{module}', [AdminConsoleController::class, 'store'])->name('modules.store');

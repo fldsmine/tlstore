@@ -7,7 +7,9 @@ use App\Features\System\Http\Controllers\Api\V1\LegalDocumentController;
 use App\Features\System\Http\Controllers\Api\V1\FrontendController;
 use App\Features\Identity\Http\Controllers\Api\V1\AuthController;
 use App\Features\Identity\Http\Controllers\Api\V1\TwoFactorChallengeController;
+use App\Features\Admin\Http\Controllers\Api\V1\AdminGatewayPaymentController;
 use App\Features\Identity\Http\Controllers\Api\V1\AdminAuthController;
+use App\Features\Identity\Http\Controllers\Api\V1\ImpersonationController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\PublicCatalogController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\ListingController;
 use App\Features\Marketplace\Http\Controllers\Api\V1\AppReportController;
@@ -48,6 +50,7 @@ use App\Features\Vas\Http\Controllers\Api\V1\VasPurchaseController;
 use App\Features\Vas\Http\Controllers\Api\V1\VasOrderController;
 use App\Features\Vas\Http\Controllers\Api\V1\VtpassWebhookController;
 use App\Features\Support\Http\Controllers\Api\V1\SupportTicketController;
+use App\Features\Support\Http\Controllers\Api\V1\GuestSupportController;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('/health', HealthController::class)->name('api.v1.health');
@@ -75,12 +78,20 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/exchange-rates', [PublicCatalogController::class, 'exchangeRates'])->name('api.v1.exchange-rates.index');
     Route::get('/currencies', [PublicCatalogController::class, 'currencies'])->name('api.v1.currencies.index');
     Route::post('/webhooks/vtpass', VtpassWebhookController::class)->middleware('throttle:30,1')->name('api.v1.vas.webhook');
+    // Public contact form: no token required, heavily rate limited per IP and address.
+    Route::post('/guest-support', [GuestSupportController::class, 'store'])->middleware('throttle:guest-support')->name('api.v1.guest-support.store');
     Route::post('/webhooks/{provider}', [TopupController::class, 'webhook'])->name('api.v1.payments.webhook');
 	Route::get('/banks', [BankController::class, 'index'])->name('api.v1.banks.index');
 
     Route::prefix('admin/auth')->name('api.v1.admin.auth.')->group(function (): void {
-        Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:6,1')->name('login');
+        Route::post('/login', [AdminAuthController::class, 'login'])->middleware('throttle:admin-auth')->name('login');
     });
+
+    // Single-use hand-off from the admin console to the Flutter web app. The app
+    // posts the code it received on `/?impersonation=` and receives a
+    // short-lived user token.
+    Route::post('/auth/impersonation', [ImpersonationController::class, 'redeem'])
+        ->middleware('throttle:20,1')->name('api.v1.auth.impersonation');
 
     Route::middleware(['auth:sanctum', 'user.account', 'user.two-factor'])->group(function (): void {
         Route::get('/support-tickets', [SupportTicketController::class, 'index'])->name('api.v1.support-tickets.index');
@@ -204,6 +215,11 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/moderation/manual-deposits/{deposit}/proof', [ModerationController::class, 'depositProof'])->name('moderation.deposits.proof');
         Route::get('/moderation/shares/{event}/proof', [ModerationController::class, 'shareProof'])->name('moderation.shares.proof');
         Route::post('/moderation/withdrawals/{withdrawal}/settle', [ModerationController::class, 'settleWithdrawal'])->name('moderation.withdrawals.settle');
+        Route::get('/gateway-payments', [AdminGatewayPaymentController::class, 'index'])->name('gateway-payments.index');
+        Route::get('/gateway-payments/{intent}', [AdminGatewayPaymentController::class, 'show'])->whereNumber('intent')->name('gateway-payments.show');
+        Route::post('/gateway-payments/{intent}/revalidate', [AdminGatewayPaymentController::class, 'revalidate'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.revalidate');
+        Route::post('/gateway-payments/{intent}/decision', [AdminGatewayPaymentController::class, 'decide'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.decision');
+        Route::get('/gateway-balances', [AdminGatewayPaymentController::class, 'balances'])->middleware('throttle:20,1')->name('gateway-balances.index');
         Route::get('/settings', [SystemSettingController::class, 'index'])->name('settings.index');
         Route::put('/settings/{settingKey}', [SystemSettingController::class, 'update'])->name('settings.update');
         Route::get('/rank-levels', [UserRankLevelController::class, 'index'])->name('rank-levels.index');
@@ -250,6 +266,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/users/{user}/reset-password', [UserManagementController::class, 'resetPassword'])->middleware('throttle:6,1')->name('users.reset-password');
         Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
         Route::post('/users/{user}/restore', [UserManagementController::class, 'restore'])->name('users.restore');
+        Route::post('/users/{user}/impersonation', [UserManagementController::class, 'impersonate'])->middleware('throttle:6,1')->name('users.impersonation.store');
         Route::get('/review-questions', [QuestionnaireController::class, 'questions'])->name('review-questions.index');
         Route::post('/review-questions', [QuestionnaireController::class, 'createQuestion'])->name('review-questions.store');
         Route::patch('/review-questions/{question}', [QuestionnaireController::class, 'updateQuestion'])->name('review-questions.update');

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../features/marketplace/presentation/listing_kind.dart';
@@ -276,10 +277,10 @@ class _AuthSpotlightPanelState extends State<AuthSpotlightPanel> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: logo != null && logo.isNotEmpty
-                    ? Image.network(
-                        logo,
+                    ? CachedNetworkImage(
+                        imageUrl: logo,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const Icon(
+                        errorWidget: (_, _, _) => const Icon(
                           Icons.account_balance_wallet_outlined,
                           size: 20,
                         ),
@@ -335,11 +336,11 @@ class _ProductCard extends StatelessWidget {
           children: [
             Expanded(
               child: image != null && image.isNotEmpty
-                  ? Image.network(
-                      image,
+                  ? CachedNetworkImage(
+                      imageUrl: image,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _imagePlaceholder(),
+                      errorWidget: (_, _, _) => _imagePlaceholder(),
                     )
                   : _imagePlaceholder(),
             ),
@@ -464,10 +465,10 @@ class _FeaturedListing extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: image != null && image.startsWith('http')
-                      ? Image.network(
-                          image,
+                      ? CachedNetworkImage(
+                          imageUrl: image,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Icon(
+                          errorWidget: (_, _, _) => Icon(
                             isApp
                                 ? Icons.apps_rounded
                                 : Icons.campaign_outlined,
@@ -532,7 +533,9 @@ class _TestimonialCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatar = testimony['avatar']?.toString();
     return Padding(padding: const EdgeInsets.only(right: 10), child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13), border: Border.all(color: const Color(0xFFE5E9E3))), child: Row(children: [
-      CircleAvatar(radius: 26, backgroundColor: softGreen, backgroundImage: avatar != null && avatar.isNotEmpty ? NetworkImage(avatar) : null, child: avatar == null || avatar.isEmpty ? const Icon(Icons.person_outline, color: brandGreen) : null),
+      CircleAvatar(radius: 26, backgroundColor: softGreen, backgroundImage: avatar != null && avatar.isNotEmpty
+          ? CachedNetworkImageProvider(avatar)
+          : null, child: avatar == null || avatar.isEmpty ? const Icon(Icons.person_outline, color: brandGreen) : null),
       const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(testimony['content']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.3, fontWeight: FontWeight.w600, color: ink)), const SizedBox(height: 5), Text('${testimony['name'] ?? 'Member'}  •  ★ ${testimony['rating'] ?? ''}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: brandGreen))]))
     ])));
   }

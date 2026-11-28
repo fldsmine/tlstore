@@ -140,7 +140,6 @@ class AutoApproveAdShares extends Command
                     $event,
                     $rewardMinor,
                     $admin,
-                    $subscription,
                     $decide
                 ): string {
                     $lockedTask = AdShareTask::query()
@@ -161,7 +160,6 @@ class AutoApproveAdShares extends Command
                         'approved',
                         'app_auto_approved',
                         'Automatically approved after the configured review delay.',
-                        $subscription->plan,
                     );
 
                     return 'approved';

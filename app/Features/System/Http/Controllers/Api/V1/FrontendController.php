@@ -175,7 +175,7 @@ final class FrontendController
 		return collect($configured)
 			->filter(fn ($step) => is_array($step))
 			->values()
-			->map(function (array $step, int $index) use ($defaults): array {
+			->map(function (array $step, int $index) use ($configured, $defaults): array {
 				$default = $defaults[$index] ?? $defaults[0];
 				return [
 					'number' => (string) ($index + 1),
@@ -272,7 +272,7 @@ final class FrontendController
 	private function getContactInfo(array|\Illuminate\Support\Collection $settings): array
 	{
         return [
-			'email' => $this->setting($settings, 'contact_email', 'support@tlstore.org'),
+			'email' => $this->setting($settings, 'contact_email', (string) config('trustlens.support_email', '')),
 			'phone' => $this->setting($settings, 'contact_phone', '+1 394 567 8900'),
 			'address' => $this->setting($settings, 'contact_address', '123 AI Street, Tech City'),
             'social_links' => [

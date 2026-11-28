@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:review/core/utils/helper.dart';
 import 'package:review/widgets/proxy_prompt_dialog.dart';
@@ -704,10 +705,10 @@ class _AppOverviewCard extends StatelessWidget {
                 width: 58,
                 height: 58,
                 child: iconUrl != null && iconUrl.isNotEmpty
-                    ? Image.network(
-                        iconUrl,
+                    ? CachedNetworkImage(
+                        imageUrl: iconUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        errorWidget: (_, __, ___) =>
                             _AppIconFallback(name: name),
                       )
                     : _AppIconFallback(name: name),

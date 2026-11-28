@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -900,10 +901,10 @@ class _UserRankingScreenState extends State<UserRankingScreen> {
           ? fallback()
           : ClipRRect(
               borderRadius: BorderRadius.circular(15),
-              child: Image.network(
-                url,
+              child: CachedNetworkImage(
+                imageUrl: url,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => fallback(),
+                errorWidget: (_, __, ___) => fallback(),
               ),
             ),
     );

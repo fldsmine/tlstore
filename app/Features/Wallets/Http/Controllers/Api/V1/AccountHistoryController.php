@@ -3,6 +3,7 @@
 namespace App\Features\Wallets\Http\Controllers\Api\V1;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Enums\TransactionStatus;
 use App\Models\Transaction;
 use App\Models\WithdrawalRequest;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,13 +16,13 @@ final class AccountHistoryController
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'category' => ['sometimes', 'in:all,review,share,payment,withdrawal,referral,bonus,other'],
-            'status' => ['sometimes', 'in:all,posted,pending,failed,rejected,cancelled'],
+            'status' => ['sometimes', 'in:all,posted,completed,approved,pending,failed,rejected,cancelled,expired'],
             'from_date' => ['sometimes', 'date'],
             'to_date' => ['sometimes', 'date'],
         ]);
-        $perPage = (int) ($validated['per_page'] ?? 5);
+        $perPage = (int) ($validated['per_page'] ?? 20);
         $baseQuery = Transaction::query()->where('user_id', $request->user()->id);
         $this->applyFilters($baseQuery, $validated);
 
@@ -81,7 +82,7 @@ final class AccountHistoryController
             ? "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(meta, '$.currency')), 'USD')"
             : "COALESCE(json_extract(meta, '$.currency'), 'USD')";
         $successRows = (clone $userTransactions)
-            ->whereIn('status', ['posted', 'completed', 'success', 'successful', 'approved'])
+            ->whereIn('status', [...TransactionStatus::settledValues(), 'posted', 'success', 'successful'])
             ->where('direction', 'credit')
             ->whereIn('type', ['app_review', 'ads_share', 'referral_bonus', 'rank_earning', 'social_follow_reward'])
             ->selectRaw("{$currencyExpression} as currency, SUM(amount) as total_amount")
@@ -128,7 +129,7 @@ final class AccountHistoryController
         $types = match ($category) {
             'review' => ['app_review'],
             'share' => ['ads_share'],
-            'payment' => ['top_up_fund', 'subscription_plan', 'package_addon', 'fund_transfer', 'vtu_purchase'],
+            'payment' => ['top_up_fund', 'subscription_plan', 'package_addon', 'fund_transfer', 'vtu_purchase', 'campaign_order'],
             'withdrawal' => ['withdrawal'],
             'referral' => ['referral_bonus'],
             'bonus' => ['referral_bonus', 'social_follow_reward', 'rank_earning'],
@@ -139,14 +140,17 @@ final class AccountHistoryController
         } elseif ($category === 'other') {
             $query->whereNotIn('type', [
                 'app_review', 'ads_share', 'top_up_fund', 'subscription_plan', 'package_addon',
-                'fund_transfer', 'vtu_purchase', 'withdrawal', 'referral_bonus', 'social_follow_reward', 'rank_earning',
+                'fund_transfer', 'vtu_purchase', 'campaign_order', 'withdrawal', 'referral_bonus',
+                'social_follow_reward', 'rank_earning',
             ]);
         }
 
-        $status = $filters['status'] ?? 'all';
-        if ($status === 'posted') {
-            $query->whereIn('status', ['posted', 'completed', 'success', 'successful', 'approved']);
-        } elseif ($status === 'cancelled') {
+        $status = TransactionStatus::normalize((string) ($filters['status'] ?? 'all'));
+        if ($status === TransactionStatus::Completed->value) {
+            // `posted` is the pre-Phase-2 spelling of a settled row and older
+            // clients still send it; both spellings select the same set.
+            $query->whereIn('status', [...TransactionStatus::settledValues(), 'posted', 'success', 'successful']);
+        } elseif ($status === TransactionStatus::Cancelled->value) {
             $query->whereIn('status', ['cancelled', 'canceled']);
         } elseif ($status !== 'all') {
             $query->where('status', $status);

@@ -6,10 +6,15 @@ class IntroScreen extends StatefulWidget {
     super.key,
     required this.onLogin,
     required this.onRegister,
+    required this.onExplore,
   });
 
   final VoidCallback onLogin;
   final VoidCallback onRegister;
+
+  /// Opens the public landing page without a session, so visitors can look
+  /// around before deciding to register or log in.
+  final VoidCallback onExplore;
 
   @override
   State<IntroScreen> createState() => _IntroScreenState();
@@ -95,6 +100,7 @@ class _IntroScreenState extends State<IntroScreen> {
                         return LastSlideScreen(
                           onGetStarted: widget.onRegister,
                           onLogin: widget.onLogin,
+                          onExplore: widget.onExplore,
                         );
                       }
 
@@ -185,8 +191,8 @@ class _IntroScreenState extends State<IntroScreen> {
     return Row(
       children: [
         TextButton(
-          onPressed: widget.onLogin,
-          child: const Text('Skip'),
+          onPressed: widget.onExplore,
+          child: const Text('Explore'),
         ),
 
         const Spacer(),
@@ -233,10 +239,12 @@ class LastSlideScreen extends StatelessWidget {
     super.key,
     required this.onGetStarted,
     required this.onLogin,
+    required this.onExplore,
   });
 
   final VoidCallback onGetStarted;
   final VoidCallback onLogin;
+  final VoidCallback onExplore;
 
   static const Color primaryGreen = Color(0xFF0C573A);
   static const Color darkGreen = Color(0xFF145A3D);
@@ -432,6 +440,35 @@ class LastSlideScreen extends StatelessWidget {
                                 'I already have an account',
                                 style: TextStyle(
                                   fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          // Explore: browse the public landing page without
+                          // creating an account or logging in.
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: TextButton.icon(
+                              onPressed: onExplore,
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.travel_explore_rounded,
+                                size: 20,
+                              ),
+                              label: const Text(
+                                'Explore without an account',
+                                style: TextStyle(
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

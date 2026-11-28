@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'core/links/referral_link.dart';
+import 'screens/frontend/landing_sreen.dart';
 import 'screens/home_screen.dart';
 import 'screens/intro_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -18,6 +19,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_theme_controller.dart';
 import 'core/update/update_gate.dart';
 import 'core/update/update_service.dart';
+import 'utils/impersonation_handoff.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -155,7 +157,10 @@ class _SessionGateState extends State<_SessionGate> {
   static const _storage = FlutterSecureStorage();
   late final Future<(AuthResult?, bool)> _initial = _restore();
 
+  String? _impersonationNotice;
+
   Future<(AuthResult?, bool)> _restore() async {
+    await _redeemImpersonationIfPresent();
     final values = await Future.wait<Object?>([
       _api.restoreSession(),
       _storage.read(key: 'trustlens.intro_seen'),
@@ -165,6 +170,23 @@ class _SessionGateState extends State<_SessionGate> {
     return (session, seen);
   }
 
+  /// An administrator can open the web app with `?impersonation=<code>`; the
+  /// code is redeemed exactly once and removed from the address bar.
+  Future<void> _redeemImpersonationIfPresent() async {
+    final code = impersonationCodeFromUrl();
+    if (code == null) return;
+    try {
+      await _api.redeemImpersonation(code);
+    } on AuthException catch (error) {
+      _impersonationNotice = error.message;
+    } catch (_) {
+      _impersonationNotice =
+          'The impersonation link could not be redeemed. Ask the administrator for a new one.';
+    } finally {
+      clearImpersonationCode();
+    }
+  }
+
   Future<void> _openAuth({required bool register}) async {
     await _storage.write(key: 'trustlens.intro_seen', value: 'true');
     if (!mounted) return;
@@ -172,6 +194,17 @@ class _SessionGateState extends State<_SessionGate> {
       MaterialPageRoute<void>(
         builder: (_) => register ? const RegisterScreen() : const LoginScreen(),
       ),
+    );
+  }
+
+  /// Guest tour: open the public landing page over the intro, with no session.
+  /// Back returns to the intro; registering/logging in from the page replaces
+  /// the whole stack with the authenticated home screen.
+  Future<void> _openExplore() async {
+    await _storage.write(key: 'trustlens.intro_seen', value: 'true');
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => LandingScreen(api: _api)),
     );
   }
 
@@ -185,10 +218,11 @@ class _SessionGateState extends State<_SessionGate> {
       final (result, introSeen) = snapshot.data!;
       return result == null
           ? introSeen
-                ? const LoginScreen()
+                ? LoginScreen(notice: _impersonationNotice)
                 : IntroScreen(
                     onLogin: () => _openAuth(register: false),
                     onRegister: () => _openAuth(register: true),
+                    onExplore: _openExplore,
                   )
           : HomeScreen(result: result, api: _api);
     },

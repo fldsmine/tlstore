@@ -3,6 +3,7 @@
 namespace App\Features\Payments\Http\Controllers\Api\V1;
 
 use App\Application\Actions\Payments\SubmitManualDeposit;
+use App\Application\Payments\PaymentIntentLifecycle;
 use App\Application\Actions\Payments\InitializeGatewayTopup;
 use App\Application\Actions\Payments\ProcessGatewayWebhook;
 use App\Application\Actions\Payments\VerifyGatewayTopup;
@@ -20,9 +21,9 @@ final class TopupController
         $data = $request->validate([
             'amount_minor' => ['required', 'integer', 'min:100'],
             'currency' => ['required', 'string', 'size:3'],
-            'gateway' => ['required', 'in:korapay,paystack,flutterwave,bachs'],
+            'gateway' => ['required', 'in:korapay,paystack,flutterwave,bachs,fincra'],
             'idempotency_key' => ['required', 'string', 'max:80'],
-            'customer_email' => ['nullable', 'string', 'max:191', 'email:rfc,dns'],
+            'customer_email' => ['nullable', 'string', 'max:191', 'email:rfc'],
         ]);
 
         return response()->json(['data' => $initialize->handle(
@@ -60,7 +61,7 @@ final class TopupController
         ]]);
     }
 
-    public function cancel(Request $request, PaymentIntent $paymentIntent): JsonResponse
+    public function cancel(Request $request, PaymentIntent $paymentIntent, PaymentIntentLifecycle $lifecycle): JsonResponse
     {
         abort_unless($paymentIntent->user_id === $request->user()->id && $paymentIntent->purpose === 'topup', 404);
         abort_if($paymentIntent->provider === 'manual', 422, 'Manual deposit requests cannot be cancelled here.');
@@ -68,7 +69,10 @@ final class TopupController
         abort_unless(in_array($paymentIntent->status, [PaymentIntentStatus::Pending, PaymentIntentStatus::Expired], true), 409, 'This payment request can no longer be cancelled.');
 
         if ($paymentIntent->status === PaymentIntentStatus::Pending) {
-            $paymentIntent->forceFill(['status' => 'expired', 'expires_at' => now()])->save();
+            // Expire the checkout *and* close its transaction projection; the
+            // projection used to linger at `pending` for ever.
+            $lifecycle->markTerminal($paymentIntent, PaymentIntentStatus::Expired, ['expired_by' => 'user']);
+            $paymentIntent->forceFill(['expires_at' => now()])->save();
         }
 
         $paymentIntent->refresh();
@@ -88,7 +92,7 @@ final class TopupController
 
     public function webhook(string $provider, Request $request, ProcessGatewayWebhook $process): JsonResponse
     {
-        abort_unless(in_array($provider, ['korapay', 'paystack', 'flutterwave', 'bachs'], true), 404);
+        abort_unless(in_array($provider, ['korapay', 'paystack', 'flutterwave', 'bachs', 'fincra'], true), 404);
         $process->handle($provider, $request);
 
         return response()->json(['received' => true]);

@@ -10,10 +10,15 @@ class AdShare extends StatelessWidget {
   final List<Map<String, dynamic>> ads;
   final AuthApi api;
 
+  /// Called when a visitor taps a campaign card; guests are offered
+  /// registration/log-in by the landing page.
+  final ValueChanged<Map<String, dynamic>>? onOpenAd;
+
   const AdShare({
     super.key, 
     required this.ads, 
     required this.api, 
+    this.onOpenAd,
   });
 
   @override
@@ -58,7 +63,7 @@ class AdShare extends StatelessWidget {
                   side: BorderSide(color: colors.outlineVariant),
                 ),
                 child: InkWell(
-                  // onTap: () => _openAd(ad),
+                  onTap: onOpenAd == null ? null : () => onOpenAd!(ad),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

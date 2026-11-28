@@ -35,3 +35,20 @@ For deployments behind Nginx, do not cache these version-sensitive files:
 with `no-store` headers; direct static requests need the equivalent Nginx
 rule. If a browser continues to show an old build after deployment, clear that
 site's stored data and unregister its old service worker once, then reload.
+
+## Administrator impersonation hand-off
+
+Super administrators can open the web build already signed in as a user (admin console →
+Users → account → *Impersonate*, or the Flutter admin screens → user → *Impersonate*). The
+hand-off relies on three things that are easy to break in a deployment:
+
+1. **The app is served at `/`.** The link is `https://<host>/?impersonation=<code>`; if a proxy
+   rewrites the root to another path or strips query strings, the code never reaches the app.
+2. **HTTPS (or localhost).** `flutter_secure_storage` needs a secure context on the web, so the
+   redeemed session cannot be stored over plain HTTP.
+3. **No aggressive caching of `/`.** The entry page already sends `no-store` via Laravel; keep
+   the equivalent rule on static hosts, otherwise a cached page keeps replaying an old code
+   (which is single use and fails on the second attempt).
+
+The code is removed from the address bar as soon as it is redeemed, and the impersonated session
+ends with the tab or after `ADMIN_IMPERSONATION_SESSION_MINUTES`.

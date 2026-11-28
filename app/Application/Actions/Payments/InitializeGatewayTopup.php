@@ -3,7 +3,10 @@
 namespace App\Application\Actions\Payments;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\FincraApi;
+use App\Application\Payments\PaymentIntentLifecycle;
 use App\Application\Support\PaymentGatewaySettings;
+use App\Enums\TransactionType;
 use App\Models\PaymentIntent;
 use App\Models\SubscriptionPlan;
 use App\Models\PackageAddon;
@@ -18,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 final class InitializeGatewayTopup
 {
+    public function __construct(private readonly PaymentIntentLifecycle $lifecycle) {}
+
     /** @return array{intent_id:int,reference:string,provider:string,checkout_url:string,status:string} */
     public function handle(
         User $user,
@@ -42,11 +47,11 @@ final class InitializeGatewayTopup
 
         $email = trim($customerEmail ?: (string) $user->email);
         $emailValidator = Validator::make(['email' => $email], [
-            'email' => ['required', 'string', 'max:191', 'email:rfc,dns'],
+            'email' => ['required', 'string', 'max:191', 'email:rfc'],
         ]);
         if ($emailValidator->fails()) {
             throw ValidationException::withMessages([
-                'customer_email' => 'Enter a valid email address on a public email domain for the payment provider. Reserved or test email domains cannot be used.',
+                'customer_email' => 'Enter a valid email address for the payment receipt.',
             ]);
         }
 
@@ -97,10 +102,13 @@ final class InitializeGatewayTopup
             'expires_at' => now()->addHours(2),
         ]));
 
+        // `transactions.type` is a TransactionType, not the plan's product
+        // type: writing 'marketplace_access' here fataled every gateway
+        // subscription checkout with a ValueError.
         $transactionType = match ($purpose) {
-            'subscription' => $subscriptionPlan?->product_type->value ?? 'subscription_plan',
-            'package_addon' => 'package_addon',
-            default => 'top_up_fund',
+            'subscription' => TransactionType::SUBSCRIPTION_PLAN->value,
+            'package_addon' => TransactionType::PACKAGE_ADDON->value,
+            default => TransactionType::TOP_UP_FUND->value,
         };
         Transaction::query()->updateOrCreate(['reference' => 'payment-intent:'.$intent->id], [
             'user_id' => $user->id,
@@ -175,6 +183,27 @@ final class InitializeGatewayTopup
                         'metadata' => ['user_id' => (string) $user->id, 'payment_intent_id' => (string) $intent->id],
                         'expires_in_minutes' => 120,
                     ]),
+                // Fincra hosted checkout. `feeBearer: business` keeps the
+                // customer paying exactly the quoted amount (as with the other
+                // gateways) and settles the net into the Fincra wallet.
+                'fincra' => FincraApi::client($providerConfig)->post(
+                    FincraApi::baseUrl($providerConfig).'/checkout/payments',
+                    [
+                        'amount' => FincraApi::amount($amountMinor, $currency),
+                        'currency' => $currency,
+                        'reference' => $reference,
+                        'redirectUrl' => $returnUrl,
+                        'feeBearer' => (string) ($providerConfig['fee_bearer'] ?? 'business'),
+                        'settlementDestination' => 'wallet',
+                        'customer' => array_filter([
+                            'name' => $name,
+                            'email' => $email,
+                            'phoneNumber' => (string) ($user->phone ?? ''),
+                        ], static fn (string $value): bool => trim($value) !== ''),
+                        'metadata' => ['user_id' => (string) $user->id, 'payment_intent_id' => (string) $intent->id],
+                        'successMessage' => 'Payment received. You can return to TrustLens.',
+                    ],
+                ),
                 default => throw ValidationException::withMessages(['gateway' => 'Unsupported payment gateway.']),
             };
             $response->throw();
@@ -184,6 +213,7 @@ final class InitializeGatewayTopup
                 'flutterwave' => data_get($body, 'data.link'),
                 'korapay' => data_get($body, 'data.checkout_url'),
                 'bachs' => data_get($body, 'checkout_url'),
+                'fincra' => data_get($body, 'data.link'),
             };
             if (! is_string($checkoutUrl) || ! filter_var($checkoutUrl, FILTER_VALIDATE_URL)) {
                 throw new \RuntimeException('The gateway did not return a valid checkout link.');
@@ -192,12 +222,25 @@ final class InitializeGatewayTopup
             if ($gateway === 'bachs' && (! is_string($checkoutId) || $checkoutId === '')) {
                 throw new \RuntimeException('BACHS PAY did not return a checkout session ID.');
             }
-            $intent->forceFill(['provider_metadata' => ['checkout_url' => $checkoutUrl, 'checkout_id' => $checkoutId]])->save();
+            $metadata = ['checkout_url' => $checkoutUrl, 'checkout_id' => $checkoutId];
+            if ($gateway === 'fincra') {
+                // Fincra's webhook/verify payloads carry their own `reference`
+                // (`fcr-p-…`) alongside our merchant reference; keep both so a
+                // payload without `merchantReference` can still be matched.
+                $fincraReference = data_get($body, 'data.reference');
+                $fincraPayCode = data_get($body, 'data.payCode');
+                $metadata['fincra_reference'] = is_string($fincraReference) ? $fincraReference : null;
+                $metadata['fincra_pay_code'] = is_string($fincraPayCode) ? $fincraPayCode : null;
+            }
+            $intent->forceFill(['provider_metadata' => $metadata])->save();
 
             return ['intent_id' => $intent->id, 'reference' => $reference, 'provider' => $gateway, 'checkout_url' => $checkoutUrl, 'status' => 'pending'];
         } catch (\Throwable $exception) {
-            $intent->forceFill(['status' => 'failed', 'provider_metadata' => ['initialization_error' => 'Gateway checkout could not be initialized.']])->save();
-            Transaction::query()->where('reference', 'payment-intent:'.$intent->id)->update(['status' => 'failed', 'updated_at' => now()]);
+            // A checkout that could not be initialised is terminal: close the
+            // intent and its projection through the single lifecycle writer.
+            $this->lifecycle->markTerminal($intent, \App\Enums\PaymentIntentStatus::Failed, [
+                'initialization_error' => 'Gateway checkout could not be initialized.',
+            ]);
             if ($exception instanceof \Illuminate\Http\Client\RequestException) {
                 Log::warning('Payment gateway rejected checkout initialization.', [
                     'provider' => $gateway,

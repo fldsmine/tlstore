@@ -2,20 +2,28 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\Concerns\ProvidesDemoAccountPassword;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class DemoUserSeeder extends Seeder
 {
+    use ProvidesDemoAccountPassword;
+
     public function run(): void
     {
+        $password = $this->demoAccountPassword();
+
+        if ($password === null) {
+            return;
+        }
+
         $now = now();
         $countries = ['NG', 'GH', 'KE', 'ZA', 'GB', 'US', 'CA', 'ZM', 'IN', 'AE', 'AU', 'NZ', 'UG', 'TZ', 'RW'];
         $currencies = ['NGN', 'GHS', 'KES', 'ZAR', 'GBP', 'USD', 'CAD', 'ZMW', 'INR', 'AED', 'AUD', 'NZD', 'UGX', 'TZS', 'RWF'];
         $rows = [];
-		$imgList = ['avatar/user10.jpg','avatar/user08.jpg','avatar/user07.avif','avatar/user06.png','avatar/user05.png','avatar/user04.jpg','avatar/user03.webp','avatar/user02.jpg','avatar/user01.avif'];
-        $password = (string) config('app.system_account_password');
+        $imgList = ['avatar/user10.jpg', 'avatar/user08.jpg', 'avatar/user07.avif', 'avatar/user06.png', 'avatar/user05.png', 'avatar/user04.jpg', 'avatar/user03.webp', 'avatar/user02.jpg', 'avatar/user01.avif'];
 
         for ($number = 1; $number <= 15; $number++) {
             $username = sprintf('tl_demo%02d', $number);

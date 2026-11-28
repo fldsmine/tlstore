@@ -13,12 +13,8 @@ class AdminAnnouncementsScreen extends StatefulWidget {
 }
 
 class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
-  final TextEditingController _email = TextEditingController(
-    text: 'admin@tlstore.test',
-  );
-  final TextEditingController _password = TextEditingController(
-    text: 'meandmyson',
-  );
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
   final TextEditingController _search = TextEditingController();
 
   String? _token;

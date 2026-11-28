@@ -1,0 +1,18 @@
+#!/bin/sh
+# Sandbox-only PHP entry point.
+#
+# The sandbox cannot install a system PHP (no packagist/getcomposer and no
+# distro packages), so PHP runs as the WASM build shipped by @php-wasm/cli.
+# Install it with:
+#   npm install --no-save --no-audit --no-fund @php-wasm/cli
+set -e
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+bin="$root/node_modules/.bin/php-wasm-cli"
+
+if [ ! -x "$bin" ]; then
+    echo "php-wasm-cli missing. Run: npm install --no-save @php-wasm/cli" >&2
+    exit 127
+fi
+
+exec "$bin" "$@"

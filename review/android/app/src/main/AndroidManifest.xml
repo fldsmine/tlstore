@@ -7,7 +7,7 @@
         android:allowBackup="false"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
         android:enableOnBackInvokedCallback="true">
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
@@ -79,18 +79,15 @@
             </intent-filter>
 
             <!-- Website/API links can be opened directly by TL Store. Keep these
-                 hosts aligned with the defaults in lib/config/api_config.dart. -->
+                 hosts aligned with the defaults in lib/config/api_config.dart.
+                 HTTPS only: release builds must not claim cleartext URLs. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="gptminpro.online" />
-                <data android:scheme="http" android:host="gptminpro.online" />
                 <data android:scheme="https" android:host="tlstore.org" />
-                <data android:scheme="http" android:host="tlstore.org" />
                 <data android:scheme="https" android:host="app.tlstore.org" />
-                <data android:scheme="http" android:host="app.tlstore.org" />
-                <data android:scheme="http" android:host="10.145.107.216" />
+                <data android:scheme="https" android:host="web.tlstore.org" />
             </intent-filter>
 
             <!-- ✅ APP LINKS (Requires assetlinks.json on server) -->
@@ -105,6 +102,9 @@
                 <data
                     android:scheme="https"
                     android:host="app.tlstore.org" />
+                <data
+                    android:scheme="https"
+                    android:host="web.tlstore.org" />
             </intent-filter>
 			
         </activity>

@@ -7,7 +7,7 @@
 |---|---|---|
 | **1. Proxy / VPN Package Add-on** | **UI Mock Only** | Billing & entitlement checks work, but `ProxyConnectionDialog` explicitly states *"No network tunnel is started"*; no VPN/proxy backend, WireGuard/SOCKS5 provisioning, or real IP routing exists. |
 | **2. SMS Notification Channel** | **Schema + UI Only (No Sender)** | `notification_templates` has `sms_body` and `sms_status`, Admin UI edits them, and `notifications.sms.enabled` setting is queried, **but zero SMS provider/dispatcher code exists**. |
-| **3. Guest Contact / Public Support** | **Client Form Only (No Backend)** | Flutter `ContactUs` submits to `POST /api/v1/guest-support`, which is completely unimplemented on the server. |
+| **3. Guest Contact / Public Support** | **✅ Implemented (2026-11-27)** | `POST /api/v1/guest-support` and the storefront `/contact` page now create real guest tickets, email the visitor an acknowledgement and the support inbox a notification; admin inbox shows and replies to them. See the resolution note in section 3. |
 | **4. Email Verification Flow** | **Column Only (Unimplemented)** | `users.email_verified_at` exists and OAuth sets it, **but password registration has no verification email, OTP, or `verified` middleware**. |
 | **5. Automated Payout Disbursement** | **Manual Admin Only** | Withdrawals only record manual admin settlement (`SettleWithdrawal`); no Paystack/Flutterwave/Korapay Transfer API integration exists despite bank-account resolution being wired. |
 | **6. Ad Share & Social Follow Verification** | **Honor-System / Manual / Timed** | `ClaimSocialFollowReward` credits instant bonus money on button tap without API/OAuth proof; `AutoApproveAdShares` approves shares purely on a timer without checking the submitted URL. |
@@ -38,16 +38,21 @@
   - `NotificationObserver::created()` dispatches FCM push and HTML email, **never SMS**.
   - No SMS gateway service (Twilio, Termii, Africa's Talking, Vonage, etc.) or `channel = 'sms'` delivery handler exists anywhere in `app/`.
 ---
-### 3. Guest Support / Public Contact Form Submission
+### 3. Guest Support / Public Contact Form Submission — ✅ resolved 2026-11-27
 - **Locations:**
-  - `review/lib/screens/frontend/widgets/contact_us.dart:59-84,113`
-  - `review/lib/services/auth_api.dart:1241-1253`
-  - `routes/api.php`
-- **What exists:** A full UI form (`Your Name`, `Email Address`, `Subject`, `Your Message`) in the Flutter landing page's `ContactUs` widget.
-- **What is missing:**
-  - Backend has **no `POST /api/v1/guest-support` route, controller, migration, rate limiter, or email notification**.
-  - Client `AuthApi.support()` was copy-pasted from `login()` (`return _authRequest('guest-support', ...)`), expecting an authenticated `User` + Sanctum token back and replacing the navigation stack with `HomeScreen`!
-  - Logged-in user ticket routing in `ContactUs` is disabled by `final isUser = false;` (`contact_us.dart:113`).
+  - `app/Features/Support/Http/Controllers/Api/V1/GuestSupportController.php`
+  - `app/Features/Support/Http/Controllers/Web/ContactController.php`, `resources/views/contact.blade.php`
+  - `app/Application/Actions/Support/SubmitGuestSupportTicket.php`
+  - `database/migrations/2026_11_27_110001_add_guest_fields_to_support_tickets.php`
+  - `review/lib/services/auth_api.dart`, `review/lib/screens/frontend/widgets/contact_us.dart`
+- **What exists now:**
+  - `POST /api/v1/guest-support` (public, `throttle:guest-support` = 4/min per IP, 6/hour per email) validates name/email/subject/message (+ optional category), stores a `support_tickets` row with `user_id = null`, `guest_name`, `guest_email`, `source = public_form`, IP/user-agent, and the first message with `sender_type = guest`. It answers `201` with the ticket reference.
+  - Emails: acknowledgement to the visitor and a notification to `SUPPORT_EMAIL` (`app/Mail/Support/*`), plus admin replies to guest tickets are emailed to the visitor. Delivery failures are reported, never fatal.
+  - Spam: silent honeypot (`website`), rate limiting, and a five-minute duplicate window that returns the existing ticket instead of opening a second one.
+  - Storefront: `GET /contact` renders the same form (branded page, CSRF), posting to the same action; the landing footer links to it instead of `mailto:`.
+  - Admin: the support inbox lists guest tickets with a *Guest form* badge, search matches guest name/email, and the ticket page shows the source and emails replies to the guest (no `Notification` row is created for a non-account).
+  - Flutter: `AuthApi.submitGuestSupport()` posts without a token; `ContactUs` shows the reference inline instead of navigating to `HomeScreen`, and signed-in users get the `+ Ticket` route (`isUser = widget.user.isNotEmpty`).
+- **Still open (deliberately):** the prebuilt `public/web/main.dart.js` bundle still needs a rebuild to pick up the Dart fix (`ERR-17`); guests cannot yet follow up on their own ticket without emailing.
 ---
 ### 4. Email Verification & Account Lifecycle Gaps
 - **Email Verification:**

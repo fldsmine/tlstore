@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Enums\TransactionType;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\WithdrawalRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -28,6 +30,7 @@ class AccountHistoryControllerTest extends TestCase
         $this->transaction($user, TransactionType::APP_REVIEW, 'credit', 21, 'review', now());
         $this->transaction($user, TransactionType::ADS_SHARE, 'credit', 2, 'share', now()->subDay());
         $this->transaction($user, TransactionType::WITHDRAWAL, 'debit', 3, 'topup_fund', now());
+        $this->paidWithdrawal($user, 300, 'NGN');
 
         $token = $user->createToken('account-history-test')->plainTextToken;
         $this->withToken($token)
@@ -39,6 +42,91 @@ class AccountHistoryControllerTest extends TestCase
             ->assertJsonPath('meta.stats.total', 3)
             ->assertJsonPath('meta.stats.earned_minor_by_currency.NGN', 2300)
             ->assertJsonPath('meta.stats.spent_minor_by_currency.NGN', 300);
+    }
+
+    /**
+     * Spending statistics count withdrawals that were actually paid, so the
+     * fixture has to contain the settled withdrawal request - not just its
+     * transaction projection.
+     */
+    private function paidWithdrawal(User $user, int $amountMinor, string $currency): void
+    {
+        $walletId = DB::table('wallets')->insertGetId([
+            'user_id' => $user->id,
+            'wallet_type' => 'share',
+            'currency' => $currency,
+            'balance_minor' => 0,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $optionId = DB::table('withdrawal_options')->insertGetId([
+            'option_id' => 'bank-transfer',
+            'name' => 'Bank transfer',
+            'fields' => json_encode([]),
+            'currency' => $currency,
+            'min_withdrawal' => 0,
+            'is_available' => 1,
+            'order' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        WithdrawalRequest::query()->create([
+            'user_id' => $user->id,
+            'wallet_id' => $walletId,
+            'withdrawal_option_id' => $optionId,
+            'amount_minor' => $amountMinor,
+            'fee_minor' => 0,
+            'currency' => $currency,
+            'payout_details' => ['account_number' => '0000000000'],
+            'status' => 'paid',
+            'idempotency_key' => (string) Str::uuid(),
+            'requested_at' => now(),
+            'processed_at' => now(),
+        ]);
+    }
+
+    public function test_default_page_size_is_twenty_and_fifty_rows_are_allowed(): void
+    {
+        $user = $this->historyUser('page-size-user@example.test');
+        for ($i = 0; $i < 55; $i++) {
+            $this->transaction($user, TransactionType::APP_REVIEW, 'credit', 1, 'review', now()->subMinutes($i));
+        }
+        $token = $user->createToken('history-page-size')->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me/account-history')
+            ->assertOk()
+            ->assertJsonPath('data.per_page', 20)
+            ->assertJsonCount(20, 'data.data')
+            ->assertJsonPath('data.total', 55);
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me/account-history?per_page=50')
+            ->assertOk()
+            ->assertJsonPath('data.per_page', 50)
+            ->assertJsonCount(50, 'data.data');
+
+        $this->withToken($token)
+            ->getJson('/api/v1/me/account-history?per_page=51')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('per_page');
+    }
+
+    private function historyUser(string $email): User
+    {
+        return User::query()->create([
+            'full_name' => 'History Page User',
+            'username' => 'history-page-'.substr(md5($email), 0, 8),
+            'email' => $email,
+            'country_code' => null,
+            'preferred_currency' => 'NGN',
+            'wallet_currency' => 'NGN',
+            'role' => 'reviewer',
+            'status' => 'active',
+        ]);
     }
 
     private function transaction(User $user, TransactionType $type, string $direction, float $amount, string $wallet, $createdAt): void

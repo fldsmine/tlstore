@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class ReferralAttribution extends Model
 {
+    use TrustLensMorphMap;
+
     protected $table = 'referral_attributions';
     protected $fillable = [
         'referral_code_id', 'referrer_user_id', 'referred_user_id', 'status', 'attributed_at', 'qualified_at',
@@ -34,8 +37,8 @@ class ReferralAttribution extends Model
         return $this->hasMany(ReferralReward::class);
     }
 
-    public function ledgerEntries(): HasMany
+    public function ledgerEntries(): MorphMany
     {
-        return $this->hasMany(LedgerEntry::class, 'source_id')->where('source_type', 'referral_attribution');
+        return $this->morphMany(LedgerEntry::class, 'source');
     }
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class User extends Authenticatable
 {
     use HasApiTokens;
+    use HasFactory;
     use SoftDeletes;
     use Notifiable;
 
@@ -55,6 +57,20 @@ class User extends Authenticatable
         'status' => UserStatus::class,
         'password' => 'hashed',
     ];
+
+    protected static function booted(): void
+    {
+        // `users.wallet_currency` is NOT NULL, but plenty of call sites (and the
+        // factory, before this fix) only provide `preferred_currency`. Default it
+        // here so a missing attribute can never abort an insert.
+        static::creating(function (User $user): void {
+            if (blank($user->wallet_currency)) {
+                $user->wallet_currency = strtoupper((string) (
+                    $user->preferred_currency ?: config('trustlens.default_currency', 'USD')
+                ));
+            }
+        });
+    }
 
     public function country(): BelongsTo
     {

@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Http\Controllers\Web;
 
+use App\Features\Support\Services\SupportMailer;
 use App\Models\AuditLog;
 use App\Models\Notification;
 use App\Models\SupportTicket;
@@ -14,6 +15,8 @@ use Illuminate\View\View;
 
 final class AdminSupportTicketController
 {
+    public function __construct(private readonly SupportMailer $mailer) {}
+
     public function index(Request $request): View
     {
         $this->authorizeSupportAccess();
@@ -31,6 +34,8 @@ final class AdminSupportTicketController
             $query->where(fn ($tickets) => $tickets
                 ->where('ticket_number', 'like', $term)
                 ->orWhere('subject', 'like', $term)
+                ->orWhere('guest_email', 'like', $term)
+                ->orWhere('guest_name', 'like', $term)
                 ->orWhereHas('user', fn ($user) => $user->where('email', 'like', $term)->orWhere('full_name', 'like', $term)));
         }
 
@@ -44,7 +49,7 @@ final class AdminSupportTicketController
     {
         $this->authorizeSupportAccess();
         $ticket->load(['user:id,full_name,email,username', 'messages.senderUser:id,full_name,username', 'messages.senderAdmin:id,full_name']);
-        $ticket->messages()->where('sender_type', 'user')->whereNull('read_at')->update(['read_at' => now()]);
+        $ticket->messages()->whereIn('sender_type', ['user', 'guest'])->whereNull('read_at')->update(['read_at' => now()]);
 
         return view('admin.support-tickets.show', [
             'title' => 'Support · '.$ticket->ticket_number,
@@ -65,19 +70,31 @@ final class AdminSupportTicketController
             'message' => trim($data['message']),
         ]);
         $ticket->forceFill(['status' => 'waiting_on_user', 'last_message_at' => now()])->save();
-        Notification::query()->firstOrCreate(
-            ['notification_key' => 'support-ticket-reply-'.$message->id],
-            [
-                'user_id' => $ticket->user_id,
-                'type' => 'support_ticket_reply',
-                'title' => 'Support replied: '.$ticket->ticket_number,
-                'body' => 'Our support team replied to ticket '.$ticket->ticket_number.': '.$ticket->subject,
-                'data' => ['support_ticket_id' => $ticket->id, 'support_ticket_message_id' => $message->id, 'ticket_number' => $ticket->ticket_number, 'ticket_subject' => $ticket->subject, 'reply' => $message->message],
-            ],
-        );
+
+        if ($ticket->user_id !== null) {
+            Notification::query()->firstOrCreate(
+                ['notification_key' => 'support-ticket-reply-'.$message->id],
+                [
+                    'user_id' => $ticket->user_id,
+                    'type' => 'support_ticket_reply',
+                    'title' => 'Support replied: '.$ticket->ticket_number,
+                    'body' => 'Our support team replied to ticket '.$ticket->ticket_number.': '.$ticket->subject,
+                    'data' => ['support_ticket_id' => $ticket->id, 'support_ticket_message_id' => $message->id, 'ticket_number' => $ticket->ticket_number, 'ticket_subject' => $ticket->subject, 'reply' => $message->message],
+                ],
+            );
+        } else {
+            // Guest tickets have no account to notify — the reply goes out by email.
+            $this->mailer->sendGuestReply($ticket, $message);
+        }
+
         $this->audit('support_ticket.replied', $ticket, $before, ['status' => $ticket->status]);
 
-        return redirect()->route('admin.support-tickets.show', $ticket)->with('success', 'Reply sent to the user.');
+        return redirect()->route('admin.support-tickets.show', $ticket)->with(
+            'success',
+            $ticket->user_id !== null
+                ? 'Reply sent to the user.'
+                : 'Reply emailed to '.$ticket->contactEmail().'.',
+        );
     }
 
     public function update(Request $request, SupportTicket $ticket): RedirectResponse

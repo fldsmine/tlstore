@@ -7,19 +7,18 @@ use App\Application\Actions\Moderation\DecideAdShare;
 use App\Application\Actions\Moderation\DecideManualDeposit;
 use App\Application\Actions\Moderation\DecideReviewSubmission;
 use App\Application\Actions\Moderation\SettleWithdrawal;
+use App\Features\Admin\Support\AdminAuditLogger;
 use App\Models\AdShareEvent;
 use App\Models\Admin;
 use App\Models\AppReport;
-use App\Models\AuditLog;
-use App\Models\LedgerEntry;
 use App\Models\ManualDepositSubmission;
 use App\Models\ReviewSubmission;
+use App\Models\ReviewQuestion;
 use App\Models\ReviewTemplate;
 use App\Models\ReviewTemplateVersion;
 use App\Models\ReviewTemplateVersionQuestion;
 use App\Models\User;
 use App\Models\UserCampaignOrder;
-use App\Models\Wallet;
 use App\Models\WithdrawalRequest;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
@@ -27,9 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -90,7 +87,7 @@ final class AdminConsoleController
         return view('admin.review_templates.versions', [
             'title' => 'Questionnaire versions',
             'questionnaire' => $questionnaire,
-            'questions' => \App\Models\ReviewQuestion::query()->orderBy('step_order')->orderBy('question_order')->get(),
+            'questions' => ReviewQuestion::query()->orderBy('step_order')->orderBy('question_order')->get(),
         ]);
     }
 
@@ -106,7 +103,7 @@ final class AdminConsoleController
 
         DB::transaction(function () use ($questionnaire, $data): void {
             $version = $questionnaire->versions()->create(['version' => $data['version'], 'status' => 'draft']);
-            $questions = \App\Models\ReviewQuestion::query()->whereIn('id', $data['question_ids'])
+            $questions = ReviewQuestion::query()->whereIn('id', $data['question_ids'])
                 ->orderBy('step_order')->orderBy('question_order')->get();
             foreach ($questions as $question) {
                 $version->questionLinks()->create([
@@ -161,7 +158,7 @@ final class AdminConsoleController
     public function dashboard(): View
     {
         $metrics = [
-            ['label' => 'Users', 'value' => User::query()->count(), 'icon' => 'people'],
+            ['label' => 'Users', 'value' => User::query()->count(), 'icon' => 'people', 'url' => route('admin.users.index')],
             ['label' => 'Active subscriptions', 'value' => DB::table('user_subscriptions')->where('status', 'active')->count(), 'icon' => 'subscriptions'],
             ['label' => 'Review approvals', 'value' => ReviewSubmission::query()->where('status', 'pending_review')->count(), 'icon' => 'reviews'],
             ['label' => 'Ad shares', 'value' => AdShareEvent::query()->where('status', 'pending_validation')->count(), 'icon' => 'campaign'],
@@ -198,13 +195,6 @@ final class AdminConsoleController
         if (! empty($definition['with_count'])) {
             $query->withCount($definition['with_count']);
         }
-        if ($prototype instanceof User) {
-            $query->withTrashed();
-            if (! $request->boolean('include_deleted')) {
-                $query->whereNull('deleted_at');
-            }
-        }
-
         $searchable = $definition['search'] ?? [];
         if ($request->filled('q') && $searchable !== []) {
             $needle = '%'.trim((string) $request->query('q')).'%';
@@ -234,7 +224,6 @@ final class AdminConsoleController
         $definition = $this->module($module);
         $this->authorizeModule($module);
         abort_unless($definition['can_create'], 403);
-        abort_if($module === 'users' && ! in_array(Auth::guard('admin')->user()?->role, ['super_admin', 'admin'], true), 403);
         abort_if($definition['fields'] === [], 403);
 
         return view('admin.modules.form', [
@@ -274,7 +263,6 @@ final class AdminConsoleController
         $definition = $this->module($module);
         $this->authorizeModule($module);
         abort_unless($definition['can_create'], 403);
-        abort_if($module === 'users' && ! in_array(Auth::guard('admin')->user()?->role, ['super_admin', 'admin'], true), 403);
         abort_if($definition['fields'] === [], 403);
         $recordModel = $definition['model']::query()->findOrFail($record);
         if ($recordModel instanceof User) {
@@ -296,7 +284,6 @@ final class AdminConsoleController
     {
         $definition = $this->module($module);
         $this->authorizeModule($module);
-        abort_if($module === 'users' && ! in_array(Auth::guard('admin')->user()?->role, ['super_admin', 'admin'], true), 403);
         abort_if($definition['fields'] === [], 403);
         $modelClass = $definition['model'];
         $recordModel = $modelClass::query()->findOrFail($record);
@@ -405,123 +392,6 @@ final class AdminConsoleController
         return back()->with('success', 'The moderation decision was recorded.');
     }
 
-    public function userDetail(int $user): View
-    {
-        $this->authorizeModule('users');
-        $account = User::withTrashed()->with(['country', 'wallets', 'payoutProfile.option', 'socialAccounts'])
-            ->findOrFail($user);
-
-        return view('admin.users.show', [
-            'title' => 'User account',
-            'account' => $account,
-            'subscriptions' => $account->subscriptions()->with('plan.group')->latest()->limit(20)->get(),
-            'transactions' => $account->transactions()->latest()->limit(25)->get(),
-            'withdrawals' => $account->withdrawalRequests()->with('option')->latest()->limit(15)->get(),
-            'referrals' => $account->sentReferrals()->with('referredUser:id,username,email,status')->latest()->limit(20)->get(),
-            'tasks' => $account->reviewTasks()->with('campaign.app')->latest()->limit(10)->get(),
-        ]);
-    }
-
-    public function userAction(Request $request, int $user, string $action): RedirectResponse
-    {
-        $this->authorizeModule('users');
-        $account = User::withTrashed()->findOrFail($user);
-        $admin = Auth::guard('admin')->user();
-
-        if ($action === 'wallet-adjustment') {
-            abort_unless(in_array($admin->role, ['super_admin', 'admin', 'finance'], true), 403);
-            $data = $request->validate([
-                'wallet_type' => ['required', Rule::in(['review', 'review_group_b', 'review_group_c', 'share', 'referral', 'topup_fund', 'bonus'])],
-                'direction' => ['required', Rule::in(['credit', 'debit'])],
-                'amount_minor' => ['required', 'integer', 'min:1', 'max:100000000000'],
-                'reason' => ['required', 'string', 'min:4', 'max:500'],
-            ]);
-            if ($account->trashed()) {
-                throw ValidationException::withMessages(['user' => 'A deleted account cannot be adjusted.']);
-            }
-            $currency = strtoupper((string) ($account->wallet_currency ?: $account->preferred_currency ?: 'USD'));
-            DB::transaction(function () use ($account, $admin, $data, $currency): void {
-                $wallet = Wallet::query()->firstOrCreate([
-                    'user_id' => $account->id,
-                    'wallet_type' => $data['wallet_type'],
-                    'currency' => $currency,
-                ], ['status' => 'active']);
-                $wallet = Wallet::query()->lockForUpdate()->findOrFail($wallet->id);
-                $amount = (int) $data['amount_minor'];
-                if ($data['direction'] === 'debit' && (int) $wallet->balance_minor < $amount) {
-                    throw ValidationException::withMessages(['amount_minor' => 'This wallet does not have enough available funds.']);
-                }
-                $entry = LedgerEntry::query()->create([
-                    'wallet_id' => $wallet->id,
-                    'entry_type' => 'admin_adjustment',
-                    'direction' => $data['direction'],
-                    'amount_minor' => $amount,
-                    'status' => 'posted',
-                    'source_type' => 'user',
-                    'source_id' => $account->id,
-                    'idempotency_key' => 'admin-wallet:'.hash('sha256', $admin->id.'|'.$account->id.'|'.Str::uuid()),
-                    'description' => $data['reason'],
-                    'metadata' => ['admin_id' => $admin->id, 'reason' => $data['reason']],
-                    'available_at' => now(),
-                    'posted_at' => now(),
-                ]);
-                $this->audit('user.wallet_adjusted', $account, null, [
-                    'wallet_id' => $wallet->id,
-                    'wallet_type' => $data['wallet_type'],
-                    'direction' => $data['direction'],
-                    'amount_minor' => $amount,
-                    'currency' => $currency,
-                    'ledger_entry_id' => $entry->id,
-                    'reason' => $data['reason'],
-                ]);
-            });
-
-            return back()->with('success', "Wallet updated in the user’s {$currency} currency.");
-        }
-
-        if ($action === 'ban' || $action === 'unban') {
-            abort_unless(in_array($admin->role, ['super_admin', 'admin', 'moderator'], true), 403);
-            $data = $request->validate(['reason' => [$action === 'ban' ? 'required' : 'nullable', 'string', 'min:4', 'max:2000']]);
-            $before = ['is_banned' => $account->is_banned, 'status' => $account->status?->value, 'ban_reason' => $account->ban_reason];
-            $account->forceFill($action === 'ban'
-                ? ['is_banned' => true, 'status' => 'banned', 'ban_reason' => $data['reason']]
-                : ['is_banned' => false, 'status' => 'active', 'ban_reason' => null])->save();
-            $account->tokens()->delete();
-            $this->audit('user.'.$action, $account, $before, ['reason' => $data['reason'] ?? null]);
-
-            return back()->with('success', $action === 'ban' ? 'User banned and API sessions revoked.' : 'User unbanned and API sessions revoked.');
-        }
-
-        if ($action === 'reset-password') {
-            abort_unless(in_array($admin->role, ['super_admin', 'admin'], true), 403);
-            abort_if($account->trashed(), 422);
-            $temporaryPassword = Str::password(20);
-            $account->forceFill(['password' => Hash::make($temporaryPassword)])->save();
-            $account->tokens()->delete();
-            $this->audit('user.password_reset_by_admin', $account, null, ['tokens_revoked' => true]);
-
-            return back()->with('temporary_password', $temporaryPassword)
-                ->with('success', 'Temporary password created. Copy it now; it is shown once.');
-        }
-
-        if ($action === 'delete' || $action === 'restore') {
-            abort_unless(in_array($admin->role, ['super_admin', 'admin'], true), 403);
-            if ($action === 'delete' && ! $account->trashed()) {
-                $account->tokens()->delete();
-                $account->delete();
-                $this->audit('user.deleted_by_admin', $account, null, ['soft_deleted_at' => $account->deleted_at?->toISOString()]);
-            } elseif ($action === 'restore' && $account->trashed()) {
-                $account->restore();
-                $account->forceFill(['status' => 'active', 'is_banned' => false, 'ban_reason' => null])->save();
-                $this->audit('user.restored_by_admin', $account, null, ['status' => 'active']);
-            }
-
-            return redirect()->route('admin.users.show', $account->id)->with('success', 'User account updated.');
-        }
-
-        abort(404);
-    }
-
     private function decideAppReport(Admin $admin, int $id, array $data): AppReport
     {
         $report = AppReport::query()->findOrFail($id);
@@ -560,8 +430,8 @@ final class AdminConsoleController
         }
         $allowed = match ($role) {
             'content_admin' => ['apps', 'review-campaigns', 'ads', 'subscription-groups', 'subscription-plans', 'package-addons', 'review-questions', 'review-templates', 'announcements', 'faqs', 'testimonials', 'legal-documents', 'countries', 'regions', 'region-countries', 'social-handles', 'app-versions'],
-            'moderator' => ['review-moderation', 'share-moderation', 'social-follow-activity', 'app-reports', 'campaign-orders', 'users'],
-            'finance' => ['deposit-moderation', 'withdrawal-moderation', 'payment-options', 'withdrawal-options', 'banks', 'users'],
+            'moderator' => ['review-moderation', 'share-moderation', 'social-follow-activity', 'app-reports', 'campaign-orders'],
+            'finance' => ['deposit-moderation', 'withdrawal-moderation', 'payment-options', 'withdrawal-options', 'banks'],
             default => [],
         };
         abort_unless(in_array($module, $allowed, true), 403);
@@ -659,38 +529,6 @@ final class AdminConsoleController
 
     private function audit(string $action, Model $entity, ?array $before, ?array $after): void
     {
-        $redact = static function (?array $values): ?array {
-            if ($values === null) {
-                return $values;
-            }
-
-            $walk = static function (mixed $value) use (&$walk): mixed {
-                if (! is_array($value)) {
-                    return $value;
-                }
-                foreach ($value as $key => $item) {
-                    if (preg_match('/secret|token|password|private.?key|api.?key|credential/i', (string) $key)) {
-                        $value[$key] = '[redacted]';
-                    } else {
-                        $value[$key] = $walk($item);
-                    }
-                }
-
-                return $value;
-            };
-
-            return $walk($values);
-        };
-
-        AuditLog::query()->create([
-            'audit_key' => (string) Str::uuid(),
-            'actor_admin_id' => Auth::guard('admin')->id(),
-            'action' => $action,
-            'entity_type' => class_basename($entity),
-            'entity_id' => (string) $entity->getKey(),
-            'before_values' => $redact($before),
-            'after_values' => $redact($after),
-            'created_at' => now(),
-        ]);
+        app(AdminAuditLogger::class)->log($action, $entity, $before, $after);
     }
 }

@@ -15,7 +15,7 @@
     @forelse($tickets as $ticket)
         <tr>
             <td><strong>{{ $ticket->subject }}</strong><div class="muted mono">{{ $ticket->ticket_number }}</div></td>
-            <td>{{ $ticket->user?->full_name ?: $ticket->user?->username }}<div class="muted">{{ $ticket->user?->email }}</div></td>
+            <td>{{ $ticket->ownerName() }}@if($ticket->isGuest()) <span class="badge gold">Guest form</span>@endif<div class="muted">{{ $ticket->contactEmail() ?: '—' }}</div></td>
             <td>{{ str($ticket->category)->replace('_',' ')->title() }}</td>
             <td><span class="badge {{ in_array($ticket->status,['resolved','closed'],true)?'green':(in_array($ticket->status,['open','in_progress'],true)?'gold':'') }}">{{ str($ticket->status)->replace('_',' ')->title() }}</span></td>
             <td>{{ $ticket->last_message_at?->format('Y-m-d H:i') ?? $ticket->created_at?->format('Y-m-d H:i') }}</td>

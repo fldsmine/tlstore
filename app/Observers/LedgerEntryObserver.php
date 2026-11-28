@@ -3,6 +3,9 @@
 namespace App\Observers;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Payments\PaymentIntentLifecycle;
+use App\Enums\LedgerEntryStatus;
+use App\Enums\TransactionStatus;
 use App\Models\LedgerEntry;
 use App\Models\Transaction;
 use App\Models\Wallet;
@@ -30,6 +33,56 @@ final class LedgerEntryObserver
             $this->balanceImpact($newDirection, $newStatus, $newAmount),
         );
         $this->sync($entry);
+    }
+
+    /**
+     * Project the *activity* a ledger entry belongs to onto the canonical
+     * transaction vocabulary. Reward rows legitimately carry workflow states
+     * (`submitted`, `pending_validation`, …) that must never leak into
+     * `transactions.status`.
+     */
+    private function activityStatus(LedgerEntry $entry, string $fallback): string
+    {
+        $entryType = (string) $entry->entry_type;
+
+        // A refund is money actually returned to the wallet: the credit is
+        // settled even though the campaign it reverses is `rejected`.
+        if (str_contains($entryType, 'refund')) {
+            return $entry->status === LedgerEntryStatus::Posted
+                ? TransactionStatus::Completed->value
+                : $fallback;
+        }
+
+        $sourceStatus = strtolower((string) ($entry->source?->status?->value ?? $entry->source?->status ?? ''));
+
+        return match ($entry->source_type) {
+            'review_submission' => match ($sourceStatus) {
+                'approved' => TransactionStatus::Approved->value,
+                'rejected' => TransactionStatus::Rejected->value,
+                'submitted', 'under_review', 'pending_review', 'needs_information', '' => TransactionStatus::Pending->value,
+                default => $fallback,
+            },
+            'ad_share_event' => match ($sourceStatus) {
+                'validated' => TransactionStatus::Approved->value,
+                'rejected' => TransactionStatus::Rejected->value,
+                'pending_validation', 'pending', '' => TransactionStatus::Pending->value,
+                default => $fallback,
+            },
+            'user_campaign_order' => match ($sourceStatus) {
+                'approved', 'active' => TransactionStatus::Approved->value,
+                'rejected' => TransactionStatus::Rejected->value,
+                'ended', 'exhausted', 'paused', 'archived' => TransactionStatus::Completed->value,
+                default => TransactionStatus::Pending->value,
+            },
+            'payment_intent' => $entry->source?->provider === 'manual'
+                ? match ($sourceStatus) {
+                    'paid' => TransactionStatus::Approved->value,
+                    'failed', 'cancelled', 'expired' => TransactionStatus::Rejected->value,
+                    default => TransactionStatus::Pending->value,
+                }
+                : $fallback,
+            default => $fallback,
+        };
     }
 
     private function balanceImpact(string $direction, string $status, int $amount): int
@@ -77,12 +130,10 @@ final class LedgerEntryObserver
             default => 'fund_transfer',
         };
 
-        $transactionStatus = match (true) {
-            str_contains($entry->entry_type, 'vtu') && $entry->status->value === 'reserved' => 'pending',
-            str_contains($entry->entry_type, 'vtu') && $entry->status->value === 'posted' => 'completed',
-            str_contains($entry->entry_type, 'vtu') && $entry->status->value === 'reversed' => 'failed',
-            default => $entry->status->value,
-        };
+        // Ledger statuses translate one-to-one onto the canonical transaction
+        // vocabulary (`posted` is a ledger status, `completed` is its
+        // transaction projection).
+        $transactionStatus = TransactionStatus::fromLedger($entry->status)->value;
 
         $reference = match (true) {
             $entry->entry_type === 'review_reward' && $entry->source_type === 'review_submission'
@@ -90,31 +141,16 @@ final class LedgerEntryObserver
             $entry->entry_type === 'ad_share_reward' && $entry->source_type === 'ad_share_event'
                 => 'ad-share-event:'.$entry->source_id,
             $entry->source_type === 'payment_intent'
-                => 'payment-intent:'.$entry->source_id,
-            $entry->source_type === 'user_campaign_order' && ! str_contains($entry->entry_type, 'refund')
+                => PaymentIntentLifecycle::transactionReference((int) $entry->source_id),
+            $entry->source_type === 'user_campaign_order' && str_contains($entry->entry_type, 'refund')
+                => 'campaign-order-refund:'.$entry->source_id,
+            $entry->source_type === 'user_campaign_order'
                 => 'campaign-order:'.$entry->source_id,
             default => 'ledger:'.$entry->id,
         };
         $existing = Transaction::query()->where('reference', $reference)->first();
 
-        $activityStatus = match ($entry->source_type) {
-            'review_submission' => $entry->source?->status?->value ?? $entry->source?->status ?? $transactionStatus,
-            'ad_share_event' => match ($entry->source?->status?->value ?? $entry->source?->status) {
-                'validated' => 'approved',
-                'rejected' => 'rejected',
-                'pending_validation' => 'pending',
-                default => $transactionStatus,
-            },
-            'user_campaign_order' => $entry->source?->status ?? $transactionStatus,
-            'payment_intent' => ($entry->source?->provider === 'manual')
-                ? match ($entry->source?->status?->value ?? $entry->source?->status) {
-                    'paid' => 'approved',
-                    'failed', 'cancelled', 'expired' => 'rejected',
-                    default => 'pending',
-                }
-                : $transactionStatus,
-            default => $transactionStatus,
-        };
+        $activityStatus = $this->activityStatus($entry, $transactionStatus);
 
         $withdrawal = $entry->source_type === 'withdrawal_request' ? $entry->source : null;
         $withdrawalFeeMinor = $withdrawal ? (int) $withdrawal->fee_minor : 0;
@@ -143,6 +179,7 @@ final class LedgerEntryObserver
                     'currency_minor_units' => CurrencyMinorUnits::precision($currency),
                     'amount_minor' => $entry->amount_minor,
                     'entry_type' => $entry->entry_type,
+                    'refund' => str_contains((string) $entry->entry_type, 'refund'),
                     'source_type' => $entry->source_type,
                     'source_id' => $entry->source_id,
                     ...($entry->source_type === 'withdrawal_request' ? [

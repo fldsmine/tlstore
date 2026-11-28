@@ -44,8 +44,19 @@
 		<true/>
 		<key>NSAppTransportSecurity</key>
 		<dict>
-			<key>NSAllowsArbitraryLoads</key>
+			<!-- Release builds are HTTPS-only. Local development may reach a
+			     localhost / LAN dev server; arbitrary insecure loads are banned
+			     (ERR-27). -->
+			<key>NSAllowsLocalNetworking</key>
 			<true/>
+			<key>NSExceptionDomains</key>
+			<dict>
+				<key>localhost</key>
+				<dict>
+					<key>NSExceptionAllowsInsecureHTTPLoads</key>
+					<true/>
+				</dict>
+			</dict>
 		</dict>
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>TL Store saves your withdrawal receipt image to your photo library.</string>

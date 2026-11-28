@@ -27,7 +27,6 @@ use App\Models\SubscriptionGroup;
 use App\Models\SubscriptionPlan;
 use App\Models\SystemSetting;
 use App\Models\Testimonial;
-use App\Models\User;
 use App\Models\UserCampaignOrder;
 use App\Models\UserRankLevel;
 use App\Models\WithdrawalOption;
@@ -58,10 +57,6 @@ return [
             $field('role', 'Role', 'select', true, ['super_admin' => 'Super administrator', 'admin' => 'Administrator', 'content_admin' => 'Content administrator', 'moderator' => 'Moderator', 'finance' => 'Finance']),
             $field('status', 'Status', 'select', true, ['active' => 'Active', 'inactive' => 'Inactive']),
         ], ['deletable' => false, 'search' => ['full_name', 'email']]),
-        'users' => $module('Users', User::class, ['id', 'full_name', 'username', 'email', 'country_code', 'preferred_currency', 'status', 'created_at'], [
-            $field('full_name', 'Full name'), $field('username', 'Username'), $field('email', 'Email', 'email', true),
-            $field('phone', 'Phone'), $field('avatar', 'Avatar URL'), $field('cover_image', 'Cover image URL'),
-        ], ['deletable' => false, 'can_create' => false, 'search' => ['full_name', 'username', 'email', 'phone']]),
         'apps' => $module('App catalog', StoreApp::class, ['id', 'name', 'store', 'developer', 'status', 'featured', 'maximum_review'], [
             $field('name', 'App name', 'text', true), $field('short_code', 'Short code', 'text', true),
             $field('store', 'Store', 'select', true, ['Google Play' => 'Google Play', 'Apple App Store' => 'Apple App Store', 'Samsung Galaxy Store' => 'Samsung Galaxy Store']),

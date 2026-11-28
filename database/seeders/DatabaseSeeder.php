@@ -17,16 +17,18 @@ class DatabaseSeeder extends Seeder
             NotificationTemplateSeeder::class,
             AboutPageSettingsSeeder::class,
             SubscriptionGroupSeeder::class,
+            // Add-on defaults are feature configuration, not demo activity, so
+            // they are seeded in every environment (existing production
+            // subscription plan records need them too).
+            PackageAddonSeeder::class,
         ]);
 
-        // Everything below is demo content. It is only safe to insert in
-        // non-production environments.
-        //if (! app()->environment(['local', 'testing', 'staging'])) {
-            // Add-on defaults are feature configuration, not demo activity.
-            // Seed them for existing production subscription plan records too.
-            $this->call(PackageAddonSeeder::class);
-        //    return;
-        //}
+        // Everything below is demo content. It is only safe to insert outside
+        // production: it creates demo administrators, demo users, synthetic
+        // wallet balances and sample platform activity.
+        if (! app()->environment(['local', 'testing', 'staging'])) {
+            return;
+        }
 
         $this->call([
             UserRankLevelSeeder::class,
@@ -39,7 +41,6 @@ class DatabaseSeeder extends Seeder
             WithdrawalOptionSeeder::class,
             ExchangeRateSnapshotSeeder::class,
             SubscriptionPlanSeeder::class,
-            PackageAddonSeeder::class,
             DemoUserSeeder::class,
             SocialHandleSeeder::class,
             SocialFollowSeeder::class,
@@ -50,7 +51,7 @@ class DatabaseSeeder extends Seeder
             AnnouncementSeeder::class,
             DemoPlatformActivitySeeder::class,
             PaymentOptionSeeder::class,
-			WalletCreditSeeder::class,
+            WalletCreditSeeder::class,
             WalletBalanceSyncSeeder::class,
         ]);
     }

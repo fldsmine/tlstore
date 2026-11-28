@@ -2,6 +2,7 @@
 
 namespace App\Features\Support\Http\Controllers\Api\V1;
 
+use App\Features\Support\Services\SupportMailer;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
 use App\Models\Notification;
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 final class SupportTicketController
 {
+    public function __construct(private readonly SupportMailer $mailer) {}
+
     private const CATEGORIES = ['general', 'account', 'payments', 'subscriptions', 'app_reviews', 'ad_shares', 'vas', 'other'];
     private const STATUSES = ['open', 'in_progress', 'waiting_on_user', 'resolved', 'closed'];
 
@@ -97,15 +100,20 @@ final class SupportTicketController
             $search = '%'.$request->string('search')->toString().'%';
             $query->where(fn ($builder) => $builder->where('ticket_number', 'like', $search)
                 ->orWhere('subject', 'like', $search)
+                ->orWhere('guest_email', 'like', $search)
+                ->orWhere('guest_name', 'like', $search)
                 ->orWhereHas('user', fn ($userQuery) => $userQuery->where('email', 'like', $search)->orWhere('full_name', 'like', $search)));
         }
-        return response()->json(['data' => $query->paginate(min(100, max(1, $request->integer('per_page', 30))))]);
+        $tickets = $query->paginate(min(100, max(1, $request->integer('per_page', 30))))
+            ->through(fn (SupportTicket $ticket): array => $this->serializeListRow($ticket));
+
+        return response()->json(['data' => $tickets]);
     }
 
     public function adminShow(SupportTicket $ticket): JsonResponse
     {
         $ticket->load(['user:id,full_name,email,username', 'messages.senderUser:id,full_name,username', 'messages.senderAdmin:id,full_name']);
-        $ticket->messages()->where('sender_type', 'user')->whereNull('read_at')->update(['read_at' => now()]);
+        $ticket->messages()->whereIn('sender_type', ['user', 'guest'])->whereNull('read_at')->update(['read_at' => now()]);
         return response()->json(['data' => $this->serialize($ticket)]);
     }
 
@@ -122,17 +130,25 @@ final class SupportTicketController
                 'message' => trim($data['message']),
             ]);
             $ticket->forceFill(['status' => 'waiting_on_user', 'last_message_at' => now()])->save();
-            Notification::query()->firstOrCreate(
-                ['notification_key' => 'support-ticket-reply-'.$message->id],
-                [
-                    'user_id' => $ticket->user_id,
-                    'type' => 'support_ticket_reply',
-                    'title' => 'Support replied: '.$ticket->ticket_number,
-                    'body' => 'Our support team replied to ticket '.$ticket->ticket_number.': '.$ticket->subject,
-                    'data' => ['support_ticket_id' => $ticket->id, 'support_ticket_message_id' => $message->id, 'ticket_number' => $ticket->ticket_number, 'ticket_subject' => $ticket->subject, 'reply' => $message->message],
-                ],
-            );
+
+            if ($ticket->user_id !== null) {
+                Notification::query()->firstOrCreate(
+                    ['notification_key' => 'support-ticket-reply-'.$message->id],
+                    [
+                        'user_id' => $ticket->user_id,
+                        'type' => 'support_ticket_reply',
+                        'title' => 'Support replied: '.$ticket->ticket_number,
+                        'body' => 'Our support team replied to ticket '.$ticket->ticket_number.': '.$ticket->subject,
+                        'data' => ['support_ticket_id' => $ticket->id, 'support_ticket_message_id' => $message->id, 'ticket_number' => $ticket->ticket_number, 'ticket_subject' => $ticket->subject, 'reply' => $message->message],
+                    ],
+                );
+            }
         });
+
+        // A guest has no account inbox; the reply leaves by email after commit.
+        if ($ticket->user_id === null) {
+            $this->mailer->sendGuestReply($ticket, $ticket->messages()->latest('id')->first());
+        }
         return response()->json(['data' => $this->serialize($ticket->fresh(['user:id,full_name,email,username', 'messages.senderUser:id,full_name,username', 'messages.senderAdmin:id,full_name']))]);
     }
 
@@ -147,6 +163,22 @@ final class SupportTicketController
         return response()->json(['data' => $this->serialize($ticket->fresh(['user:id,full_name,email,username', 'messages']))]);
     }
 
+    /**
+     * Admin list rows keep the shape the mobile admin app already consumes and
+     * add the `guest` block, so a contact-form ticket is identifiable in the list.
+     *
+     * @return array<string, mixed>
+     */
+    private function serializeListRow(SupportTicket $ticket): array
+    {
+        $row = $ticket->toArray();
+        $row['guest'] = $ticket->user_id === null
+            ? ['name' => $ticket->guest_name, 'email' => $ticket->guest_email]
+            : null;
+
+        return $row;
+    }
+
     private function serialize(SupportTicket $ticket): array
     {
         $ticket->loadMissing(['user:id,full_name,email,username', 'messages.senderUser:id,full_name,username', 'messages.senderAdmin:id,full_name']);
@@ -155,6 +187,7 @@ final class SupportTicketController
             'ticket_number' => $ticket->ticket_number,
             'subject' => $ticket->subject,
             'category' => $ticket->category,
+            'source' => $ticket->source ?? SupportTicket::SOURCE_USER,
             'status' => $ticket->status,
             'priority' => $ticket->priority,
             'last_message_at' => $ticket->last_message_at,
@@ -166,12 +199,20 @@ final class SupportTicketController
                 'username' => $ticket->user->username,
                 'email' => $ticket->user->email,
             ] : null,
+            // Guest tickets are owned by whoever typed the form in; the address is
+            // only echoed to administrators, never to another user's ticket list.
+            'guest' => $ticket->user_id === null ? [
+                'name' => $ticket->guest_name,
+                'email' => $ticket->guest_email,
+            ] : null,
             'messages' => $ticket->messages->map(fn (SupportTicketMessage $message) => [
                 'id' => $message->id,
                 'sender_type' => $message->sender_type,
-                'sender_name' => $message->sender_type === 'admin'
-                    ? ($message->senderAdmin?->full_name ?? 'TLStore Support')
-                    : ($message->senderUser?->full_name ?? $ticket->user?->full_name ?? 'You'),
+                'sender_name' => match ($message->sender_type) {
+                    'admin' => $message->senderAdmin?->full_name ?? 'TLStore Support',
+                    'guest' => $ticket->guest_name ?: 'Guest',
+                    default => $message->senderUser?->full_name ?? $ticket->user?->full_name ?? 'You',
+                },
                 'message' => $message->message,
                 'read_at' => $message->read_at,
                 'created_at' => $message->created_at,

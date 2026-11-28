@@ -3,6 +3,7 @@
 namespace App\Application\Actions\Wallets;
 
 use App\Application\Money\CurrencyMinorUnits;
+use App\Application\Money\WithdrawalSchedule;
 use App\Application\Money\CurrencyConverter;
 use App\Models\LedgerEntry;
 use App\Models\Notification;
@@ -12,7 +13,9 @@ use App\Models\UserSubscription;
 use App\Models\WithdrawalOption;
 use App\Models\WithdrawalRequest as Withdrawal;
 use App\Models\SystemSetting;
+use App\Jobs\SendWithdrawalTelegramNotificationJob;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 final class RequestWithdrawal
@@ -21,7 +24,9 @@ final class RequestWithdrawal
 
     public function handle(User $user, int $walletId, int $optionId, int $amountMinor, array $payoutDetails, string $idempotencyKey): Withdrawal
     {
-        return DB::transaction(function () use ($user, $walletId, $optionId, $amountMinor, $payoutDetails, $idempotencyKey): Withdrawal {
+        $created = false;
+
+        $withdrawal = DB::transaction(function () use ($user, $walletId, $optionId, $amountMinor, $payoutDetails, $idempotencyKey, &$created): Withdrawal {
             $existing = Withdrawal::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existing) {
                 if ($existing->user_id !== $user->id) {
@@ -63,8 +68,8 @@ final class RequestWithdrawal
             }
             $plan = $subscription?->plan;
             $withdrawalDays = $plan?->withdrawal_days ?? [];
-            if (! $isReferralOrBonusWallet && ! $this->isWithdrawalDay($withdrawalDays, now())) {
-                throw ValidationException::withMessages(['withdrawal' => 'Your package allows withdrawals on: '.implode(' and ', $withdrawalDays).'.']);
+            if (! $isReferralOrBonusWallet && ! WithdrawalSchedule::allows($withdrawalDays, now())) {
+                throw ValidationException::withMessages(['withdrawal' => 'Your package allows withdrawals on: '.WithdrawalSchedule::describe($withdrawalDays).'.']);
             }
             $requiredFields = $option->fields ?? [];
             $payoutDetails = array_intersect_key($payoutDetails, array_flip($requiredFields));
@@ -115,6 +120,7 @@ final class RequestWithdrawal
                 'payout_details' => $payoutDetails, 'status' => 'pending', 'idempotency_key' => $idempotencyKey,
                 'requested_at' => now(),
             ]);
+            $created = true;
             LedgerEntry::query()->create([
                 'wallet_id' => $wallet->id, 'entry_type' => 'withdrawal_reservation', 'direction' => 'debit',
                 'amount_minor' => $amountMinor, 'status' => 'reserved', 'source_type' => 'withdrawal_request',
@@ -153,18 +159,28 @@ final class RequestWithdrawal
 
             return $withdrawal->load('option');
         });
-    }
 
-    private function isWithdrawalDay(array $days, \Illuminate\Support\Carbon $date): bool
-    {
-        if ($days === []) return true;
-        foreach ($days as $day) {
-            $day = strtolower(trim((string) $day));
-            if (preg_match('/^monthly\s+(\d{1,2})(?:st|nd|rd|th)?$/', $day, $matches) && $date->day === (int) $matches[1]) return true;
-            if (strtolower($date->englishDayOfWeek) === $day) return true;
+        if ($created) {
+            $this->notifyTelegram($withdrawal);
         }
 
-        return false;
+        return $withdrawal;
+    }
+
+    /**
+     * Telegram is a side-channel: its failure must never surface to the user or
+     * roll back a request that has already been recorded and reserved.
+     */
+    private function notifyTelegram(Withdrawal $withdrawal): void
+    {
+        try {
+            SendWithdrawalTelegramNotificationJob::dispatch($withdrawal->id);
+        } catch (\Throwable $error) {
+            Log::warning('telegram.withdrawal_notification_dispatch_failed', [
+                'withdrawal_id' => $withdrawal->id,
+                'error' => $error->getMessage(),
+            ]);
+        }
     }
 
     private function walletWithdrawalsEnabled(string $walletType): bool

@@ -18,6 +18,14 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # Only the front controller (index.php) and the gateway return bridge
+    # (redirect.php) are allowed to execute PHP from the document root.
+    # Anything else - a dropped adminer.php, a web shell, a leftover export
+    # script - must be unreachable even if it lands in public/.
+    RewriteCond %{REQUEST_URI} !^/index\.php$ [NC]
+    RewriteCond %{REQUEST_URI} !^/redirect\.php$ [NC]
+    RewriteRule (^|/)\.?[^/]*\.(php[0-9]?|phtml|phar|pht|inc)$ - [F,L,NC]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f

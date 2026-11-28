@@ -1,6 +1,11 @@
 @extends('admin.layout')
 @section('content')
 <div class="eyebrow">{{ $record ? 'Edit record' : 'New record' }}</div><h2 class="page-title">{{ $title }}</h2><p class="page-subtitle">Values are validated before saving. Use JSON fields for structured configuration.</p>
+@if($module === 'system-settings')
+<section class="card" style="margin-bottom:16px">
+    <div class="section-head"><div><h2>Editing raw JSON</h2><p class="muted" style="margin:4px 0 0">A system setting is stored as JSON. The settings console edits the same value with a typed control and keeps the format the app expects.</p></div><a class="button" href="{{ route('admin.settings.index') }}">Open settings console</a></div>
+</section>
+@endif
 <form class="card" method="POST" enctype="multipart/form-data" action="{{ $record ? route('admin.modules.update',[$module,$record->getKey()]) : route('admin.modules.store',$module) }}">@csrf @if($record)@method('PATCH')@endif
 <div class="form-grid">@foreach($definition['fields'] as $field)@php($name=$field['name'])@php($value=old($name,data_get($record,$name)))@php($value=$value instanceof \BackedEnum?$value->value:$value)@php($value=$value instanceof \Carbon\CarbonInterface?($field['type']==='datetime'?$value->format('Y-m-d\\TH:i'):($field['type']==='date'?$value->format('Y-m-d'):$value->toDateTimeString())):$value)@php($value=is_array($value)||is_object($value)?json_encode($value,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES):$value)
 <div class="field {{ in_array($field['type'],['textarea','json','images'],true)?'full':'' }}">@if($field['type']==='boolean')<label class="checkline"><input type="checkbox" name="{{ $name }}" value="1" @checked((bool)$value)> {{ $field['label'] }}</label>

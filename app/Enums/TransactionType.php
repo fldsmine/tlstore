@@ -2,8 +2,6 @@
 
 namespace App\Enums;
 
-use Illuminate\Support\Str;
-
 enum TransactionType: string
 {
     case ADS_SHARE = 'ads_share';
@@ -24,17 +22,16 @@ enum TransactionType: string
         return match ($this) {
             self::VTU_PURCHASE => 'VTU Payment',
             self::CAMPAIGN_ORDER => 'Campaign order',
-            self::RANK_EARNING => 'Salary Salary',
+            self::RANK_EARNING => 'Rank reward',
             self::FUND_TRANSFER => 'Account Topup',
             self::SUBSCRIPTION_PLAN => 'Package Purchase',
             self::PACKAGE_ADDON => 'Package Add-on',
             self::WITHDRAWAL => 'Cash withdrawal',
             self::TOP_UP_FUND => 'Account Top-up',
-            self::REFERRAL_BONUS => 'Referal Reward',
+            self::REFERRAL_BONUS => 'Referral reward',
             self::SOCIAL_FOLLOW_REWARD => 'Social follow reward',
             self::APP_REVIEW => 'App Review',
             self::ADS_SHARE => 'Share Ads',
-            default => Str::headline($this->value),
         };
     }
 
@@ -42,7 +39,6 @@ enum TransactionType: string
     public function isGatewayCharge(): bool
     {
         return in_array($this, [
-            self::VTU_PURCHASE,
             self::SUBSCRIPTION_PLAN,
             self::PACKAGE_ADDON,
             self::TOP_UP_FUND,
@@ -78,7 +74,6 @@ enum TransactionType: string
             self::RANK_EARNING => 'ri-exchange-funds-line',
             self::VTU_PURCHASE => 'ri-shopping-bag-line',
             self::CAMPAIGN_ORDER => 'ri-megaphone-line',
-            default => 'ri-exchange-line',
         };
     }
 

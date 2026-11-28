@@ -22,7 +22,6 @@ class _AdminAppReportsScreenState extends State<AdminAppReportsScreen> {
   @override
   void initState() {
     super.initState();
-    _email.text = 'admin@tlstore.test';
   }
 
   @override

@@ -74,7 +74,7 @@ class GroupADailyShareRevenueTest extends TestCase
     {
         $this->seed(\Database\Seeders\SubscriptionPlanSeeder::class);
         $user = $this->user();
-        $plan = SubscriptionPlan::query()->where('plan_key', 'demo-market-lite')->firstOrFail();
+        $plan = SubscriptionPlan::query()->where('plan_key', 'market-lite')->firstOrFail();
         UserSubscription::query()->create([
             'user_id' => $user->id,
             'subscription_plan_id' => $plan->id,
@@ -111,7 +111,7 @@ class GroupADailyShareRevenueTest extends TestCase
     {
         $this->seed(\Database\Seeders\SubscriptionPlanSeeder::class);
         $user = $this->user();
-        $plan = SubscriptionPlan::query()->where('plan_key', 'demo-market-lite')->firstOrFail();
+        $plan = SubscriptionPlan::query()->where('plan_key', 'market-lite')->firstOrFail();
         $plan->daily_task_limit = 1;
         $plan->save();
         UserSubscription::query()->create([

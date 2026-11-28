@@ -16,8 +16,14 @@ final class TransferTopupFunds
 
     public function handle(User $user, int $amountMinor, string $targetType, string $idempotencyKey): void
     {
-        if (! in_array($targetType, ['review_group_b', 'review_group_c', 'share', 'referral', 'bonus'], true)) {
-            throw ValidationException::withMessages(['target_wallet' => 'Funds can only be transferred to review, share, or referral wallets.']);
+        $transferTargets = array_map(
+            static fn (WalletType $type): string => $type->value,
+            WalletType::transferTargets(),
+        );
+        if (! in_array($targetType, $transferTargets, true)) {
+            throw ValidationException::withMessages([
+                'target_wallet' => 'Funds can only be transferred to a Group B/Group C review, share, referral or bonus wallet.',
+            ]);
         }
 
         DB::transaction(function () use ($user, $amountMinor, $targetType, $idempotencyKey): void {

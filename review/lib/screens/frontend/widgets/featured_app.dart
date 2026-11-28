@@ -7,7 +7,11 @@ import 'auto_slide_view.dart';
 class FeaturedApp extends StatefulWidget {
   final List<Map<String, dynamic>> apps;
 
-  const FeaturedApp({super.key, required this.apps});
+  /// Called when a visitor opens an app card. The landing page uses it to
+  /// offer registration/log-in to guests.
+  final ValueChanged<Map<String, dynamic>>? onOpenApp;
+
+  const FeaturedApp({super.key, required this.apps, this.onOpenApp});
 
   @override
   State<FeaturedApp> createState() => _FeaturedAppState();
@@ -83,7 +87,9 @@ class _FeaturedAppState extends State<FeaturedApp> {
                 side: BorderSide(color: colors.outlineVariant),
               ),
               child: InkWell(
-                onTap: () {},
+                onTap: widget.onOpenApp == null
+                    ? null
+                    : () => widget.onOpenApp!(app),
                 child: Padding(
                   padding: const EdgeInsets.all(15),
                   child: Column(
@@ -143,7 +149,9 @@ class _FeaturedAppState extends State<FeaturedApp> {
                           Text(_text(app['rating'], 'New')),
                           const Spacer(),
                           TextButton.icon(
-                            onPressed: () {},
+                            onPressed: widget.onOpenApp == null
+                                ? null
+                                : () => widget.onOpenApp!(app),
                             icon: const Icon(Icons.arrow_forward_rounded),
                             label: const Text('Details'),
                           ),

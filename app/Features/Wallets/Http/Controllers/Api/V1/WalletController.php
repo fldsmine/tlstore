@@ -6,12 +6,14 @@ use App\Application\Actions\Wallets\RequestWithdrawal;
 use App\Application\Actions\Wallets\TransferTopupFunds;
 use App\Application\Receipts\WithdrawalReceiptPdf;
 use App\Application\Security\SecurityPinHasher;
+use App\Enums\WalletType;
 use App\Models\LedgerEntry;
 use App\Models\Wallet;
 use App\Models\WithdrawalOption;
 use App\Models\SystemSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 final class WalletController
 {
@@ -59,7 +61,12 @@ final class WalletController
     {
         $data = $request->validate([
             'amount_minor' => ['required', 'integer', 'min:1'],
-            'target_wallet' => ['required', 'in:review,review_group_b,review_group_c,share,referral,bonus'],
+            // Same list as TransferTopupFunds (WalletType::transferTargets()):
+            // the legacy mixed `review` wallet is not a transfer target.
+            'target_wallet' => ['required', Rule::in(array_map(
+                static fn (WalletType $type): string => $type->value,
+                WalletType::transferTargets(),
+            ))],
             'idempotency_key' => ['required', 'string', 'max:80'],
         ]);
         $transfer->handle($request->user(), $data['amount_minor'], $data['target_wallet'], $data['idempotency_key']);

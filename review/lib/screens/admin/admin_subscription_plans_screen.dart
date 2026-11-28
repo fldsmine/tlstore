@@ -43,8 +43,6 @@ class _AdminSubscriptionPlansScreenState
   @override
   void initState() {
     super.initState();
-    _email.text = "admin@tlstore.test";
-    _password.text = "meandmyson";
   }
 
   Map<String, dynamic> _map(Object? value) => value is Map

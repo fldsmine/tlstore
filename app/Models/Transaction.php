@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Application\Money\CurrencyMinorUnits;
 use App\Enums\TransactionType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -35,7 +36,7 @@ class Transaction extends Model
 
     public function paymentIntents(): HasMany
     {
-        return $this->hasMany(PaymentIntent::class, 'source_id')->latest();
+        return $this->hasMany(PaymentIntent::class, 'source_id');
     }
 
     public function getIsCreditAttribute(): bool
@@ -45,7 +46,10 @@ class Transaction extends Model
 
     public function getSignedAmountAttribute(): string
     {
-        return ($this->is_credit ? '+' : '-').money($this->amount);
+        $currency = strtoupper((string) ($this->meta['currency'] ?? config('trustlens.default_currency', 'USD')));
+        $precision = CurrencyMinorUnits::precision($currency);
+
+        return ($this->is_credit ? '+' : '-').number_format((float) $this->amount, $precision, '.', '');
     }
 
     public function getNetAmountAttribute(): float
