@@ -3,6 +3,7 @@
 use App\Features\System\Http\Controllers\Web\LandingPageController;
 use App\Features\System\Http\Controllers\Web\WellKnownController;
 use App\Features\Admin\Http\Controllers\Web\AdminConsoleController;
+use App\Features\Admin\Http\Controllers\Web\UserAdminController;
 use App\Features\Admin\Http\Controllers\Web\GatewayPaymentAdminController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
@@ -105,8 +106,16 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('/review-templates/{template}/versions', [AdminConsoleController::class, 'createTemplateVersion'])->whereNumber('template')->name('review-templates.versions.store');
         Route::post('/review-templates/{template}/versions/{version}/publish', [AdminConsoleController::class, 'publishTemplateVersion'])->whereNumber('template')->whereNumber('version')->name('review-templates.versions.publish');
         Route::get('/modules/{module}/{record}/proof', [AdminConsoleController::class, 'moderationProof'])->name('modules.proof');
-        Route::get('/users/{user}', [AdminConsoleController::class, 'userDetail'])->whereNumber('user')->name('users.show');
-        Route::post('/users/{user}/actions/{action}', [AdminConsoleController::class, 'userAction'])->whereNumber('user')->name('users.action');
+        Route::get('/users', [UserAdminController::class, 'index'])->name('users.index');
+        Route::get('/users/{user}', [UserAdminController::class, 'show'])->whereNumber('user')->name('users.show');
+        Route::get('/users/{user}/wallet', [UserAdminController::class, 'wallet'])->whereNumber('user')->name('users.wallet');
+        Route::get('/users/{user}/tasks', [UserAdminController::class, 'tasks'])->whereNumber('user')->name('users.tasks');
+        Route::get('/users/{user}/withdrawals', [UserAdminController::class, 'withdrawals'])->whereNumber('user')->name('users.withdrawals');
+        Route::get('/users/{user}/referrals', [UserAdminController::class, 'referrals'])->whereNumber('user')->name('users.referrals');
+        Route::get('/users/{user}/notifications', [UserAdminController::class, 'notifications'])->whereNumber('user')->name('users.notifications');
+        Route::get('/users/{user}/activity', [UserAdminController::class, 'activity'])->whereNumber('user')->name('users.activity');
+        Route::patch('/users/{user}/profile', [UserAdminController::class, 'updateProfile'])->whereNumber('user')->name('users.profile.update');
+        Route::post('/users/{user}/actions/{action}', [UserAdminController::class, 'action'])->whereNumber('user')->name('users.action');
         Route::get('/modules/{module}', [AdminConsoleController::class, 'index'])->name('modules.index');
         Route::get('/modules/{module}/create', [AdminConsoleController::class, 'create'])->name('modules.create');
         Route::post('/modules/{module}', [AdminConsoleController::class, 'store'])->name('modules.store');
