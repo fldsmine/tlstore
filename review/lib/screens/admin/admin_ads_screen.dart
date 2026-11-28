@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -2002,19 +2003,15 @@ class _AdEditorState extends State<_AdEditor> {
                               const _CreativeFallback(),
                         )
                       : showRemote
-                      ? Image.network(
-                          previewUrl,
+                      ? CachedNetworkImage(
+                          imageUrl: previewUrl,
                           fit: BoxFit.cover,
-                          loadingBuilder:
-                              (BuildContext context, Widget child,
-                                  ImageChunkEvent? progress) {
-                                if (progress == null) return child;
-                                return const _CreativeFallback(
-                                  busy: true,
-                                );
-                              },
-                          errorBuilder: (BuildContext context, Object error,
-                                  StackTrace? trace) =>
+                          placeholder: (BuildContext context, String url) =>
+                              const _CreativeFallback(
+                                busy: true,
+                              ),
+                          errorWidget: (BuildContext context, String url,
+                                  Object error) =>
                               const _CreativeFallback(),
                         )
                       : const _CreativeFallback(),
@@ -2359,16 +2356,12 @@ class _AdThumb extends StatelessWidget {
         width: 56,
         height: 56,
         child: creative.startsWith('http')
-            ? Image.network(
-                creative,
+            ? CachedNetworkImage(
+                imageUrl: creative,
                 fit: BoxFit.cover,
-                loadingBuilder: (BuildContext context, Widget child,
-                    ImageChunkEvent? progress) {
-                  if (progress == null) return child;
-                  return fallback;
-                },
-                errorBuilder: (BuildContext context, Object error,
-                        StackTrace? trace) =>
+                placeholder: (BuildContext context, String url) => fallback,
+                errorWidget: (BuildContext context, String url,
+                        Object error) =>
                     fallback,
               )
             : fallback,

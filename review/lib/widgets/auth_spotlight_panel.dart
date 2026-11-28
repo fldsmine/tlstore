@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../features/marketplace/presentation/listing_kind.dart';
@@ -276,10 +277,10 @@ class _AuthSpotlightPanelState extends State<AuthSpotlightPanel> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: logo != null && logo.isNotEmpty
-                    ? Image.network(
-                        logo,
+                    ? CachedNetworkImage(
+                        imageUrl: logo,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const Icon(
+                        errorWidget: (_, _, _) => const Icon(
                           Icons.account_balance_wallet_outlined,
                           size: 20,
                         ),
@@ -335,11 +336,11 @@ class _ProductCard extends StatelessWidget {
           children: [
             Expanded(
               child: image != null && image.isNotEmpty
-                  ? Image.network(
-                      image,
+                  ? CachedNetworkImage(
+                      imageUrl: image,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _imagePlaceholder(),
+                      errorWidget: (_, _, _) => _imagePlaceholder(),
                     )
                   : _imagePlaceholder(),
             ),
@@ -464,10 +465,10 @@ class _FeaturedListing extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: image != null && image.startsWith('http')
-                      ? Image.network(
-                          image,
+                      ? CachedNetworkImage(
+                          imageUrl: image,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Icon(
+                          errorWidget: (_, _, _) => Icon(
                             isApp
                                 ? Icons.apps_rounded
                                 : Icons.campaign_outlined,

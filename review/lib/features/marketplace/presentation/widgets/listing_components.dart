@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/currency/money.dart' as currency_money;
@@ -126,10 +127,10 @@ class ListingCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: image != null && image.startsWith('http')
-                        ? Image.network(
-                            image,
+                        ? CachedNetworkImage(
+                            imageUrl: image,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Icon(
+                            errorWidget: (_, _, _) => Icon(
                               review
                                   ? Icons.apps_rounded
                                   : Icons.campaign_outlined,

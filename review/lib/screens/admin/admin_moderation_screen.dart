@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -457,7 +458,7 @@ class _AdminModerationScreenState extends State<AdminModerationScreen>
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             ListTile(title: Text(title), trailing: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded))),
             const Divider(height: 1),
-            Flexible(child: InteractiveViewer(child: Image.network(ApiConfig.endpoint(path).toString(), headers: {'Accept': 'image/*', 'Authorization': 'Bearer $token'}, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Could not display this evidence file.')))))),
+            Flexible(child: InteractiveViewer(child: CachedNetworkImage(imageUrl: ApiConfig.endpoint(path).toString(), httpHeaders: {'Accept': 'image/*', 'Authorization': 'Bearer $token'}, fit: BoxFit.contain, errorWidget: (_, __, ___) => const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Could not display this evidence file.')))))),
           ]),
         ),
       ),

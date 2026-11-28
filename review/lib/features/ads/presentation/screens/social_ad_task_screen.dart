@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -205,10 +206,10 @@ class _SocialAdTaskScreenState extends State<SocialAdTaskScreen> {
                             _icon(_platform),
                             color: colors.onPrimaryContainer,
                           )
-                        : Image.network(
-                            image,
+                        : CachedNetworkImage(
+                            imageUrl: image,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Icon(
+                            errorWidget: (_, _, _) => Icon(
                               _icon(_platform),
                               color: colors.onPrimaryContainer,
                             ),

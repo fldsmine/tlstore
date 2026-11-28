@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -1794,13 +1795,13 @@ class _AppIcon extends StatelessWidget {
         height: size,
         child: url == null || !url!.startsWith('http')
             ? fallback
-            : Image.network(
-                url!,
+            : CachedNetworkImage(
+                imageUrl: url!,
                 fit: BoxFit.cover,
-                errorBuilder: (
+                errorWidget: (
                   BuildContext context,
+                  String url,
                   Object error,
-                  StackTrace? trace,
                 ) => fallback,
               ),
       ),
@@ -3412,10 +3413,10 @@ class _ExistingScreenshotTile extends StatelessWidget {
                     color: theme.colorScheme.surfaceContainerHighest,
                     child: url == null || url.isEmpty
                         ? const Icon(Icons.image_not_supported_outlined)
-                        : Image.network(
-                            url,
+                        : CachedNetworkImage(
+                            imageUrl: url,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
+                            errorWidget: (_, _, _) =>
                                 const Icon(Icons.broken_image_outlined),
                           ),
                   ),

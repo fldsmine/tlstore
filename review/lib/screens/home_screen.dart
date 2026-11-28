@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:review/screens/addons_screen.dart';
@@ -1398,10 +1399,10 @@ class _HomeScreenState extends State<HomeScreen>
     final avatar = _sessionUser['avatar']?.toString();
     return ClipOval(
       child: avatar != null && avatar.isNotEmpty
-          ? Image.network(
-              avatar,
+          ? CachedNetworkImage(
+              imageUrl: avatar,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _avatarPlaceholder(),
+              errorWidget: (_, _, _) => _avatarPlaceholder(),
             )
           : _avatarPlaceholder(),
     );

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1637,10 +1638,10 @@ class _TaskImage extends StatelessWidget {
       height: 66,
       child: url == null
           ? _fallback()
-          : Image.network(
-              url!,
+          : CachedNetworkImage(
+              imageUrl: url!,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _fallback(),
+              errorWidget: (_, _, _) => _fallback(),
             ),
     ),
   );

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:review/core/theme/app_colors.dart';
@@ -433,10 +434,10 @@ class _ProviderLogo extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: remote != null
-          ? Image.network(
-              remote,
+          ? CachedNetworkImage(
+              imageUrl: remote,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => fallback,
+              errorWidget: (_, __, ___) => fallback,
             )
           : asset != null
           ? Image.asset(
@@ -469,10 +470,10 @@ class _ServiceArt extends StatelessWidget {
     final art = _serviceArt(serviceKey);
     final Widget content;
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-      content = Image.network(
-        imageUrl!,
+      content = CachedNetworkImage(
+        imageUrl: imageUrl!,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _iconTile(),
+        errorWidget: (_, __, ___) => _iconTile(),
       );
     } else if (art.isEmpty) {
       content = _iconTile();

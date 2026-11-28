@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2469,10 +2470,10 @@ class _ProfileHero extends StatelessWidget {
         ),
         if (coverUrl != null)
           Positioned.fill(
-            child: Image.network(
-              coverUrl!,
+            child: CachedNetworkImage(
+              imageUrl: coverUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+              errorWidget: (context, url, error) => const SizedBox.shrink(),
             ),
           ),
         if (coverUrl == null) ...<Widget>[
@@ -2570,10 +2571,10 @@ class _ProfileHero extends StatelessWidget {
                     color: scheme.onSecondaryContainer,
                   ),
                 )
-              : Image.network(
-                  avatarUrl!,
+              : CachedNetworkImage(
+                  imageUrl: avatarUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stack) => Container(
+                  errorWidget: (context, url, error) => Container(
                     color: scheme.secondaryContainer,
                     alignment: Alignment.center,
                     child: Icon(
@@ -3436,7 +3437,7 @@ class _MediaRow extends StatelessWidget {
                           color: colors.onPrimaryContainer,
                         ),
                       )
-                    : Image.network(url!, fit: BoxFit.cover),
+                    : CachedNetworkImage(imageUrl: url!, fit: BoxFit.cover),
               ),
             ),
     );

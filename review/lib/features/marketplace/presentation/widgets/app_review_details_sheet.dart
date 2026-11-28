@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../services/media_url.dart';
@@ -141,10 +142,10 @@ class AppReviewDetailsSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                       child: AspectRatio(
                         aspectRatio: .72,
-                        child: Image.network(
-                          screenshots[index],
+                        child: CachedNetworkImage(
+                          imageUrl: screenshots[index],
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => ColoredBox(
+                          errorWidget: (_, _, _) => ColoredBox(
                             color: scheme.surfaceContainerHighest,
                             child: const Center(
                               child: Icon(Icons.broken_image_outlined),
@@ -250,10 +251,10 @@ class AppScreenshotGalleryPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: InteractiveViewer(
           child: Center(
-            child: Image.network(
-              screenshots[index],
+            child: CachedNetworkImage(
+              imageUrl: screenshots[index],
               fit: BoxFit.contain,
-              errorBuilder: (_, _, _) =>
+              errorWidget: (_, _, _) =>
                   const Icon(Icons.broken_image_outlined, size: 48),
             ),
           ),
@@ -282,10 +283,10 @@ class _AppDetailsIcon extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
             )
-          : Image.network(
-              url!,
+          : CachedNetworkImage(
+              imageUrl: url!,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => ColoredBox(
+              errorWidget: (_, _, _) => ColoredBox(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 child: Icon(
                   Icons.apps_rounded,

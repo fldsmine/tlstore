@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../services/media_url.dart';
@@ -175,10 +176,10 @@ class _ScreenshotStrip extends StatelessWidget {
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                urls[index],
+              child: CachedNetworkImage(
+                imageUrl: urls[index],
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
+                errorWidget: (_, _, _) =>
                     const _ImagePlaceholder(icon: Icons.phone_android_rounded),
               ),
             ),
@@ -201,10 +202,10 @@ class _AppIcon extends StatelessWidget {
       height: 46,
       child: url == null
           ? const _ImagePlaceholder(icon: Icons.apps_rounded)
-          : Image.network(
-              url!,
+          : CachedNetworkImage(
+              imageUrl: url!,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
+              errorWidget: (_, _, _) =>
                   const _ImagePlaceholder(icon: Icons.apps_rounded),
             ),
     ),
