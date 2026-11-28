@@ -61,6 +61,9 @@
     @endif
 </div>
 
+@if($activeTab === 'environment')
+    @include('admin.settings.environment')
+@else
 <form method="POST" action="{{ route('admin.settings.update') }}" novalidate>
     @csrf
     @method('PATCH')
@@ -97,7 +100,9 @@
     </div>
 </form>
 
-@if($sensitiveKeys !== [])
+@endif
+
+@if($activeTab !== 'environment' && $sensitiveKeys !== [])
     <section class="card" style="margin-top:16px">
         <div class="section-head"><div><h2>Protected values</h2><p class="muted" style="margin:4px 0 0">Secrets are never shown in this console. Configure them on their own screens or in the server environment.</p></div></div>
         <div class="stack">

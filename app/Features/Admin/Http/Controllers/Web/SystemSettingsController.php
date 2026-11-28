@@ -2,6 +2,8 @@
 
 namespace App\Features\Admin\Http\Controllers\Web;
 
+use App\Application\Settings\EnvironmentSettingsManager;
+use App\Application\Settings\EnvironmentSettingsSchema;
 use App\Application\Settings\SystemSettingsManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,15 +34,35 @@ final class SystemSettingsController
         $tabs = $this->manager->tabs($settings);
         $tab = $this->resolveTab($request->query('tab', $request->old('tab')), $tabs);
 
-        return view('admin.settings.index', [
+        $data = [
             'title' => 'System settings',
             'tabs' => $tabs,
             'activeTab' => $tab,
             'activeTabMeta' => $tabs[$tab],
-            'fields' => $this->manager->fields($tab, $settings),
-            'sensitiveKeys' => $this->manager->sensitiveKeys($settings),
+            'fields' => [],
+            'sensitiveKeys' => [],
             'settingCount' => $settings->count(),
-        ]);
+        ];
+
+        if ($tab === 'environment') {
+            $environment = app(EnvironmentSettingsManager::class);
+            $state = $environment->sections();
+
+            $data += [
+                'envSections' => $state['sections'],
+                'envConfigured' => $state['configured'],
+                'envProviderCount' => $state['total'],
+                'envProblem' => $environment->problem(),
+                'envPath' => $environment->file()->path(),
+                'envBackup' => $environment->file()->backupPath(),
+                'envServerManaged' => EnvironmentSettingsSchema::serverManaged(),
+            ];
+        } else {
+            $data['fields'] = $this->manager->fields($tab, $settings);
+            $data['sensitiveKeys'] = $this->manager->sensitiveKeys($settings);
+        }
+
+        return view('admin.settings.index', $data);
     }
 
     public function update(Request $request): RedirectResponse

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Application\Settings\EnvironmentFile;
 use App\Models\LedgerEntry;
 use App\Models\Notification;
 use App\Observers\LedgerEntryObserver;
@@ -18,7 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // The console edits the deployment's .env file; tests bind a temp file.
+        $this->app->bind(EnvironmentFile::class, static fn (): EnvironmentFile => new EnvironmentFile(base_path('.env')));
     }
 
     /**

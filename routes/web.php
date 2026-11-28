@@ -8,6 +8,7 @@ use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
 use App\Features\Admin\Http\Controllers\Web\TelegramAdminController;
 use App\Features\Admin\Http\Controllers\Web\SystemSettingsController;
+use App\Features\Admin\Http\Controllers\Web\EnvironmentSettingsController;
 use App\Features\Support\Http\Controllers\Web\ContactController;
 use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
@@ -81,6 +82,8 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         // Friendly settings console: one tab per system_settings group.
         Route::get('/settings', [SystemSettingsController::class, 'index'])->name('settings.index');
         Route::patch('/settings', [SystemSettingsController::class, 'update'])->middleware('throttle:60,1')->name('settings.update');
+        // Provider credentials written straight to the deployment's .env file.
+        Route::patch('/settings/api-keys', [EnvironmentSettingsController::class, 'update'])->middleware('throttle:30,1')->name('settings.environment.update');
         Route::get('/notifications', [NotificationTemplateAdminController::class, 'index'])->name('notifications.index');
         Route::patch('/notifications/settings', [NotificationTemplateAdminController::class, 'updateSettings'])->name('notifications.settings');
         Route::post('/notifications/test', [NotificationTemplateAdminController::class, 'sendTest'])->middleware('throttle:3,1')->name('notifications.test');

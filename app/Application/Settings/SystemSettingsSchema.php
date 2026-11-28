@@ -103,7 +103,7 @@ final class SystemSettingsSchema
                 'icon' => '₦',
                 'description' => 'Which gateways and currencies customers may pay with, and who verifies payout account names.',
                 'settings' => [
-                    'payment.active_gateways' => ['label' => 'Gateways & currencies', 'section' => 'Payment gateways', 'type' => 'gateways', 'help' => 'Tick every currency each gateway should accept. A gateway only appears to customers when its API keys are set on the server.'],
+                    'payment.active_gateways' => ['label' => 'Gateways & currencies', 'section' => 'Payment gateways', 'type' => 'gateways', 'link_tab' => 'environment', 'help' => 'Tick every currency each gateway should accept. A gateway only appears to customers once its API keys are saved.'],
                     'account_validation.provider' => ['label' => 'Payout account validation', 'section' => 'Account validation', 'type' => 'select_wrapped', 'wrap' => 'provider', 'required' => true, 'options' => [
                         'paystack' => 'Paystack',
                         'flutterwave' => 'Flutterwave',

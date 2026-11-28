@@ -198,6 +198,10 @@
         <span class="field-help">{{ $field['help'] }}</span>
     @endif
 
+    @if($field['link_tab'])
+        <a class="link" style="font-size:11px" href="{{ route('admin.settings.index', ['tab' => $field['link_tab']]) }}">Set the provider keys →</a>
+    @endif
+
     @if($field['updated_at'])
         <span class="field-help">Last updated {{ $field['updated_at'] }}@if($field['updated_by']) by {{ $field['updated_by'] }}@endif.</span>
     @endif

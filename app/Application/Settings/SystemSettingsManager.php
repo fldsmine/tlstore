@@ -39,7 +39,21 @@ final class SystemSettingsManager
             ];
         }
 
-        $tabs['advanced']['count'] = count($this->unmanagedKeys($settings));
+        // Credentials live in .env, not in system_settings, but they belong to
+        // the same console: insert the tab before the catch-all JSON editor.
+        $advanced = $tabs['advanced'] ?? null;
+        unset($tabs['advanced']);
+        $tabs['environment'] = [
+            'label' => 'API keys & secrets',
+            'icon' => '🔑',
+            'description' => 'Provider credentials, portal IDs and switches written to the deployment .env file.',
+            'count' => EnvironmentSettingsSchema::keyCount(),
+            'link' => null,
+        ];
+        if ($advanced !== null) {
+            $tabs['advanced'] = $advanced;
+            $tabs['advanced']['count'] = count($this->unmanagedKeys($settings));
+        }
 
         return $tabs;
     }
@@ -279,6 +293,7 @@ final class SystemSettingsManager
             'uppercase' => (bool) ($definition['uppercase'] ?? false),
             'disabled' => (bool) ($definition['disabled'] ?? false),
             'required' => (bool) ($definition['required'] ?? false),
+            'link_tab' => $definition['link_tab'] ?? null,
             'key_label' => $definition['key_label'] ?? 'Key',
             'value_label' => $definition['value_label'] ?? 'Value',
             'options' => $definition['options'] ?? [],
