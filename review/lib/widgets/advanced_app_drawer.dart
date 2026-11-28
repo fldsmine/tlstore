@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
@@ -187,7 +188,7 @@ class AdvancedAppDrawer extends StatelessWidget {
                                 backgroundColor: colors.surface,
                                 foregroundImage: avatar == null
                                     ? null
-                                    : NetworkImage(avatar),
+                                    : CachedNetworkImageProvider(avatar),
                                 child: Icon(
                                   Icons.person_rounded,
                                   color: colors.primary,

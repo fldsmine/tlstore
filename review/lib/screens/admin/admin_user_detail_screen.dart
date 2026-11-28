@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -452,7 +453,9 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen>
             child: Row(children: [
               CircleAvatar(
                 radius: 32,
-                backgroundImage: avatar.isEmpty ? null : NetworkImage(avatar),
+                backgroundImage: avatar.isEmpty
+                    ? null
+                    : CachedNetworkImageProvider(avatar),
                 child: avatar.isEmpty ? Text(name.isEmpty ? '?' : name.substring(0, 1).toUpperCase()) : null,
               ),
               const SizedBox(width: 14),

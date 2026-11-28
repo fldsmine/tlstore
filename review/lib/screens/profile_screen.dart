@@ -3416,7 +3416,9 @@ class _MediaRow extends StatelessWidget {
           ? CircleAvatar(
               radius: 24,
               backgroundColor: colors.primaryContainer,
-              backgroundImage: url == null ? null : NetworkImage(url!),
+              backgroundImage: url == null || url!.isEmpty
+                  ? null
+                  : CachedNetworkImageProvider(url!),
               child: url == null
                   ? Icon(
                       Icons.person_outline,

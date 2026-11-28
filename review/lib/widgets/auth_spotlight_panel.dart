@@ -533,7 +533,9 @@ class _TestimonialCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final avatar = testimony['avatar']?.toString();
     return Padding(padding: const EdgeInsets.only(right: 10), child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13), border: Border.all(color: const Color(0xFFE5E9E3))), child: Row(children: [
-      CircleAvatar(radius: 26, backgroundColor: softGreen, backgroundImage: avatar != null && avatar.isNotEmpty ? NetworkImage(avatar) : null, child: avatar == null || avatar.isEmpty ? const Icon(Icons.person_outline, color: brandGreen) : null),
+      CircleAvatar(radius: 26, backgroundColor: softGreen, backgroundImage: avatar != null && avatar.isNotEmpty
+          ? CachedNetworkImageProvider(avatar)
+          : null, child: avatar == null || avatar.isEmpty ? const Icon(Icons.person_outline, color: brandGreen) : null),
       const SizedBox(width: 11), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(testimony['content']?.toString() ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.3, fontWeight: FontWeight.w600, color: ink)), const SizedBox(height: 5), Text('${testimony['name'] ?? 'Member'}  •  ★ ${testimony['rating'] ?? ''}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: brandGreen))]))
     ])));
   }
