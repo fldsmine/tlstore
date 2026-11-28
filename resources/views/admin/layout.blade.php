@@ -26,10 +26,10 @@
                 'Packages & rewards' => ['subscription-groups' => 'Subscription groups', 'subscription-plans' => 'Subscription plans', 'package-addons' => 'Package addons', 'rank-levels' => 'Ranking levels', 'referrals' => 'Referrals'],
                 'Moderation' => ['review-moderation' => 'App reviews', 'share-moderation' => 'Ad shares', 'social-follow-activity' => 'Social follow rewards', 'deposit-moderation' => 'Manual deposits', 'admin.gateway-payments.index' => 'Gateway payments', 'admin.gateway-balances.index' => 'Gateway balances', 'withdrawal-moderation' => 'Withdrawals', 'campaign-orders' => 'Campaign orders', 'app-reports' => 'App reports', 'admin.support-tickets.index' => 'Support tickets'],
                 'Platform content' => ['review-questions' => 'Review questions', 'review-templates' => 'Question templates', 'announcements' => 'Announcements', 'faqs' => 'FAQs', 'testimonials' => 'Testimonials', 'legal-documents' => 'Privacy & terms', 'admin.notifications.index' => 'Email & notification templates', 'admin.telegram.index' => 'Telegram messaging'],
-                'Configuration' => ['system-settings' => 'System settings', 'payment-options' => 'Payment gateways', 'withdrawal-options' => 'Withdrawal methods', 'banks' => 'Banks', 'countries' => 'Countries', 'regions' => 'Regions', 'region-countries' => 'Region coverage', 'social-handles' => 'Social platforms', 'app-versions' => 'App versions', 'exchange-rates' => 'Exchange rates', 'vtu-orders' => 'VAS orders', 'audit-logs' => 'Audit log'],
+                'Configuration' => ['admin.settings.index' => 'System settings', 'payment-options' => 'Payment gateways', 'withdrawal-options' => 'Withdrawal methods', 'banks' => 'Banks', 'countries' => 'Countries', 'regions' => 'Regions', 'region-countries' => 'Region coverage', 'social-handles' => 'Social platforms', 'app-versions' => 'App versions', 'exchange-rates' => 'Exchange rates', 'vtu-orders' => 'VAS orders', 'audit-logs' => 'Audit log'],
             ];
             $roleModules = match ($role) {
-                'super_admin' => [...array_keys(config('admin.modules')), 'admin.support-tickets.index', 'admin.notifications.index', 'admin.telegram.index', 'admin.gateway-payments.index', 'admin.gateway-balances.index'],
+                'super_admin' => [...array_keys(config('admin.modules')), 'admin.settings.index', 'admin.support-tickets.index', 'admin.notifications.index', 'admin.telegram.index', 'admin.gateway-payments.index', 'admin.gateway-balances.index'],
                 'admin' => [...array_values(array_diff(array_keys(config('admin.modules')), ['admins', 'system-settings'])), 'admin.support-tickets.index', 'admin.notifications.index', 'admin.telegram.index', 'admin.gateway-payments.index'],
                 'content_admin' => ['apps','review-campaigns','ads','subscription-groups','subscription-plans','package-addons','review-questions','review-templates','announcements','faqs','testimonials','legal-documents','countries','regions','region-countries','social-handles','app-versions'],
                 'moderator' => ['review-moderation','share-moderation','social-follow-activity','app-reports','campaign-orders','users','admin.support-tickets.index'],
@@ -51,6 +51,8 @@
                             <a class="nav-link {{ request()->routeIs('admin.notifications.*') ? 'active' : '' }}" href="{{ route('admin.notifications.index') }}"><span class="nav-icon">✉</span>{{ $label }}</a>
                         @elseif($key === 'admin.telegram.index')
                             <a class="nav-link {{ request()->routeIs('admin.telegram.*') ? 'active' : '' }}" href="{{ route('admin.telegram.index') }}"><span class="nav-icon">➤</span>{{ $label }}</a>
+                        @elseif($key === 'admin.settings.index')
+                            <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}" href="{{ route('admin.settings.index') }}"><span class="nav-icon">⚙</span>{{ $label }}</a>
                         @elseif($key === 'admin.gateway-payments.index')
                             <a class="nav-link {{ request()->routeIs('admin.gateway-payments.*') ? 'active' : '' }}" href="{{ route('admin.gateway-payments.index') }}"><span class="nav-icon">₦</span>{{ $label }}</a>
                         @elseif($key === 'admin.gateway-balances.index')

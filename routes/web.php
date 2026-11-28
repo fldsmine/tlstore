@@ -7,6 +7,7 @@ use App\Features\Admin\Http\Controllers\Web\GatewayPaymentAdminController;
 use App\Features\Admin\Http\Controllers\Web\AdminSupportTicketController;
 use App\Features\Admin\Http\Controllers\Web\NotificationTemplateAdminController;
 use App\Features\Admin\Http\Controllers\Web\TelegramAdminController;
+use App\Features\Admin\Http\Controllers\Web\SystemSettingsController;
 use App\Features\Support\Http\Controllers\Web\ContactController;
 use App\Http\Middleware\EnsureAdminWebAccount;
 use App\Services\TelegramBotUsername;
@@ -77,6 +78,9 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('/gateway-payments/{intent}/revalidate', [GatewayPaymentAdminController::class, 'revalidate'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.revalidate');
         Route::post('/gateway-payments/{intent}/decision', [GatewayPaymentAdminController::class, 'decide'])->whereNumber('intent')->middleware('throttle:30,1')->name('gateway-payments.decision');
         Route::get('/gateway-balances', [GatewayPaymentAdminController::class, 'balances'])->middleware('throttle:20,1')->name('gateway-balances.index');
+        // Friendly settings console: one tab per system_settings group.
+        Route::get('/settings', [SystemSettingsController::class, 'index'])->name('settings.index');
+        Route::patch('/settings', [SystemSettingsController::class, 'update'])->middleware('throttle:60,1')->name('settings.update');
         Route::get('/notifications', [NotificationTemplateAdminController::class, 'index'])->name('notifications.index');
         Route::patch('/notifications/settings', [NotificationTemplateAdminController::class, 'updateSettings'])->name('notifications.settings');
         Route::post('/notifications/test', [NotificationTemplateAdminController::class, 'sendTest'])->middleware('throttle:3,1')->name('notifications.test');
